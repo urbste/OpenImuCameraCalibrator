@@ -3,7 +3,7 @@ if (COMMAND cmake_policy)
   cmake_policy(SET CMP0003 NEW)
 endif (COMMAND cmake_policy)
 
-project(CameraCalibrator C CXX)
+project(OpenCameraCalibrator C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_STANDARD 11)
@@ -29,7 +29,6 @@ endif (THEIA_FOUND)
 add_subdirectory(applications)
 
 include_directories(include
-    include/CameraCalibrator/spline
     ${THEIA_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS})
 

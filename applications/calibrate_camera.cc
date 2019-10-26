@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
   bool validPose = false;
   bool showRejected = false;
   int cnt_wrong = 0;
-  const int skip_frames = 10;
+  const int skip_frames = 1;
   int frame_cnt = 0;
   bool first_detection = false;  // at the first detection fill a theia
                                  // reconstruction with keypoints
@@ -198,13 +198,13 @@ int main(int argc, char* argv[]) {
     theia::RadialDistUncalibratedAbsolutePose pose;
     theia::RansacSummary ransac_summary;
     theia::RadialDistUncalibratedAbsolutePoseMetaData meta_data;
-    meta_data.max_focal_length = 1500;
+    meta_data.max_focal_length = 1200;
     meta_data.min_focal_length = 500;
     theia::EstimateRadialDistUncalibratedAbsolutePose(
         ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
         &pose, &ransac_summary);
 
-    if (ransac_summary.inliers.size() < charucoIds.size() * 0.4) continue;
+    if (ransac_summary.inliers.size() < charucoIds.size() * 0.5) continue;
 
     // fill charucoCorners to theia reconstruction
     theia::ViewId view_id =
@@ -216,6 +216,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Estimated radial distortion: " << pose.radial_distortion
               << std::endl
               << std::endl;
+    std::cout<< "Number of Ransac inliers: "<<ransac_summary.inliers.size()<<std::endl;
 
     theia::Camera* cam = view->MutableCamera();
     cam->SetImageSize(image.cols, image.rows);
@@ -256,7 +257,10 @@ int main(int argc, char* argv[]) {
   //            theia::OptimizeIntrinsicsType::RADIAL_DISTORTION ||
   //            theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS ||
   //            theia::OptimizeIntrinsicsType::ASPECT_RATIO;
-  theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset);
+  theia::BundleAdjustmentSummary summary = theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset);
+
+  std::cout<<"Optimized camera focal length: "<<recon_calib_dataset.MutableView(0)->Camera().FocalLength()<<std::endl;
+  std::cout<<"Mean reprojection error: "<<summary.final_cost / recon_calib_dataset.NumViews() / charuco_id_to_theia_track_id.size()<<std::endl;
 
   return 0;
 }
