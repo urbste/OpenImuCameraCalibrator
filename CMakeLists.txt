@@ -6,7 +6,7 @@ endif (COMMAND cmake_policy)
 project(OpenCameraCalibrator C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 # OpenCV
 message("-- Check for OpenCV")
@@ -26,12 +26,13 @@ else (THEIA_FOUND)
   message("Cannot find TheiaSfM!")
 endif (THEIA_FOUND)
 
-add_subdirectory(applications)
+file(GLOB_RECURSE CAMCALIB_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/*.cc)
+file(GLOB_RECURSE CAMCALIB_HEADER_FILES ${CMAKE_SOURCE_DIR}/include/*.h)
 
-include_directories(include
+include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/include
     ${THEIA_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS})
 
-file(GLOB_RECURSE CAMCALIB_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/*.cc)
-
-add_library(CameraCalibrator STATIC ${CAMCALIB_SOURCE_FILES})
+add_library(OpenCameraCalibrator STATIC ${CAMCALIB_SOURCE_FILES})
+add_subdirectory(applications)

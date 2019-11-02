@@ -16,38 +16,13 @@
 #include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/opencv.hpp>
 
+#include "OpenCameraCalibrator/utils/utils.h"
+
 using namespace cv;
 
 DEFINE_string(input_video, "", "Path to save charuco board to.");
 DEFINE_string(detector_params, "", "Path detector yaml.");
 
-static bool ReadDetectorParameters(std::string filename,
-                                   Ptr<aruco::DetectorParameters>& params) {
-  FileStorage fs(filename, FileStorage::READ);
-  if (!fs.isOpened()) return false;
-  fs["adaptiveThreshWinSizeMin"] >> params->adaptiveThreshWinSizeMin;
-  fs["adaptiveThreshWinSizeMax"] >> params->adaptiveThreshWinSizeMax;
-  fs["adaptiveThreshWinSizeStep"] >> params->adaptiveThreshWinSizeStep;
-  fs["adaptiveThreshConstant"] >> params->adaptiveThreshConstant;
-  fs["minMarkerPerimeterRate"] >> params->minMarkerPerimeterRate;
-  fs["maxMarkerPerimeterRate"] >> params->maxMarkerPerimeterRate;
-  fs["polygonalApproxAccuracyRate"] >> params->polygonalApproxAccuracyRate;
-  fs["minCornerDistanceRate"] >> params->minCornerDistanceRate;
-  fs["minDistanceToBorder"] >> params->minDistanceToBorder;
-  fs["minMarkerDistanceRate"] >> params->minMarkerDistanceRate;
-  fs["cornerRefinementMethod"] >> params->cornerRefinementMethod;
-  fs["cornerRefinementWinSize"] >> params->cornerRefinementWinSize;
-  fs["cornerRefinementMaxIterations"] >> params->cornerRefinementMaxIterations;
-  fs["cornerRefinementMinAccuracy"] >> params->cornerRefinementMinAccuracy;
-  fs["markerBorderBits"] >> params->markerBorderBits;
-  fs["perspectiveRemovePixelPerCell"] >> params->perspectiveRemovePixelPerCell;
-  fs["perspectiveRemoveIgnoredMarginPerCell"] >>
-      params->perspectiveRemoveIgnoredMarginPerCell;
-  fs["maxErroneousBitsInBorderRate"] >> params->maxErroneousBitsInBorderRate;
-  fs["minOtsuStdDev"] >> params->minOtsuStdDev;
-  fs["errorCorrectionRate"] >> params->errorCorrectionRate;
-  return true;
-}
 
 std::vector<std::string> load_images(const std::string& img_dir_path) {
   DIR* dir;
@@ -92,8 +67,7 @@ int main(int argc, char* argv[]) {
   Ptr<aruco::DetectorParameters> detectorParams =
       aruco::DetectorParameters::create();
 
-  bool readOk = ReadDetectorParameters(FLAGS_detector_params, detectorParams);
-  if (!readOk) {
+  if (!OpenCamCalib::ReadDetectorParameters(FLAGS_detector_params, detectorParams)) {
     std::cerr << "Invalid detector parameters file\n";
     return 0;
   }

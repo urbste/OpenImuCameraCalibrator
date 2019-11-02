@@ -11,6 +11,8 @@
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/aruco/dictionary.hpp>
 
+
+
 // Input/output files.
 DEFINE_string(save_charuco_image, "", "Path to save charuco board to.");
 
