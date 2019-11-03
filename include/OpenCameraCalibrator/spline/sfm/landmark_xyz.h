@@ -32,7 +32,7 @@ class LandmarkXYZ {
   std::vector<std::shared_ptr<ObservationXYZ>> observations() const;
 
   Eigen::Vector4d get_point() const;
-  void set_point(const Eigen::Vector3d& pt);
+  void set_point(const Eigen::Vector4d& pt);
   double* xyz_ptr();
 
   bool IsLocked() const;

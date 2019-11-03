@@ -32,4 +32,3 @@ class ObservationXYZ {
 } // namespace sfm
 } // namespace kontiki
 
-#endif //KONTIKI_OBSERVATION_H

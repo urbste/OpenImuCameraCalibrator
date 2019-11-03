@@ -37,4 +37,3 @@ double ObservationXYZ::v() const { return uv_(1); }
 }  // namespace sfm
 }  // namespace kontiki
 
-#endif  // KONTIKIV2_OBSERVATIONXYZ_IMPL_H

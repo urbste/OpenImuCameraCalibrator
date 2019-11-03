@@ -8,10 +8,10 @@ namespace sfm {
 class ObservationXYZ;
 class LandmarkXYZ;
 
-class View : public std::enable_shared_from_this<View> {
+class ViewXYZ : public std::enable_shared_from_this<ViewXYZ> {
  public:
-  View(size_t frame, double t0);
-  ~View();
+  ViewXYZ(size_t frame, double t0);
+  ~ViewXYZ();
 
   size_t frame_nr() const;
   void set_frame_nr(size_t fnr);
@@ -19,7 +19,7 @@ class View : public std::enable_shared_from_this<View> {
   void set_t0(double t0);
 
   std::vector<std::shared_ptr<ObservationXYZ>> observations() const;
-  std::shared_ptr<Observation> CreateObservation(std::shared_ptr<LandmarkXYZ> landmark, const Eigen::Vector2d &uv);
+  std::shared_ptr<ObservationXYZ> CreateObservation(std::shared_ptr<LandmarkXYZ> landmark, const Eigen::Vector2d &uv);
   void RemoveObservation(std::shared_ptr<ObservationXYZ> obs);
 
  protected:
@@ -30,4 +30,3 @@ class View : public std::enable_shared_from_this<View> {
 
 } // namespace sfm
 } // namespace kontiki
-#endif //KONTIKI_VIEW_H

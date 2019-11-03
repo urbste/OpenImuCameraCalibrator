@@ -6,10 +6,10 @@
 namespace kontiki {
 namespace sfm {
 
-View::View(size_t frame, double t0)
+ViewXYZ::ViewXYZ(size_t frame, double t0)
     : frame_nr_(frame), t0_(t0) {};
 
-View::~View() {
+ViewXYZ::~ViewXYZ() {
   // Make sure a View that is destroyed propagate observations removed
   std::vector<std::shared_ptr<ObservationXYZ>> obs_copy(observations_);
   for (auto obs : obs_copy) {
@@ -17,28 +17,28 @@ View::~View() {
   }
 }
 
-size_t View::frame_nr() const {
+size_t ViewXYZ::frame_nr() const {
   return frame_nr_;
 }
 
-void View::set_frame_nr(size_t fnr) {
+void ViewXYZ::set_frame_nr(size_t fnr) {
   frame_nr_ = fnr;
 }
 
-double View::t0() const {
+double ViewXYZ::t0() const {
   return t0_;
 }
 
-void View::set_t0(double t0) {
+void ViewXYZ::set_t0(double t0) {
   t0_ = t0;
 }
 
-std::vector<std::shared_ptr<ObservationXYZ>> View::observations() const {
+std::vector<std::shared_ptr<ObservationXYZ>> ViewXYZ::observations() const {
   return observations_;
 
 }
 
-std::shared_ptr<ObservationXYZ> View::CreateObservation(std::shared_ptr<LandmarkXYZ> landmark, const Eigen::Vector2d &uv) {
+std::shared_ptr<ObservationXYZ> ViewXYZ::CreateObservation(std::shared_ptr<LandmarkXYZ> landmark, const Eigen::Vector2d &uv) {
   // Create and store the new observation
   auto obs = std::make_shared<ObservationXYZ>(uv, landmark, shared_from_this());
   observations_.push_back(obs);
@@ -49,7 +49,7 @@ std::shared_ptr<ObservationXYZ> View::CreateObservation(std::shared_ptr<Landmark
   return obs;
 }
 
-void View::RemoveObservation(std::shared_ptr<ObservationXYZ> obs) {
+void ViewXYZ::RemoveObservation(std::shared_ptr<ObservationXYZ> obs) {
   // Find and remove the landmark from the view's list
   auto it = std::find(observations_.begin(), observations_.end(), obs);
   if (it!=observations_.end()) {
@@ -65,4 +65,3 @@ void View::RemoveObservation(std::shared_ptr<ObservationXYZ> obs) {
 } // namespace sfm
 } // namespace kontiki
 
-#endif //KONTIKIV2_VIEW_IMPL_H
