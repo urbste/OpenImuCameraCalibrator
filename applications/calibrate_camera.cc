@@ -14,6 +14,7 @@
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/sfm/reconstruction.h>
 #include <theia/solvers/ransac.h>
+#include <theia/io/reconstruction_writer.h>
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/opencv.hpp>
@@ -27,7 +28,8 @@ DEFINE_string(detector_params, "", "Path detector yaml.");
 DEFINE_string(camera_model_to_calibrate, "LINEAR_PINHOLE",
               "What camera model do you want to calibrate. Options:"
               "LINEAR_PINHOLE,DIVISION_UNDISTORTION");
-DEFINE_double(downsample_factor, 3, "Downsample factor for images.");
+DEFINE_double(downsample_factor, 2.5, "Downsample factor for images.");
+DEFINE_string(save_path_calib_dataset, "", "Where to save the recon dataset to.");
 
 std::vector<std::string> load_images(const std::string& img_dir_path) {
   DIR* dir;
@@ -140,6 +142,7 @@ int main(int argc, char* argv[]) {
   bool showRejected = false;
   int cnt_wrong = 0;
   const int skip_frames = 1;
+  double fps = inputVideo.get(cv::CAP_PROP_FPS);
   int frame_cnt = 0;
   bool first_detection = false;  // at the first detection fill a theia
                                  // reconstruction with keypoints
@@ -150,6 +153,7 @@ int main(int argc, char* argv[]) {
       if (cnt_wrong > 200) break;
       continue;
     }
+    std::string timestamp = std::to_string(inputVideo.get(cv::CAP_PROP_POS_MSEC) / 1000.0);
     ++frame_cnt;
     std::cout << frame_cnt << " % " << skip_frames << " = "
               << frame_cnt % skip_frames << std::endl;
@@ -223,8 +227,8 @@ int main(int argc, char* argv[]) {
       std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
                 << std::endl;
     } else if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION") {
-      meta_data.max_focal_length = 1200;
-      meta_data.min_focal_length = 500;
+      meta_data.max_focal_length = 1200; // TODO SET THAT FROM IMAGE SIZE
+      meta_data.min_focal_length = 200;
       theia::EstimateRadialDistUncalibratedAbsolutePose(
           ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
           &pose_division_undist, &ransac_summary);
@@ -236,11 +240,11 @@ int main(int argc, char* argv[]) {
                 << std::endl;
     }
 
-    if (ransac_summary.inliers.size() < charucoIds.size() * 0.75) continue;
+    if (ransac_summary.inliers.size() < charucoIds.size() * 0.8) continue;
 
     // fill charucoCorners to theia reconstruction
     theia::ViewId view_id =
-        recon_calib_dataset.AddView(std::to_string(frame_cnt), 0);
+        recon_calib_dataset.AddView(timestamp, 0);
     theia::View* view = recon_calib_dataset.MutableView(view_id);
     view->SetEstimated(true);
 
@@ -328,6 +332,8 @@ int main(int argc, char* argv[]) {
   summary = theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset);
 
   PrintResult(FLAGS_camera_model_to_calibrate, recon_calib_dataset);
+
+  theia::WriteReconstruction(recon_calib_dataset, FLAGS_save_path_calib_dataset);
 
   return 0;
 }

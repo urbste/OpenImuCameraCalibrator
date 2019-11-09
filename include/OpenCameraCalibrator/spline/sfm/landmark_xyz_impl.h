@@ -55,8 +55,8 @@ void LandmarkXYZ::set_point(const Eigen::Vector4d& pt) {
 }
 
 double* LandmarkXYZ::xyz_ptr() {
-    return nullptr;
-  //return xyz_.data;
+  //  return nullptr;
+  return (double*)xyz_.data();
 }
 
 bool LandmarkXYZ::IsLocked() const {

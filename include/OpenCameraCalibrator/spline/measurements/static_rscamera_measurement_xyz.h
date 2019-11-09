@@ -14,7 +14,7 @@ template<
     typename T>
 Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& ref,
                                         const sfm::ObservationXYZ& obs,
-                                        const sfm::LandmarkXYZ landmark,
+                                        const Eigen::Matrix<T, 4, 1> landmark,
                                         const type::Trajectory<TrajectoryModel, T>& trajectory,
                                         const type::Camera<CameraModel, T>& camera) {
   using Vector3 = Eigen::Matrix<T, 3, 1>;
@@ -32,7 +32,7 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& ref,
   const Vector3 p_ct = camera.relative_position();
   const Eigen::Quaternion<T> q_ct = camera.relative_orientation();
 
-  Vector3 landmark_world = landmark.get_point().hnormalized();
+  Vector3 landmark_world = landmark.hnormalized();
   Vector3 X_in_spline = eval_obs->orientation.conjugate() * (landmark_world -  eval_obs->position);
   Vector3 X_camera = q_ct * X_in_spline + p_ct;
 
@@ -73,7 +73,7 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& ref,
     template<typename TrajectoryModel, typename T>
     Eigen::Matrix<T, 2, 1> Error(const type::Trajectory<TrajectoryModel, T> &trajectory,
                                  const type::Camera<CameraModel, T> &camera,
-                                 const T landmark_xyz) const {
+                                 const Eigen::Matrix<T, 4, 1>& landmark_xyz) const {
       Eigen::Matrix<T,2,1> y_hat = this->Project<TrajectoryModel, T>(trajectory, camera, landmark_xyz);
       return T(weight) * (observation->uv().cast<T>() - y_hat);
     }
@@ -102,8 +102,11 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& ref,
         auto camera = entity::Map<CameraModel, T>(&params[offset], camera_meta);
         offset += camera_meta.NumParameters();
         //T inverse_depth = params[offset][0];
-        T landmark_xyz;
-        landmark_xyz << params[offset][0], params[offset][1], params[offset][2], params[offset][3];
+        Eigen::Matrix<T, 4, 1> landmark_xyz;
+        landmark_xyz(0,0) = params[offset][0];
+        landmark_xyz(1,0) = params[offset][1];
+        landmark_xyz(2,0) = params[offset][2];
+        landmark_xyz(3,0) = params[offset][3];
         Eigen::Map<Eigen::Matrix<T,2,1>> r(residual);
         r = measurement.Error<TrajectoryModel, T>(trajectory, camera, landmark_xyz);
         return true;
