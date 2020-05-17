@@ -21,8 +21,8 @@ bool ReadGoProTelemetry(const std::string& path_to_telemetry_file,
     for (const auto& e : accl) {
         Eigen::Vector3d v;
         v << e["value"][0], e["value"][1], e["value"][2];
-        telemetry.accererometer.acc_masurement.emplace_back(v);
-        telemetry.accererometer.timestamp_ms.emplace_back( e["cts"]);
+        telemetry.accelerometer.acc_masurement.emplace_back(v);
+        telemetry.accelerometer.timestamp_ms.emplace_back( e["cts"]);
     }
     for (const auto& e : gyro) {
         Eigen::Vector3d v;

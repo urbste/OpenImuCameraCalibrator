@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <theia/io/reconstruction_writer.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjustment.h>
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
@@ -14,7 +15,6 @@
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/sfm/reconstruction.h>
 #include <theia/solvers/ransac.h>
-#include <theia/io/reconstruction_writer.h>
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/opencv.hpp>
@@ -28,8 +28,11 @@ DEFINE_string(detector_params, "", "Path detector yaml.");
 DEFINE_string(camera_model_to_calibrate, "LINEAR_PINHOLE",
               "What camera model do you want to calibrate. Options:"
               "LINEAR_PINHOLE,DIVISION_UNDISTORTION");
-DEFINE_double(downsample_factor, 2.5, "Downsample factor for images.");
-DEFINE_string(save_path_calib_dataset, "", "Where to save the recon dataset to.");
+DEFINE_double(downsample_factor, 2, "Downsample factor for images.");
+DEFINE_string(save_path_calib_dataset, "",
+              "Where to save the recon dataset to.");
+DEFINE_double(checker_size_m, 0.039,
+              "Size of one square on the checkerbaord in [m].");
 
 std::vector<std::string> load_images(const std::string& img_dir_path) {
   DIR* dir;
@@ -87,12 +90,9 @@ int main(int argc, char* argv[]) {
 
   int squaresX = 10;
   int squaresY = 8;
-  int squareLength = 2;
-  int markerLength = 1;
+  float squareLength = FLAGS_checker_size_m;
+  float markerLength = FLAGS_checker_size_m / 2.0;
   int dictionaryId = cv::aruco::DICT_ARUCO_ORIGINAL;
-  int margins = squareLength - markerLength;
-  int borderBits = 1;
-  bool showImage = true;
   const int min_number_detected_corners = 30;
 
   theia::RansacParameters ransac_params;
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
   bool validPose = false;
   bool showRejected = false;
   int cnt_wrong = 0;
-  const int skip_frames = 1;
+  const int skip_frames = 5;
   double fps = inputVideo.get(cv::CAP_PROP_FPS);
   int frame_cnt = 0;
   bool first_detection = false;  // at the first detection fill a theia
@@ -150,16 +150,19 @@ int main(int argc, char* argv[]) {
     Mat image, imageCopy;
     if (!inputVideo.read(image)) {
       cnt_wrong++;
-      if (cnt_wrong > 200) break;
+      if (cnt_wrong > 500) break;
+      std::cout<<"Missing frame, skippint...";
       continue;
     }
-    std::string timestamp = std::to_string(inputVideo.get(cv::CAP_PROP_POS_MSEC) / 1000.0);
+    std::string timestamp =
+        std::to_string(inputVideo.get(cv::CAP_PROP_POS_MSEC) / 1000.0);
     ++frame_cnt;
     std::cout << frame_cnt << " % " << skip_frames << " = "
               << frame_cnt % skip_frames << std::endl;
     if (frame_cnt % skip_frames != 0) continue;
 
-    cv::resize(image, image, cv::Size(), 1./FLAGS_downsample_factor, 1./FLAGS_downsample_factor);
+    cv::resize(image, image, cv::Size(), 1. / FLAGS_downsample_factor,
+               1. / FLAGS_downsample_factor);
 
     std::vector<int> markerIds, charucoIds;
     std::vector<std::vector<Point2f>> markerCorners, rejectedMarkers;
@@ -221,41 +224,43 @@ int main(int argc, char* argv[]) {
 
     if (FLAGS_camera_model_to_calibrate == "LINEAR_PINHOLE") {
       theia::EstimateUncalibratedAbsolutePose(
-          ransac_params, theia::RansacType::RANSAC, correspondences,
-          &pose_linear, &ransac_summary);
-      std::cout << "Estimated focal length: " << pose_linear.focal_length << std::endl;
+          ransac_params, theia::RansacType::LMED, correspondences, &pose_linear,
+          &ransac_summary);
+      std::cout << "Estimated focal length: " << pose_linear.focal_length
+                << std::endl;
       std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
                 << std::endl;
     } else if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION") {
-      meta_data.max_focal_length = 1200; // TODO SET THAT FROM IMAGE SIZE
+      meta_data.max_focal_length = 600;  // TODO SET THAT FROM IMAGE SIZE
       meta_data.min_focal_length = 200;
       theia::EstimateRadialDistUncalibratedAbsolutePose(
-          ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
+          ransac_params, theia::RansacType::LMED, correspondences, meta_data,
           &pose_division_undist, &ransac_summary);
-      std::cout << "Estimated focal length: " << pose_division_undist.focal_length << std::endl;
-      std::cout << "Estimated radial distortion: " << pose_division_undist.radial_distortion
-                << std::endl
+      std::cout << "Estimated focal length: "
+                << pose_division_undist.focal_length << std::endl;
+      std::cout << "Estimated radial distortion: "
+                << pose_division_undist.radial_distortion << std::endl
                 << std::endl;
       std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
                 << std::endl;
     }
 
-    if (ransac_summary.inliers.size() < charucoIds.size() * 0.8) continue;
+    if (ransac_summary.inliers.size() < charucoIds.size() * 0.6) continue;
 
     // fill charucoCorners to theia reconstruction
-    theia::ViewId view_id =
-        recon_calib_dataset.AddView(timestamp, 0);
+    theia::ViewId view_id = recon_calib_dataset.AddView(timestamp, 0);
     theia::View* view = recon_calib_dataset.MutableView(view_id);
     view->SetEstimated(true);
 
     theia::Camera* cam = view->MutableCamera();
     cam->SetImageSize(image.cols, image.rows);
     if (FLAGS_camera_model_to_calibrate == "LINEAR_PINHOLE") {
-        cam->SetPosition(pose_linear.position);
-        cam->SetOrientationFromRotationMatrix(pose_linear.rotation);
+      cam->SetPosition(pose_linear.position);
+      cam->SetOrientationFromRotationMatrix(pose_linear.rotation);
     } else if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION") {
-        cam->SetPosition(-pose_division_undist.rotation * pose_division_undist.translation);
-        cam->SetOrientationFromRotationMatrix(pose_division_undist.rotation);
+      cam->SetPosition(-pose_division_undist.rotation *
+                       pose_division_undist.translation);
+      cam->SetOrientationFromRotationMatrix(pose_division_undist.rotation);
     }
 
     if (FLAGS_camera_model_to_calibrate == "LINEAR_PINHOLE") {
@@ -277,7 +282,8 @@ int main(int argc, char* argv[]) {
           theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
       double* intrinsics = cam->mutable_intrinsics();
       intrinsics[theia::DivisionUndistortionCameraModel::
-                     InternalParametersIndex::FOCAL_LENGTH] = pose_division_undist.focal_length;
+                     InternalParametersIndex::FOCAL_LENGTH] =
+          pose_division_undist.focal_length;
       intrinsics[theia::DivisionUndistortionCameraModel::
                      InternalParametersIndex::PRINCIPAL_POINT_X] =
           image.cols / 2.0;
@@ -305,11 +311,27 @@ int main(int argc, char* argv[]) {
     if (key == 27) break;
   }
 
+  // find and set median of focal length
+  //    std::vector<double> focal_lengths;
+  //    for (auto v_ids : recon_calib_dataset.ViewIds()) {
+  //      const theia::Camera c = recon_calib_dataset.View(v_ids)->Camera();
+  //      focal_lengths.push_back(c.FocalLength());
+  //    }
+
+  //    double median_focal_length =
+  //    OpenCamCalib::MedianOfDoubleVec(focal_lengths); std::cout<<"MEDIAN FOCAL
+  //    LENGTH: "<<median_focal_length<<std::endl; for (auto v_ids :
+  //    recon_calib_dataset.ViewIds()) {
+  //      theia::Camera* c =
+  //      recon_calib_dataset.MutableView(v_ids)->MutableCamera();
+  //      c->SetFocalLength(median_focal_length);
+  //    }
+
+  // bundle adjust everything
   theia::BundleAdjustmentOptions ba_options;
   ba_options.verbose = true;
   ba_options.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options.robust_loss_width = 1.345;
-
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
   if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION")
@@ -333,7 +355,40 @@ int main(int argc, char* argv[]) {
 
   PrintResult(FLAGS_camera_model_to_calibrate, recon_calib_dataset);
 
-  theia::WriteReconstruction(recon_calib_dataset, FLAGS_save_path_calib_dataset);
+  theia::WriteReconstruction(recon_calib_dataset,
+                             FLAGS_save_path_calib_dataset+"/calib_dataset.data");
 
+  // write calibration textfile
+  std::string output_file = FLAGS_save_path_calib_dataset + "/camera_calibration.txt";
+  std::ofstream calib_txt_output;
+  calib_txt_output.open(output_file);
+  const theia::Camera cam =
+      recon_calib_dataset.View(recon_calib_dataset.ViewIds()[0])->Camera();
+  const double* intrinsics = cam.intrinsics();
+
+  calib_txt_output << cam.FocalLength() << " " << cam.ImageWidth() << " "
+                   << cam.ImageHeight() << " " << cam.PrincipalPointX() << " "
+                   << cam.PrincipalPointY() << " ";
+  if (FLAGS_camera_model_to_calibrate == "LINEAR_PINHOLE") {
+    calib_txt_output
+        << intrinsics[theia::PinholeCameraModel::InternalParametersIndex::
+                          ASPECT_RATIO]
+        << " "
+        << intrinsics[theia::PinholeCameraModel::InternalParametersIndex::SKEW]
+        << " " << 0.0 << " " << 0.0 << " "
+        << (int)theia::CameraIntrinsicsModelType::PINHOLE;
+  } else if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION") {
+    calib_txt_output
+        << intrinsics[theia::DivisionUndistortionCameraModel::
+                          InternalParametersIndex::ASPECT_RATIO]
+        << " "
+        << 0.0 // skew
+        << " "
+        << intrinsics[theia::DivisionUndistortionCameraModel::
+                          InternalParametersIndex::RADIAL_DISTORTION_1]
+        << " " << 0.0 << " "
+        << (int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION;
+  }
+  calib_txt_output.close();
   return 0;
 }

@@ -38,7 +38,7 @@ public:
 struct CameraTelemetryData
 {
   // IMU
-  CameraAccData accererometer;
+  CameraAccData accelerometer;
   CameraGyroData gyroscope;
   // GPS
   GPXData gps;

@@ -12,8 +12,7 @@ template<
     typename TrajectoryModel,
     typename CameraModel,
     typename T>
-Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& ref,
-                                        const sfm::ObservationXYZ& obs,
+Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& obs,
                                         const Eigen::Matrix<T, 4, 1> landmark,
                                         const type::Trajectory<TrajectoryModel, T>& trajectory,
                                         const type::Camera<CameraModel, T>& camera) {
@@ -62,7 +61,7 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& ref,
     Eigen::Matrix<T, 2, 1> Project(const type::Trajectory<TrajectoryModel, T> &trajectory,
                                    const type::Camera<CameraModel, T> &camera,
                                    const Eigen::Matrix<T, 4, 1> landmark_xyz) const {
-      return reproject_static<TrajectoryModel, CameraModel>(*observation->landmark()->reference(), *observation, landmark_xyz, trajectory, camera);
+      return reproject_static<TrajectoryModel, CameraModel>(*observation, landmark_xyz, trajectory, camera);
     };
 
     template<typename TrajectoryModel>
