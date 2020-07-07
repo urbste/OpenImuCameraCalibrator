@@ -37,7 +37,6 @@ bool ReadGoProTelemetry(const std::string& path_to_telemetry_file,
         vel2d_vel3d <<e["value"][3], e["value"][4];
         telemetry.gps.lle.emplace_back(v);
         telemetry.gps.timestamp_ms.emplace_back(e["cts"]);
-        telemetry.gps.geoid_height.emplace_back(e["geoidHeight"]);
         telemetry.gps.precision.emplace_back(e["precision"]);
         telemetry.gps.vel2d_vel3d.emplace_back(vel2d_vel3d);
     }

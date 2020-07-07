@@ -5,6 +5,7 @@
 #include <chrono>  // NOLINT
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include <theia/io/reconstruction_writer.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjustment.h>

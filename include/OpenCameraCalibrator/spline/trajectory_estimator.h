@@ -105,6 +105,7 @@ class TrajectoryEstimator {
       // Valid for trajectory?
       if ((t1 < trajectory_->MinTime()) ||
           (t2 >= trajectory_->MaxTime())) {
+          std::cout<<"traj min time: "<<trajectory_->MinTime()<< " traj max time: "<<trajectory_->MaxTime()<<std::endl;
           std::cout<<"t1: "<<t1<<" t2: "<<t2<<std::endl;
         throw std::range_error("Time span out of range for trajectory");
       }

@@ -105,7 +105,7 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& obs,
         landmark_xyz(0,0) = params[offset][0];
         landmark_xyz(1,0) = params[offset][1];
         landmark_xyz(2,0) = params[offset][2];
-        landmark_xyz(3,0) = params[offset][3];
+        landmark_xyz(3,0) = T(1.0);
         Eigen::Map<Eigen::Matrix<T,2,1>> r(residual);
         r = measurement.Error<TrajectoryModel, T>(trajectory, camera, landmark_xyz);
         return true;

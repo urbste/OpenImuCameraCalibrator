@@ -41,6 +41,8 @@
 
 #include "theia/io/reconstruction_reader.h"
 #include "theia/sfm/reconstruction.h"
+#include <theia/sfm/camera/division_undistortion_camera_model.h>
+#include <theia/sfm/camera/pinhole_camera_model.h>
 
 // Input/output files.
 DEFINE_string(
@@ -48,13 +50,19 @@ DEFINE_string(
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
 DEFINE_string(input_video, "", "Path to corresponding video file.");
 DEFINE_string(detector_params, "", "Path detector yaml.");
-DEFINE_double(downsample_factor, 2.5, "Downsample factor for images.");
 DEFINE_string(input_calibration_dataset, "",
               "Path to input calibration dataset.");
 DEFINE_double(checker_size_m, 0.039,
               "Size of one square on the checkerbaord in [m].");
 DEFINE_string(output_path_txt_files_for_testing, "",
               "Output files for scale estimator.");
+DEFINE_string(camera_model_to_calibrate, "DIVISION_UNDISTORTION",
+              "What camera model do you want to calibrate. Options:"
+              "LINEAR_PINHOLE,DIVISION_UNDISTORTION");
+DEFINE_double(cam_fps, 60.0,
+              "Cameras fps");
+DEFINE_double(max_t, 2.0,
+              "Maximum nr of seconds to take");
 namespace TT = kontiki::trajectories;
 namespace M = kontiki::measurements;
 namespace S = kontiki::sensors;
@@ -171,8 +179,10 @@ int main(int argc, char* argv[]) {
       if (cnt_wrong > 200) break;
       continue;
     }
-    std::string timestamp_s =
-        std::to_string(inputVideo.get(cv::CAP_PROP_POS_MSEC) / 1000.0);
+    const double timestamp_ = inputVideo.get(cv::CAP_PROP_POS_MSEC) / 1000.0;
+    if (timestamp_ > FLAGS_max_t)
+        break;
+    std::string timestamp_s = std::to_string(timestamp_);
     ++frame_cnt;
 
     cv::resize(image, image,
@@ -207,8 +217,10 @@ int main(int argc, char* argv[]) {
     if (showRejected && rejectedMarkers.size() > 0)
       aruco::drawDetectedMarkers(imageCopy, rejectedMarkers, noArray(),
                                  Scalar(100, 0, 255));
+    if (interpolatedCorners < 10)
+        continue;
 
-    if (interpolatedCorners > 0) {
+    if (interpolatedCorners > 10) {
       Scalar color;
       color = Scalar(255, 0, 0);
       aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds,
@@ -258,7 +270,7 @@ int main(int argc, char* argv[]) {
 
   const double dt_r3 = 0.1;
   const double dt_so3 = 0.1;
-  const double time_offset_cam_to_imu = 0.0082;
+  const double time_offset_cam_to_imu = 0.0;
   const double time_offset_imu_to_cam = -time_offset_cam_to_imu;
 
   // Number of cameras.
@@ -276,8 +288,8 @@ int main(int argc, char* argv[]) {
 
   // find smallest timestamp
   auto result = std::minmax_element(timestamps.begin(), timestamps.end());
-  double t0 = timestamps[result.first - timestamps.begin()]-time_offset_cam_to_imu;
-  double tend = timestamps[result.second - timestamps.begin()]+time_offset_cam_to_imu;
+  double t0 = timestamps[result.first - timestamps.begin()]-time_offset_cam_to_imu - dt_so3;
+  double tend = timestamps[result.second - timestamps.begin()]+time_offset_cam_to_imu + dt_r3;
 
   // split trajectory
   std::shared_ptr<SO3TrajClass> so3_traj_spline =
@@ -348,25 +360,26 @@ int main(int argc, char* argv[]) {
   for (auto l : kontiki_landmarks) l->set_reference(l->observations()[0]);
 
   camera.GetCalibrationMatrix(&K);
-  std::shared_ptr<PinholeCameraClass> cam_kontiki =
-      std::make_shared<PinholeCameraClass>(camera.ImageWidth(),
-                                           camera.ImageHeight(), 1. / 60., K);
-
+  std::shared_ptr<DivisionUndistortionCameraClass> cam_kontiki =
+      std::make_shared<DivisionUndistortionCameraClass>(camera.ImageWidth(),
+                                           camera.ImageHeight(), 1. / FLAGS_cam_fps, K);
+  cam_kontiki->set_distortion(camera.intrinsics()[theia::DivisionUndistortionCameraModel::
+          InternalParametersIndex::RADIAL_DISTORTION_1]);
   // Eigen::Quaterniond imu2cam(angleaxis.toRotationMatrix());
   Eigen::Quaterniond imu2cam(0.0076, 0.7169, -0.6971, 0.0041);
   imu2cam.normalize();
   std::cout << imu2cam.toRotationMatrix() << std::endl;
-  cam_kontiki->set_relative_orientation(imu2cam);
-  cam_kontiki->LockRelativeOrientation(true);
+  //cam_kontiki->set_relative_orientation(imu2cam);
+  cam_kontiki->LockRelativeOrientation(false);
   cam_kontiki->LockRelativePosition(true);
   cam_kontiki->LockTimeOffset(true);
-  Eigen::Vector3d gyro_bias(0.0033, 0.0026, -0.0013);
-  Eigen::Vector3d acc_bias(0.3524,-1.15,0.2070);
+  Eigen::Vector3d gyro_bias(0.0,0.0,0.0);
+  Eigen::Vector3d acc_bias(0.0,0.0,0.0);
   std::shared_ptr<IMUClass> imu_kontiki =
       std::make_shared<IMUClass>(acc_bias, gyro_bias);
   imu_kontiki->LockAccelerometerBias(true);
   imu_kontiki->LockTimeOffset(true);
-  imu_kontiki->LockGyroscopeBias(true);
+  imu_kontiki->LockGyroscopeBias(false);
   imu_kontiki->set_time_offset(time_offset_imu_to_cam);
 
   int sub_sample_imu = 1;
@@ -377,7 +390,7 @@ int main(int argc, char* argv[]) {
   double weight_r3 = 1.0;
   double weight_so3 = 1.0;
 
-  std::cout << "Trajectory start time: " << t0-time_offset_cam_to_imu << " tend: " << tend
+  std::cout << "Trajectory start time: " << t0 << " tend: " << tend
             << std::endl;
 
   r3_traj_spline->ExtendTo(tend, Eigen::Vector3d(0.0, 0.0, 0.0));
@@ -391,7 +404,7 @@ int main(int argc, char* argv[]) {
                 << telemetry_data.accelerometer.acc_masurement[i](1) << " "
                 << telemetry_data.accelerometer.acc_masurement[i](2) << "\n";
       if (t >= tend - std::max(dt_so3, dt_r3)) break;
-      if (t < t0 + std::max(dt_so3, dt_r3)) continue;
+      if (t < t0 - std::max(dt_so3, dt_r3)) continue;
       std::shared_ptr<AccMeasurement> acc_measurement =
           std::make_shared<AccMeasurement>(
               imu_kontiki, t, telemetry_data.accelerometer.acc_masurement[i],
@@ -411,7 +424,7 @@ int main(int argc, char* argv[]) {
                 << telemetry_data.gyroscope.gyro_measurement[i](1) << " "
                 << telemetry_data.gyroscope.gyro_measurement[i](2) << "\n";
       if (t >= tend - std::max(dt_so3, dt_r3)) break;
-      if (t < t0 + std::max(dt_so3, dt_r3)) continue;
+      if (t < t0 - std::max(dt_so3, dt_r3)) continue;
       std::shared_ptr<GyroMeasurement> gyr_measurement =
           std::make_shared<GyroMeasurement>(
               imu_kontiki, t, telemetry_data.gyroscope.gyro_measurement[i],
@@ -423,18 +436,18 @@ int main(int argc, char* argv[]) {
   }
   gyro_file.close();
   // iterate all observations and create measurements
-  std::vector<std::shared_ptr<CamMeasurementPinhole>> measurements;
+  std::vector<std::shared_ptr<CamMeasurementDivUndist>> measurements;
   for (auto it : kontiki_views) {
     auto kon_view = it.second;
     std::vector<std::shared_ptr<Observation>> observations =
         kon_view->observations();
     for (int i = 0; i < observations.size(); ++i) {
-      measurements.push_back(std::make_shared<CamMeasurementPinhole>(
+      measurements.push_back(std::make_shared<CamMeasurementDivUndist>(
           cam_kontiki, observations[i]));
       traj_spline_estimator.AddMeasurement(
           measurements[measurements.size() - 1]);
     }
   }
 
-  traj_spline_estimator.Solve(100);
+  traj_spline_estimator.Solve(100, true, 1);
 }
