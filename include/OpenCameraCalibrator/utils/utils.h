@@ -14,4 +14,5 @@ bool ReadDetectorParameters(std::string filename,
 
 double MedianOfDoubleVec(std::vector<double>& double_vec);
 
+
 }

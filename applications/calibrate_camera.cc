@@ -391,5 +391,6 @@ int main(int argc, char* argv[]) {
         << (int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION;
   }
   calib_txt_output.close();
+
   return 0;
 }

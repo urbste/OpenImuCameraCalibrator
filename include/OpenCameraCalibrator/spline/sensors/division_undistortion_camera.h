@@ -41,7 +41,7 @@ class DivisionUndistortionView : public PinholeView<T, MetaType> {
   }
 
   Result EvaluateProjection(const Vector3 &X, const Vector3 &dX, bool derive) const override {
-    const T eps = T(1e-32);
+    const T eps = T(1e-20);
 
     auto result = std::make_unique<CameraEvaluation<T>>(derive);
 
@@ -50,29 +50,22 @@ class DivisionUndistortionView : public PinholeView<T, MetaType> {
     A(1) *= this->camera_matrix()(1,1);
 
     const T r_u_sq = A(0) * A(0) + A(1) * A(1);
-    const T r_u = ceres::sqrt(r_u_sq);
+    const T denom = T(2.0) * distortion() * r_u_sq;
+    const T inner_sqrt = T(1.0) - T(4.0) * distortion() * r_u_sq;
 
-    const T denom = 2.0 * distortion() * r_u;
-
-    // If the denominator is nearly zero, use L'Hopital's rule to compute r_d by
-    // taking the derivatives of the numerator and denominator.
-    T r_d_sq;
-    if (denom < eps && denom > -eps)
+    Vector3 Y;
+    if (ceres::abs(denom) < eps || inner_sqrt < T(0.0))
     {
-        // We can directly compute r_d_sq to avoid a sqrt call.
-        r_d_sq = 1.0 / (1.0 - 4.0 * distortion() * r_u_sq);
+        Y(0) = A(0);
+        Y(1) = A(1);
     }
     else
     {
-        const T r_d = (1.0 - ceres::sqrt(1.0 - 4.0 * distortion() * r_u_sq)) / denom;
-        r_d_sq = r_d * r_d;
+        const T scale = (T(1.0) - ceres::sqrt(inner_sqrt)) / denom;
+        Y(0) = A(0) * scale + this->camera_matrix()(0,2);
+        Y(1) = A(1) * scale + this->camera_matrix()(1,2);
     }
-
-    // Plug in r_d into Eq (2) to obtain the distorted point.
-    T rad = 1.0 + distortion() * r_d_sq;
-    Vector3 Y(A(0) * rad + this->camera_matrix()(0,2),
-              A(1) * rad + this->camera_matrix()(1,2),
-              T(1.0));
+    Y(2) = T(1.0);
 
     result->y = Y.head(2);
 

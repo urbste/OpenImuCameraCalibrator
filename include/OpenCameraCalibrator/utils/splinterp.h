@@ -1,4 +1,4 @@
-/// -- splinterp.h --
+// -- splinterp.h --
 // Created by AJ Pryor on 2/2/17.
 // C-style array support for 2D interp added by DL Elliott 09/2019
 

@@ -43,6 +43,7 @@
 #include "theia/sfm/reconstruction.h"
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
+#include "OpenCameraCalibrator/utils/json.h"
 
 // Input/output files.
 DEFINE_string(
@@ -56,12 +57,14 @@ DEFINE_double(checker_size_m, 0.039,
               "Size of one square on the checkerbaord in [m].");
 DEFINE_string(output_path_txt_files_for_testing, "",
               "Output files for scale estimator.");
+DEFINE_string(gyro_to_cam_initial_calibration, "",
+              "Initial gyro to camera calibration json.");
 DEFINE_string(camera_model_to_calibrate, "DIVISION_UNDISTORTION",
               "What camera model do you want to calibrate. Options:"
               "LINEAR_PINHOLE,DIVISION_UNDISTORTION");
 DEFINE_double(cam_fps, 60.0,
               "Cameras fps");
-DEFINE_double(max_t, 2.0,
+DEFINE_double(max_t, 1000.,
               "Maximum nr of seconds to take");
 namespace TT = kontiki::trajectories;
 namespace M = kontiki::measurements;
@@ -88,6 +91,8 @@ using CamMeasurementDivUndist =
 using GyroMeasurement = M::GyroscopeMeasurement<IMUClass>;
 using AccMeasurement = M::AccelerometerMeasurement<IMUClass>;
 using PositionMeasurement = M::PositionMeasurement;
+
+using json = nlohmann::json;
 
 using namespace cv;
 using namespace theia;
@@ -262,16 +267,34 @@ int main(int argc, char* argv[]) {
       theia::Feature feature;
       feature << static_cast<double>(charucoCorners[i].x),
           static_cast<double>(charucoCorners[i].y);
-      recon_calib_dataset.AddObservation(view_id, track_id, feature);
+
+      Eigen::Vector3d normalized_coord = camera.PixelToNormalizedCoordinates(feature);
+
+      recon_calib_dataset.AddObservation(view_id, track_id, normalized_coord.hnormalized());
     }
     if (frame_cnt > 20 * 60) break;
   }
   cam_pose_file.close();
 
+
+  // read a gyro to cam calibration json
+  std::ifstream in_file(FLAGS_gyro_to_cam_initial_calibration);
+  json gyro_to_cam_calib;
+  in_file >> gyro_to_cam_calib;
+  Eigen::Quaterniond imu2cam(gyro_to_cam_calib["gyro_to_camera_rotation"]["w"],
+          gyro_to_cam_calib["gyro_to_camera_rotation"]["x"],
+          gyro_to_cam_calib["gyro_to_camera_rotation"]["y"],
+          gyro_to_cam_calib["gyro_to_camera_rotation"]["z"]);
+  Eigen::Vector3d gyro_bias;
+  gyro_bias << gyro_to_cam_calib["gyro_bias"][0],
+          gyro_to_cam_calib["gyro_bias"][1],
+          gyro_to_cam_calib["gyro_bias"][2];
+  in_file.close();
+
   const double dt_r3 = 0.1;
   const double dt_so3 = 0.1;
-  const double time_offset_cam_to_imu = 0.0;
-  const double time_offset_imu_to_cam = -time_offset_cam_to_imu;
+  const double time_offset_imu_to_cam = gyro_to_cam_calib["time_offset_gyro_to_cam"];
+  const double time_offset_cam_to_imu = -time_offset_imu_to_cam;
 
   // Number of cameras.
   const auto& view_ids = recon_calib_dataset.ViewIds();
@@ -288,8 +311,8 @@ int main(int argc, char* argv[]) {
 
   // find smallest timestamp
   auto result = std::minmax_element(timestamps.begin(), timestamps.end());
-  double t0 = timestamps[result.first - timestamps.begin()]-time_offset_cam_to_imu - dt_so3;
-  double tend = timestamps[result.second - timestamps.begin()]+time_offset_cam_to_imu + dt_r3;
+  double t0 = timestamps[result.first - timestamps.begin()]-time_offset_cam_to_imu - 10*dt_so3;
+  double tend = timestamps[result.second - timestamps.begin()]+time_offset_cam_to_imu + 10*dt_r3;
 
   // split trajectory
   std::shared_ptr<SO3TrajClass> so3_traj_spline =
@@ -357,30 +380,29 @@ int main(int argc, char* argv[]) {
   }
 
   // set landmark references to first observation
-  for (auto l : kontiki_landmarks) l->set_reference(l->observations()[0]);
-
-  camera.GetCalibrationMatrix(&K);
-  std::shared_ptr<DivisionUndistortionCameraClass> cam_kontiki =
-      std::make_shared<DivisionUndistortionCameraClass>(camera.ImageWidth(),
+  for (auto l : kontiki_landmarks) {
+      l->set_reference(l->observations()[0]);
+  }
+  //camera.GetCalibrationMatrix(&K);
+  K.setIdentity();
+  std::shared_ptr<PinholeCameraClass> cam_kontiki =
+      std::make_shared<PinholeCameraClass>(camera.ImageWidth(),
                                            camera.ImageHeight(), 1. / FLAGS_cam_fps, K);
-  cam_kontiki->set_distortion(camera.intrinsics()[theia::DivisionUndistortionCameraModel::
-          InternalParametersIndex::RADIAL_DISTORTION_1]);
-  // Eigen::Quaterniond imu2cam(angleaxis.toRotationMatrix());
-  Eigen::Quaterniond imu2cam(0.0076, 0.7169, -0.6971, 0.0041);
+  //cam_kontiki->set_distortion(camera.intrinsics()[theia::DivisionUndistortionCameraModel::
+  //        InternalParametersIndex::RADIAL_DISTORTION_1]);
   imu2cam.normalize();
   std::cout << imu2cam.toRotationMatrix() << std::endl;
-  //cam_kontiki->set_relative_orientation(imu2cam);
-  cam_kontiki->LockRelativeOrientation(false);
+  cam_kontiki->set_relative_orientation(imu2cam);
+  cam_kontiki->LockRelativeOrientation(true);
   cam_kontiki->LockRelativePosition(true);
   cam_kontiki->LockTimeOffset(true);
-  Eigen::Vector3d gyro_bias(0.0,0.0,0.0);
+
   Eigen::Vector3d acc_bias(0.0,0.0,0.0);
   std::shared_ptr<IMUClass> imu_kontiki =
       std::make_shared<IMUClass>(acc_bias, gyro_bias);
   imu_kontiki->LockAccelerometerBias(true);
   imu_kontiki->LockTimeOffset(true);
-  imu_kontiki->LockGyroscopeBias(false);
-  imu_kontiki->set_time_offset(time_offset_imu_to_cam);
+  imu_kontiki->LockGyroscopeBias(true);
 
   int sub_sample_imu = 1;
   // add imu
@@ -398,7 +420,7 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < telemetry_data.accelerometer.acc_masurement.size(); ++i) {
     if (i % sub_sample_imu == 0) {
-      double t = telemetry_data.accelerometer.timestamp_ms[i] / 1000.0;
+      double t = telemetry_data.accelerometer.timestamp_ms[i] / 1000.0 + time_offset_imu_to_cam;
       accl_file << t * 1e9 << " "
                 << telemetry_data.accelerometer.acc_masurement[i](0) << " "
                 << telemetry_data.accelerometer.acc_masurement[i](1) << " "
@@ -418,7 +440,7 @@ int main(int argc, char* argv[]) {
   accl_file.close();
   for (int i = 0; i < telemetry_data.gyroscope.gyro_measurement.size(); ++i) {
     if (i % sub_sample_imu == 0) {
-      double t = telemetry_data.gyroscope.timestamp_ms[i] / 1000.0;
+      double t = telemetry_data.gyroscope.timestamp_ms[i] / 1000.0 + time_offset_imu_to_cam;
       gyro_file << t * 1e9 << " "
                 << telemetry_data.gyroscope.gyro_measurement[i](0) << " "
                 << telemetry_data.gyroscope.gyro_measurement[i](1) << " "
@@ -436,13 +458,13 @@ int main(int argc, char* argv[]) {
   }
   gyro_file.close();
   // iterate all observations and create measurements
-  std::vector<std::shared_ptr<CamMeasurementDivUndist>> measurements;
+  std::vector<std::shared_ptr<CamMeasurementPinhole>> measurements;
   for (auto it : kontiki_views) {
     auto kon_view = it.second;
     std::vector<std::shared_ptr<Observation>> observations =
         kon_view->observations();
     for (int i = 0; i < observations.size(); ++i) {
-      measurements.push_back(std::make_shared<CamMeasurementDivUndist>(
+      measurements.push_back(std::make_shared<CamMeasurementPinhole>(
           cam_kontiki, observations[i]));
       traj_spline_estimator.AddMeasurement(
           measurements[measurements.size() - 1]);
@@ -450,4 +472,8 @@ int main(int argc, char* argv[]) {
   }
 
   traj_spline_estimator.Solve(100, true, 1);
+
+  std::cout<<"relative_orientation: "<<cam_kontiki->relative_orientation().toRotationMatrix()<<"\n";
+
+  return 0;
 }

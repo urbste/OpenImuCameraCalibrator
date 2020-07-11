@@ -20,7 +20,7 @@ public:
 
 struct CameraGyroData
 {
-    std::vector<Eigen::Vector3d> gyro_measurement;
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> gyro_measurement;
     std::vector<double> timestamp_ms;
 
 public:

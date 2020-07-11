@@ -51,4 +51,6 @@ int main(int argc, char* argv[]) {
 
   std::cout<<FLAGS_save_charuco_image+"board.png"<<std::endl;
   imwrite(FLAGS_save_charuco_image+"/board.png", boardImage);
+
+  return 0;
 }
