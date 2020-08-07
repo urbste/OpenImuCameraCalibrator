@@ -47,10 +47,12 @@ int main(int argc, char* argv[]) {
     std::cout << "Could not read: " << FLAGS_gopro_telemetry_json << std::endl;
   }
 
-  Vec3Map angular_velocities;
+  Vec3Map angular_velocities, acclerations;
   for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size(); ++i) {
     angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
                               telemetry_data.gyroscope.gyro_measurement[i];
+    acclerations[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
+            telemetry_data.accelerometer.acc_masurement[i];
   }
   // get mean hz imu
   double imu_dt_s = 0.0;
@@ -61,12 +63,14 @@ int main(int argc, char* argv[]) {
   imu_dt_s /= 1000.0;
 
   QuatMap visual_rotations;
+  Vec3Map visual_translation;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {
     const theia::View* view = pose_dataset.View(pose_dataset.ViewIds()[i]);
     const double timestamp_s = std::stod(view->Name()); // holds timestamp
     // cam to world trafo, so transposed rotation matrix
-    Eigen::Quaterniond vis_quat(view->Camera().GetOrientationAsRotationMatrix().transpose());
+    Eigen::Quaterniond vis_quat(view->Camera().GetOrientationAsRotationMatrix());
     visual_rotations[timestamp_s] = vis_quat;
+    visual_translation[timestamp_s] = view->Camera().GetPosition();
   }
   std::vector<double> timestamps_images;
   for (const auto& vis_rot : visual_rotations) {
@@ -106,5 +110,25 @@ int main(int argc, char* argv[]) {
   std::ofstream out_file(FLAGS_gyro_calibration_output);
   out_file << std::setw(4) << output_json << std::endl;
 
+//  // write to txt for testing
+//  std::ofstream vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable/poses.txt");
+//  std::ofstream acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable/accelerometer.txt");
+//  std::ofstream gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable/gyroscope.txt");
+
+//  for (auto v : visual_rotations) {
+//    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
+//    vis_out << v.first * 1e9 << " " << pos[0] <<" "<<pos[1]<<" "<<
+//               pos[2]<<" "<<v.second.w()<< " " <<
+//               v.second.x()<< " " << v.second.y()<< " " << v.second.z()<<"\n";
+//  }
+//  vis_out.close();
+//  for (auto a : acclerations) {
+//    acc_out << a.first * 1e9 << " " << a.second[0] <<" "<<a.second[1]<<" "<<a.second[2]<<"\n";
+//  }
+//  acc_out.close();
+//  for (auto v : angular_velocities) {
+//    gyr_out << v.first * 1e9 << " " << v.second[0] <<" "<<v.second[1]<<" "<<v.second[2]<<"\n";
+//  }
+//  gyr_out.close();
   return 0;
 }

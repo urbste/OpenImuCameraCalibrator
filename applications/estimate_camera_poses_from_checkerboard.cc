@@ -112,7 +112,8 @@ int main(int argc, char* argv[]) {
   bool show_rejected = false;
   int cnt_wrong = 0;
   int frame_cnt = 0;
-
+  unsigned int processed_frames = 0;
+  double total_repro_error = 0.0;
   // start processing the video stream and estimating poses
   while (true) {
     cv::Mat image, imageCopy;
@@ -223,15 +224,20 @@ int main(int argc, char* argv[]) {
                  static_cast<double>(charuco_corners[i].y);
       reproj_error += (pt-feature).norm();
     }
+    total_repro_error += reproj_error / charuco_ids.size();
+    ++processed_frames;
+
     const std::string plt_text = "Reprojection error: "+
             std::to_string(reproj_error / charuco_ids.size())+" pixels.";
     cv::putText(back_proj,plt_text, cv::Point(50,50),
                 cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255,255,255), 2);
 
-    cv::imshow("bbackprojected", back_proj);
+    cv::imshow("backprojected", back_proj);
     cv::waitKey(1);
   }
 
+  total_repro_error /= (double)processed_frames;
+  std::cout<<"Mean reprojection error all images: "<<total_repro_error<<"\n";
   theia::WriteReconstruction(pose_dataset, FLAGS_output_calibration_dataset);
 
   return 0;

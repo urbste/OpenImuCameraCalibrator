@@ -3,6 +3,10 @@
 
 #include <Eigen/Core>
 #include <vector>
+#include <unordered_map>
+#include <map>
+#include <deque>
+
 
 namespace OpenCamCalib {
 
@@ -55,5 +59,21 @@ struct IMUCalibData
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
+
+template <typename T>
+using aligned_vector = std::vector<T, Eigen::aligned_allocator<T>>;
+
+template <typename T>
+using aligned_deque = std::deque<T, Eigen::aligned_allocator<T>>;
+
+template <typename K, typename V>
+using aligned_map = std::map<K, V, std::less<K>,
+                             Eigen::aligned_allocator<std::pair<K const, V>>>;
+
+template <typename K, typename V>
+using aligned_unordered_map =
+    std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
+                       Eigen::aligned_allocator<std::pair<K const, V>>>;
+
 
 }

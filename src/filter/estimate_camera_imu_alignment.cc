@@ -207,12 +207,30 @@ void EstimateCameraImuAlignment(
 
   for (size_t i = 0; i < qtDiffs.size();++i) {
       Quaterniond angVisQ = qtDiffs[i] * qtVis_interp[i].inverse();
-      const double diff_dt = -2.0 * dt_imu;
+      const double diff_dt = -2.0 / dt_imu;
       Vector3d angVisVec(
                   diff_dt * angVisQ.x(),
                   diff_dt * angVisQ.y(),
                   diff_dt * angVisQ.z());
       angVis.push_back(angVisVec);
+  }
+
+  // calculate moving average to smooth the values a bit
+  SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
+  SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
+
+  Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
+  for (int i=0; i < angImu.size(); ++i) {
+    x_imu.add(angImu[i][0]);
+    y_imu.add(angImu[i][1]);
+    z_imu.add(angImu[i][2]);
+    smoothed_ang_imu.push_back(
+                Eigen::Vector3d(x_imu.avg(),y_imu.avg(),z_imu.avg()));
+    x_vis.add(angVis[i][0]);
+    y_vis.add(angVis[i][1]);
+    z_vis.add(angVis[i][2]);
+    smoothed_vis_vel.push_back(
+                Eigen::Vector3d(x_vis.avg(),y_vis.avg(),z_vis.avg()));
   }
 
   const double gRatio = (1.0 + std::sqrt(5.0)) / 2.0;
@@ -231,8 +249,8 @@ void EstimateCameraImuAlignment(
 
       Eigen::Matrix3d Rsc, Rsd;
       Eigen::Vector3d biasc, biasd;
-      const double fc = SolveClosedForm(angVis, angImu, tIMU, c, dt_imu, Rsc, biasc);
-      const double fd = SolveClosedForm(angVis, angImu, tIMU, d, dt_imu, Rsd, biasd);
+      const double fc = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU, c, dt_imu, Rsc, biasc);
+      const double fd = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU, d, dt_imu, Rsd, biasd);
 
       if (fc < fd) {
           b = d;

@@ -311,8 +311,8 @@ int main(int argc, char* argv[]) {
 
   // find smallest timestamp
   auto result = std::minmax_element(timestamps.begin(), timestamps.end());
-  double t0 = timestamps[result.first - timestamps.begin()]-time_offset_cam_to_imu - 10*dt_so3;
-  double tend = timestamps[result.second - timestamps.begin()]+time_offset_cam_to_imu + 10*dt_r3;
+  double t0 = timestamps[result.first - timestamps.begin()] - 1*dt_so3;
+  double tend = timestamps[result.second - timestamps.begin()]+ 1*dt_r3;
 
   // split trajectory
   std::shared_ptr<SO3TrajClass> so3_traj_spline =
@@ -392,8 +392,8 @@ int main(int argc, char* argv[]) {
   //        InternalParametersIndex::RADIAL_DISTORTION_1]);
   imu2cam.normalize();
   std::cout << imu2cam.toRotationMatrix() << std::endl;
-  cam_kontiki->set_relative_orientation(imu2cam);
-  cam_kontiki->LockRelativeOrientation(true);
+  cam_kontiki->set_relative_orientation(imu2cam.conjugate());
+  cam_kontiki->LockRelativeOrientation(false);
   cam_kontiki->LockRelativePosition(true);
   cam_kontiki->LockTimeOffset(true);
 
@@ -471,7 +471,13 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  traj_spline_estimator.Solve(100, true, 1);
+  traj_spline_estimator.Solve(20, true, -1);
+
+
+//  for (int i = 0; i < recon_calib_dataset.ViewIds().size(); ++i) {
+//      split_traj_spline->
+//  }
+
 
   std::cout<<"relative_orientation: "<<cam_kontiki->relative_orientation().toRotationMatrix()<<"\n";
 

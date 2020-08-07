@@ -60,4 +60,5 @@ double MedianOfDoubleVec(std::vector<double>& double_vec) {
   }
 }
 
+
 }  // namespace OpenCamCalib
