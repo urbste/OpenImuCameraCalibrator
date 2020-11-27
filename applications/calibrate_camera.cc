@@ -1,13 +1,10 @@
 #include <algorithm>
 #include <chrono> // NOLINT
-#include <dirent.h>
 #include <fstream>
 #include <gflags/gflags.h>
 #include <string>
 #include <time.h>
 #include <vector>
-
-#include <OpenCameraCalibrator/utils/json.h>
 
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/aruco/dictionary.hpp>
@@ -23,6 +20,7 @@
 #include <theia/solvers/ransac.h>
 
 #include "OpenCameraCalibrator/utils/intrinsic_initializer.h"
+#include "OpenCameraCalibrator/utils/json.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 
 using namespace cv;
@@ -38,95 +36,20 @@ DEFINE_string(save_path_calib_dataset, "",
 DEFINE_double(checker_size_m, 0.023,
               "Size of one square on the checkerbaord in [m]. Needed to only "
               "take far away poses!");
-DEFINE_double(grid_size, 0.06,
+DEFINE_double(grid_size, 0.04,
               "Only take images that are at least grid_size apart");
 DEFINE_bool(is_stablelized, false, "Indicate if image was stablelized");
-std::vector<std::string> load_images(const std::string &img_dir_path) {
-  DIR *dir;
-  if ((dir = opendir(img_dir_path.c_str())) == nullptr) {
-  }
-  std::vector<std::string> img_paths;
-  dirent *dp;
-  for (dp = readdir(dir); dp != nullptr; dp = readdir(dir)) {
-    img_paths.push_back(img_dir_path + "/" + std::string(dp->d_name));
-  }
-  closedir(dir);
-
-  std::sort(img_paths.begin(), img_paths.end());
-  return img_paths;
-}
-
-std::string CameraIDToString(const int theia_enum) {
-  if (theia_enum == (int)theia::CameraIntrinsicsModelType::DOUBLE_SPHERE) {
-    return "DOUBLE_SPHERE";
-  } else if ((int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION) {
-    return "DIVISION_UNDISTORTION";
-  } else if ((int)theia::CameraIntrinsicsModelType::PINHOLE) {
-    return "PINHOLE";
-  }
-}
-
-double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
-                            const theia::ViewId v_id) {
-  const theia::View *v = recon_dataset.View(v_id);
-  std::vector<theia::TrackId> track_ids = v->TrackIds();
-  double view_reproj_error = 0.0;
-  for (int t = 0; t < track_ids.size(); ++t) {
-    const theia::Feature *feat = v->GetFeature(track_ids[t]);
-    const theia::Track *track = recon_dataset.Track(track_ids[t]);
-    Eigen::Vector2d pt;
-    v->Camera().ProjectPoint(track->Point(), &pt);
-    view_reproj_error += (pt - (*feat)).norm();
-  }
-  view_reproj_error /= track_ids.size();
-  return view_reproj_error;
-}
-
-void PrintResult(const std::string cam_type,
-                 const theia::Reconstruction &recon_calib_dataset) {
-  for (int i = 0; i < recon_calib_dataset.NumViews(); ++i) {
-    theia::ViewId id = recon_calib_dataset.ViewIds()[i];
-    std::cout << "Viewid: " << id << "\n";
-    std::cout << "Optimized camera focal length: "
-              << recon_calib_dataset.View(id)->Camera().FocalLength()
-              << std::endl;
-    std::cout << "Optimized principal point: "
-              << recon_calib_dataset.View(id)->Camera().PrincipalPointX() << " "
-              << recon_calib_dataset.View(id)->Camera().PrincipalPointY()
-              << std::endl;
-    std::cout << "Optimized aspect ratio: "
-              << recon_calib_dataset.View(id)
-                     ->Camera()
-                     .intrinsics()[theia::PinholeCameraModel::
-                                       InternalParametersIndex::ASPECT_RATIO]
-              << std::endl;
-    if (cam_type == "DIVISION_UNDISTORTION") {
-      std::cout
-          << "Optimized radial distortion: "
-          << recon_calib_dataset.View(id)
-                 ->Camera()
-                 .intrinsics()[theia::DivisionUndistortionCameraModel::
-                                   InternalParametersIndex::RADIAL_DISTORTION_1]
-          << std::endl;
-    } else if (cam_type == "DOUBLE_SPHERE") {
-      std::cout
-          << "Optimized XI: "
-          << recon_calib_dataset.View(id)->Camera().intrinsics()
-                 [theia::DoubleSphereCameraModel::InternalParametersIndex::XI]
-          << std::endl;
-      std::cout << "Optimized ALPHA: "
-                << recon_calib_dataset.View(id)
-                       ->Camera()
-                       .intrinsics()[theia::DoubleSphereCameraModel::
-                                         InternalParametersIndex::ALPHA]
-                << std::endl;
-    }
-  }
-}
+DEFINE_bool(use_also_aruco_corners, false,
+            "Indicate if also aruco corners should be added");
 
 using Vector2D = Eigen::Vector2d;
 using image_points_t =
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>;
+
+int markerIdToTheiaId(const int marker_id, const int corner,
+                      const int offset = 1000) {
+  return (offset * marker_id) + offset + corner;
+}
 
 int main(int argc, char *argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
@@ -139,9 +62,9 @@ int main(int argc, char *argv[]) {
   const int min_number_detected_corners = 30;
 
   theia::RansacParameters ransac_params;
-  ransac_params.error_thresh = 1.5;
+  ransac_params.error_thresh = 0.1;
   ransac_params.failure_probability = 0.001;
-  ransac_params.min_iterations = 10;
+  ransac_params.min_iterations = 30;
   ransac_params.use_mle = true;
 
   theia::Reconstruction recon_calib_dataset;
@@ -150,8 +73,8 @@ int main(int argc, char *argv[]) {
   Ptr<aruco::DetectorParameters> detectorParams =
       aruco::DetectorParameters::create();
 
-  if (!OpenCamCalib::ReadDetectorParameters(FLAGS_detector_params,
-                                            detectorParams)) {
+  if (!OpenCamCalib::utils::ReadDetectorParameters(FLAGS_detector_params,
+                                                   detectorParams)) {
     std::cerr << "Invalid detector parameters file\n";
     return 0;
   }
@@ -163,11 +86,11 @@ int main(int argc, char *argv[]) {
       squaresX, squaresY, squareLength, markerLength, dictionary);
   Ptr<aruco::Board> board = charucoboard.staticCast<aruco::Board>();
 
-  theia::RandomNumberGenerator gne;
   // fill reconstruction with charuco points
   std::vector<cv::Point3f> chessoard3d = charucoboard->chessboardCorners;
   std::map<int, theia::TrackId> charuco_id_to_theia_track_id;
-  for (int i = 0; i < chessoard3d.size(); ++i) {
+  // fill charuco markers
+  for (size_t i = 0; i < chessoard3d.size(); ++i) {
     theia::TrackId track_id = recon_calib_dataset.AddTrack();
     theia::Track *track = recon_calib_dataset.MutableTrack(track_id);
     track->SetEstimated(true);
@@ -179,17 +102,37 @@ int main(int argc, char *argv[]) {
     charuco_id_to_theia_track_id[i] = track_id;
   }
 
+  if (FLAGS_use_also_aruco_corners) {
+    std::vector<std::vector<cv::Point3f>> arucoBoard3d =
+        charucoboard->objPoints;
+    // fill aruco markers
+    for (size_t i = 0; i < arucoBoard3d.size(); ++i) {
+      for (int j = 0; j < 4; ++j) {
+        theia::TrackId track_id = recon_calib_dataset.AddTrack();
+        theia::Track *track = recon_calib_dataset.MutableTrack(track_id);
+        track->SetEstimated(true);
+        Eigen::Vector4d *point = track->MutablePoint();
+        (*point)[0] = static_cast<double>(arucoBoard3d[i][j].x);
+        (*point)[1] = static_cast<double>(arucoBoard3d[i][j].y);
+        (*point)[2] = static_cast<double>(arucoBoard3d[i][j].z);
+        (*point)[3] = 1.0;
+        charuco_id_to_theia_track_id[markerIdToTheiaId(charucoboard->ids[i],
+                                                       j)] = track_id;
+      }
+    }
+  }
+
   VideoCapture inputVideo;
   inputVideo.open(FLAGS_input_video);
   bool showRejected = false;
   int cnt_wrong = 0;
   double fps = inputVideo.get(cv::CAP_PROP_FPS);
-  const int skip_frames = fps / fps;
 
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       saved_poses;
 
   int frame_cnt = 0;
+  double minMarkerLengthRatioOriginalImg = 0.0;
   std::map<theia::ViewId, double> ids_to_remove_after_init;
   while (true) {
     Mat image, imageCopy;
@@ -202,10 +145,10 @@ int main(int argc, char *argv[]) {
     std::string timestamp =
         std::to_string(inputVideo.get(cv::CAP_PROP_POS_MSEC) / 1000.0);
     ++frame_cnt;
-    std::cout << frame_cnt << " % " << skip_frames << " = "
-              << frame_cnt % skip_frames << std::endl;
-    if (frame_cnt % skip_frames != 0)
-      continue;
+    //    std::cout << frame_cnt << " % " << skip_frames << " = "
+    //              << frame_cnt % skip_frames << std::endl;
+    //    if (frame_cnt % skip_frames != 0)
+    //      continue;
 
     cv::resize(image, image, cv::Size(), 1. / FLAGS_downsample_factor,
                1. / FLAGS_downsample_factor);
@@ -215,7 +158,9 @@ int main(int argc, char *argv[]) {
     std::vector<Point2f> charucoCorners;
 
     // detect markers
-    aruco::detectMarkers(image, dictionary, markerCorners, markerIds,
+    detectorParams->minMarkerLengthRatioOriginalImg = minMarkerLengthRatioOriginalImg;
+    std::cout<<"minMarkerLengthRatioOriginalImg: "<<minMarkerLengthRatioOriginalImg<<std::endl;
+    minMarkerLengthRatioOriginalImg = aruco::detectMarkers(image, dictionary, markerCorners, markerIds,
                          detectorParams, rejectedMarkers);
 
     // refind strategy to detect more markers
@@ -229,8 +174,13 @@ int main(int argc, char *argv[]) {
           markerCorners, markerIds, image, charucoboard, charucoCorners,
           charucoIds);
 
-    if (charucoIds.size() < min_number_detected_corners)
-      continue;
+    if (FLAGS_use_also_aruco_corners) {
+        if (markerIds.size() < min_number_detected_corners)
+            continue;
+    } else if (charucoIds.size() + 4*markerIds.size() < min_number_detected_corners) {
+        continue;
+    }
+
     // draw results
     image.copyTo(imageCopy);
     if (markerIds.size() > 0) {
@@ -263,6 +213,24 @@ int main(int argc, char *argv[]) {
           recon_calib_dataset.Track(track_id)->Point();
       correspondence.world_point = track.hnormalized();
       correspondences[i] = correspondence;
+    }
+
+    if (FLAGS_use_also_aruco_corners) {
+      for (int i = 0; i < markerIds.size(); ++i) {
+        for (int j = 0; j < 4; ++j) {
+          theia::FeatureCorrespondence2D3D correspondence;
+          correspondence.feature
+              << (static_cast<double>(markerCorners[i][j].x) - px),
+              (static_cast<double>(markerCorners[i][j].y) - py);
+          const int marker_id_converted = markerIdToTheiaId(markerIds[i], j);
+          theia::TrackId track_id =
+              charuco_id_to_theia_track_id.find(marker_id_converted)->second;
+          const Eigen::Vector4d track =
+              recon_calib_dataset.Track(track_id)->Point();
+          correspondence.world_point = track.hnormalized();
+          correspondences[i] = correspondence;
+        }
+      }
     }
 
     theia::RansacSummary ransac_summary;
@@ -303,9 +271,16 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if (!take_image || !success_init ||
-        ransac_summary.inliers.size() < charucoIds.size() * 0.6) {
-      continue;
+    if (!take_image || !success_init) {
+        continue;
+    }
+
+    if (FLAGS_use_also_aruco_corners) {
+        if (ransac_summary.inliers.size() < (charucoIds.size() + 4*markerIds.size()) * 0.6) {
+            continue;
+             }
+    } else if (ransac_summary.inliers.size() < charucoIds.size() * 0.6) {
+        continue;
     }
 
     saved_poses.push_back(position);
@@ -378,11 +353,25 @@ int main(int argc, char *argv[]) {
           static_cast<double>(charucoCorners[i].y);
       recon_calib_dataset.AddObservation(view_id, track_id, feature);
     }
+    if (FLAGS_use_also_aruco_corners) {
+      for (int i = 0; i < markerIds.size(); ++i) {
+        for (int j = 0; j < 4; ++j) {
+          const int marker_id_converted = markerIdToTheiaId(markerIds[i], j);
+          theia::TrackId track_id =
+              charuco_id_to_theia_track_id.find(marker_id_converted)->second;
+          theia::Feature feature;
+          feature << static_cast<double>(markerCorners[i][j].x),
+              static_cast<double>(markerCorners[i][j].y);
+          recon_calib_dataset.AddObservation(view_id, track_id, feature);
+        }
+      }
+    }
 
-    const double init_reproj_error = GetReprojErrorOfView(
-                recon_calib_dataset, view_id);
-    if (init_reproj_error > 10.0) {
-        ids_to_remove_after_init[view_id] = init_reproj_error;
+    const double init_reproj_error =
+        OpenCamCalib::utils::GetReprojErrorOfView(recon_calib_dataset, view_id);
+    std::cout<<"init_reproj_error: "<<init_reproj_error<<std::endl;
+    if (init_reproj_error > 25.0) {
+      ids_to_remove_after_init[view_id] = init_reproj_error;
     }
     imshow("out", imageCopy);
     char key = (char)waitKey(1);
@@ -391,8 +380,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (recon_calib_dataset.NumViews() < 10) {
-     std::cout<<"Not enough views left for proper calibration!"<<std::endl;
-     return 0;
+    std::cout << "Not enough views left for proper calibration!" << std::endl;
+    return 0;
   }
 
   std::cout << "Using " << recon_calib_dataset.NumViews()
@@ -417,17 +406,19 @@ int main(int argc, char *argv[]) {
   std::map<theia::ViewId, double> ids_to_remove;
   for (int i = 0; i < recon_calib_dataset.NumViews(); ++i) {
     const theia::ViewId v_id = recon_calib_dataset.ViewIds()[i];
-    const double view_reproj_error = GetReprojErrorOfView(
-                recon_calib_dataset, v_id);
-    if (view_reproj_error > 10.0) {
-        ids_to_remove[v_id] = view_reproj_error;
+    const double view_reproj_error =
+        OpenCamCalib::utils::GetReprojErrorOfView(recon_calib_dataset, v_id);
+    if (view_reproj_error > 3.0) {
+      ids_to_remove[v_id] = view_reproj_error;
     }
   }
   for (auto v_id : ids_to_remove) {
-      recon_calib_dataset.RemoveView(v_id.first);
-      std::cout<<"Removed view: "<<v_id.first<<" with RMSE reproj error: "<<v_id.second<<"\n";
+    recon_calib_dataset.RemoveView(v_id.first);
+    std::cout << "Removed view: " << v_id.first
+              << " with RMSE reproj error: " << v_id.second << "\n";
   }
-  PrintResult(FLAGS_camera_model_to_calibrate, recon_calib_dataset);
+  OpenCamCalib::utils::PrintResult(FLAGS_camera_model_to_calibrate,
+                                   recon_calib_dataset);
 
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
@@ -439,13 +430,14 @@ int main(int argc, char *argv[]) {
   summary = theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset);
 
   if (recon_calib_dataset.NumViews() < 8) {
-     std::cout<<"Not enough views left for proper calibration!"<<std::endl;
-     return 0;
+    std::cout << "Not enough views left for proper calibration!" << std::endl;
+    return 0;
   }
-  std::cout<<"Re-run Bundle adjustment."<<std::endl;
+  std::cout << "Re-run Bundle adjustment." << std::endl;
   summary = theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset);
 
-  PrintResult(FLAGS_camera_model_to_calibrate, recon_calib_dataset);
+  OpenCamCalib::utils::PrintResult(FLAGS_camera_model_to_calibrate,
+                                   recon_calib_dataset);
 
   std::string output_str = "";
   std::string size_str = std::to_string(int(FLAGS_downsample_factor));
@@ -469,10 +461,8 @@ int main(int argc, char *argv[]) {
   // final reprojection error
   double reproj_error = 0;
   for (int i = 0; i < recon_calib_dataset.NumViews(); ++i) {
-    const theia::View *v =
-        recon_calib_dataset.View(recon_calib_dataset.ViewIds()[i]);
-    const double view_reproj_error = GetReprojErrorOfView(
-                recon_calib_dataset,recon_calib_dataset.ViewIds()[i]);
+    const double view_reproj_error = OpenCamCalib::utils::GetReprojErrorOfView(
+        recon_calib_dataset, recon_calib_dataset.ViewIds()[i]);
     reproj_error += view_reproj_error;
     std::cout << "View: " << recon_calib_dataset.ViewIds()[i]
               << " RMSE reprojection error: " << view_reproj_error << "\n";
@@ -496,14 +486,16 @@ int main(int argc, char *argv[]) {
         [theia::PinholeCameraModel::InternalParametersIndex::ASPECT_RATIO];
     json["intrinsics"]["skew"] = 0.0;
     json["intrinsic_type"]["camera_type"] =
-        CameraIDToString((int)theia::CameraIntrinsicsModelType::PINHOLE);
+        OpenCamCalib::utils::CameraIDToString(
+            (int)theia::CameraIntrinsicsModelType::PINHOLE);
   } else if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION") {
     json["intrinsics"]["aspect_ratio"] =
         intrinsics[theia::DivisionUndistortionCameraModel::
                        InternalParametersIndex::ASPECT_RATIO];
     json["intrinsics"]["skew"] = 0.0;
-    json["intrinsic_type"]["camera_type"] = CameraIDToString(
-        (int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
+    json["intrinsic_type"]["camera_type"] =
+        OpenCamCalib::utils::CameraIDToString(
+            (int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
     json["intrinsic_type"]["div_undist_distortion"] =
         intrinsics[theia::DivisionUndistortionCameraModel::
                        InternalParametersIndex::RADIAL_DISTORTION_1];
@@ -512,7 +504,8 @@ int main(int argc, char *argv[]) {
         [theia::DoubleSphereCameraModel::InternalParametersIndex::ASPECT_RATIO];
     json["intrinsics"]["skew"] = 0.0;
     json["intrinsic_type"]["camera_type"] =
-        CameraIDToString((int)theia::CameraIntrinsicsModelType::DOUBLE_SPHERE);
+        OpenCamCalib::utils::CameraIDToString(
+            (int)theia::CameraIntrinsicsModelType::DOUBLE_SPHERE);
     json["intrinsic_type"]["xi"] =
         intrinsics[theia::DoubleSphereCameraModel::InternalParametersIndex::XI];
     json["intrinsic_type"]["alpha"] = intrinsics

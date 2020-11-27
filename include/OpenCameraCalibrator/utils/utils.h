@@ -4,21 +4,31 @@
 #include <opencv2/aruco.hpp>
 #include <opencv2/opencv.hpp>
 
+#include <theia/sfm/view.h>
+#include <theia/sfm/reconstruction.h>
+
 #include <vector>
 #include <algorithm>
+#include <dirent.h>
 
 namespace OpenCamCalib {
-
-template<typename T>
-T square(const T & m)
-{
-    return m * m;
-}
+namespace utils {
 
 bool ReadDetectorParameters(std::string filename,
                             cv::Ptr<cv::aruco::DetectorParameters>& params);
 
 double MedianOfDoubleVec(std::vector<double>& double_vec);
+
+void PrintResult(const std::string cam_type,
+                 const theia::Reconstruction &recon_calib_dataset);
+
+std::string CameraIDToString(const int theia_enum);
+
+double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
+                            const theia::ViewId v_id);
+
+std::vector<std::string> load_images(const std::string &img_dir_path);
+
 
 // from https://rosettacode.org/wiki/Averages/Simple_moving_average#C.2B.2B
 class SimpleMovingAverage {
@@ -98,4 +108,5 @@ private:
     }
 };
 
+}
 }

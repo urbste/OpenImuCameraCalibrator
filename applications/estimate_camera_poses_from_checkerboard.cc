@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
   // set charuco detector parameters
   cv::Ptr<cv::aruco::DetectorParameters> detectorParams =
       cv::aruco::DetectorParameters::create();
-  if (!OpenCamCalib::ReadDetectorParameters(FLAGS_detector_params,
+  if (!OpenCamCalib::utils::ReadDetectorParameters(FLAGS_detector_params,
                                             detectorParams)) {
     std::cerr << "Invalid detector parameters file\n";
     return 0;
@@ -224,7 +224,12 @@ int main(int argc, char* argv[]) {
                  static_cast<double>(charuco_corners[i].y);
       reproj_error += (pt-feature).norm();
     }
-    total_repro_error += reproj_error / charuco_ids.size();
+    const double repro_error_n = reproj_error / charuco_ids.size();
+    if (repro_error_n > 3.0) {
+        std::cout<<"Removing view as reprojection error is to big: "<<repro_error_n<<"\n";
+        pose_dataset.RemoveView(view_id);
+    }
+    total_repro_error += repro_error_n;
     ++processed_frames;
 
     const std::string plt_text = "Reprojection error: "+

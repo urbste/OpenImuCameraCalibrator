@@ -6,11 +6,11 @@ endif (COMMAND cmake_policy)
 project(OpenCameraCalibrator C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # OpenCV
 message("-- Check for OpenCV")
-find_package(OpenCV 4.1.2)
+find_package(OpenCV 4.5.0)
 if (OpenCV_FOUND)
   message("-- Found OpenCV: ${OpenCV_INCLUDE_DIRS}")
 else (OpenCV_FOUND)
@@ -28,6 +28,9 @@ endif (THEIA_FOUND)
 
 file(GLOB_RECURSE CAMCALIB_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/*.cc)
 file(GLOB_RECURSE CAMCALIB_HEADER_FILES ${CMAKE_SOURCE_DIR}/include/*.h)
+
+include_directories(thirdparty/Sophus)
+
 
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/include

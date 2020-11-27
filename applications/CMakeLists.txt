@@ -16,3 +16,6 @@ target_link_libraries(estimate_camera_poses_from_checkerboard OpenCameraCalibrat
 
 add_executable(estimate_imu_to_camera_rotation estimate_imu_to_camera_rotation.cc)
 target_link_libraries(estimate_imu_to_camera_rotation OpenCameraCalibrator ${GLOG_LIBRARIES} ${THEIA_LIBRARIES} ${OpenCV_LIBRARIES} ${GFLAGS_LIBRARIES})
+
+add_executable(continuous_time_imu_to_camera_calibration_new continuous_time_imu_to_camera_calibration_new.cc)
+target_link_libraries(continuous_time_imu_to_camera_calibration_new OpenCameraCalibrator ${GLOG_LIBRARIES} ${THEIA_LIBRARIES} ${OpenCV_LIBRARIES} ${GFLAGS_LIBRARIES})

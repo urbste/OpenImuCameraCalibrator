@@ -97,8 +97,8 @@ double SolveClosedForm(
     InterpolateVector3d(time_with_offset, timestamps_s, angVis, dt_imu, interpolated_angVis);
 
     // compute mean vectors
-    Vector3d mean_vis;
-    Vector3d mean_imu;
+    Vector3d mean_vis(0.0,0.0,0.0);
+    Vector3d mean_imu(0.0,0.0,0.0);
     for (size_t i = 0; i < interpolated_angVis.size(); ++i) {
         mean_imu += angImu[i];
         mean_vis += interpolated_angVis[i];
@@ -142,7 +142,9 @@ void EstimateCameraImuAlignment(
     const double dt_imu,
     Matrix3d& R_imu_to_camera,
     double& time_offset_imu_to_camera,
-    Vector3d& gyro_bias) {
+    Vector3d& gyro_bias,
+    Vec3Vector& smoothed_ang_imu,
+    Vec3Vector& smoothed_vis_vel) {
   // find start and end points of camera and imu
   const double start_time_cam = visual_rotations.begin()->first;
   const double end_time_cam = visual_rotations.rbegin()->first;
@@ -188,7 +190,6 @@ void EstimateCameraImuAlignment(
       tVis.push_back(vis.first);
       qtVis.push_back(vis.second);
   }
-
   QuatVector qtVis_interp;
   InterpolateQuaternions(tVis, tIMU, qtVis, dt_vis, qtVis_interp);
 
@@ -216,10 +217,10 @@ void EstimateCameraImuAlignment(
   }
 
   // calculate moving average to smooth the values a bit
-  SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
-  SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
+  OpenCamCalib::utils::SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
+  OpenCamCalib::utils::SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
 
-  Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
+  //Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
   for (int i=0; i < angImu.size(); ++i) {
     x_imu.add(angImu[i][0]);
     y_imu.add(angImu[i][1]);

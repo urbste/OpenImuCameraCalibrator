@@ -12,7 +12,7 @@ bool initialize_pinhole_camera(
     Eigen::Vector3d &position, double &focal_length) {
 
   theia::UncalibratedAbsolutePose pose_linear;
-
+  // use -> cv::initCameraMatrix2D()
   const bool success = theia::EstimateUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, &pose_linear,
       &ransac_summary);
@@ -24,7 +24,8 @@ bool initialize_pinhole_camera(
   rotation = pose_linear.rotation;
   position = pose_linear.position;
   focal_length = pose_linear.focal_length;
-
+  if (ransac_summary.inliers.size() < 10)
+      return false;
   return success;
 }
 
@@ -32,14 +33,16 @@ bool initialize_radial_undistortion_camera(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
     const theia::RansacParameters &ransac_params,
     theia::RansacSummary &ransac_summary, const int img_cols,
-    Eigen::Matrix3d &rotation,
-    Eigen::Vector3d &position, double &focal_length,
+    Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
     double &radial_distortion) {
 
+  if (correspondences.size() <= 4) {
+    return false;
+  }
   theia::RadialDistUncalibratedAbsolutePoseMetaData meta_data;
   theia::RadialDistUncalibratedAbsolutePose pose_division_undist;
-  meta_data.max_focal_length = 0.5*img_cols+150.0; // TODO SET THAT FROM IMAGE SIZE
-  meta_data.min_focal_length = 0.5*img_cols-150.0;
+  meta_data.max_focal_length = 0.5 * img_cols + 150.0;
+  meta_data.min_focal_length = 0.5 * img_cols - 150.0;
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
       &pose_division_undist, &ransac_summary);
@@ -54,7 +57,8 @@ bool initialize_radial_undistortion_camera(
   position = -pose_division_undist.rotation * pose_division_undist.translation;
   radial_distortion = pose_division_undist.radial_distortion;
   focal_length = pose_division_undist.focal_length;
-
+  if (ransac_summary.inliers.size() < 10)
+      return false;
   return success;
 }
 
@@ -85,11 +89,10 @@ bool initialize_doublesphere_model(
   bool success = false;
 
   // Now we try to find a non-radial line to initialize the focal length
-  const size_t target_cols =
-      charucoboard->getChessboardSize().width;
-  const size_t target_rows =
-      charucoboard->getChessboardSize().height;
-  std::cout<<"chessboard size"<<target_cols<<" "<<target_rows<<std::endl;
+  const size_t target_cols = charucoboard->getChessboardSize().width;
+  const size_t target_rows = charucoboard->getChessboardSize().height;
+  std::cout << "chessboard size" << target_cols << " " << target_rows
+            << std::endl;
   for (int r = 0; r < target_rows; ++r) {
     aligned_vector<Eigen::Vector4d> P;
 
@@ -98,8 +101,9 @@ bool initialize_doublesphere_model(
 
       if (id_to_corner.find(corner_id) != id_to_corner.end()) {
         const Eigen::Vector2d imagePoint = id_to_corner[corner_id];
-        P.emplace_back(imagePoint[0], imagePoint[1],
-                0.5, -0.5 * (square(imagePoint[0]) + square(imagePoint[1])));
+        P.emplace_back(imagePoint[0], imagePoint[1], 0.5,
+                       -0.5 * (imagePoint[0] * imagePoint[0] +
+                               imagePoint[1] * imagePoint[1]));
       }
     }
     const int MIN_CORNERS = 8;
@@ -125,7 +129,7 @@ bool initialize_doublesphere_model(
       // std::cerr << "C\n" << C.transpose() << std::endl;
       // std::cerr << "P*res\n" << P_mat.transpose() * C << std::endl;
 
-      double t = square(C(0)) + square(C(1)) + C(2) * C(3);
+      double t = C(0) * C(0) + C(1) * C(1) + C(2) * C(3);
       if (t < 0) {
         continue;
       }
@@ -139,7 +143,7 @@ bool initialize_doublesphere_model(
         continue;
       }
 
-      double nz = sqrt(1.0 - square(nx) - square(ny));
+      double nz = sqrt(1.0 - nx * nx - ny * ny);
       double gamma = fabs(C(2) * d / nz);
 
       // undistort points with intrinsic guess
@@ -201,12 +205,15 @@ bool initialize_doublesphere_model(
           rotation = pose.rotation;
           position = pose.position;
           focal_length = 0.5 * gamma0;
-          std::cout<<"new min_reproj_error: "<<min_reproj_error<<std::endl;
+          std::cout << "new min_reproj_error: " << min_reproj_error
+                    << std::endl;
 
         } // if clause
       }   // if in_image
     }     // if P.size()
   }       // for target cols
+  if (ransac_summary.inliers.size() < 10)
+      return false;
   return success;
 } // for target rows
 

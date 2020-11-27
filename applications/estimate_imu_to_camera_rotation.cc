@@ -83,11 +83,12 @@ int main(int argc, char* argv[]) {
       cams_dt_s.push_back(timestamps_images[i] - timestamps_images[i-1]);
   }
   // we take the median as some images might not have been estimated
-  const double cam_dt_s = OpenCamCalib::MedianOfDoubleVec(cams_dt_s);
+  const double cam_dt_s = OpenCamCalib::utils::MedianOfDoubleVec(cams_dt_s);
 
   Eigen::Matrix3d R_gyro_to_camera;
   double time_offset_gyro_to_camera;
   Eigen::Vector3d gyro_bias;
+  Vec3Vector ang_vel, imu_vel;
   OpenCamCalib::filter::EstimateCameraImuAlignment(
       visual_rotations,
       angular_velocities,
@@ -95,7 +96,8 @@ int main(int argc, char* argv[]) {
       imu_dt_s,
       R_gyro_to_camera,
       time_offset_gyro_to_camera,
-      gyro_bias);
+      gyro_bias,
+      imu_vel, ang_vel);
 
   json output_json;
   output_json["gyro_bias"] = {gyro_bias[0], gyro_bias[1], gyro_bias[2]};
@@ -110,10 +112,12 @@ int main(int argc, char* argv[]) {
   std::ofstream out_file(FLAGS_gyro_calibration_output);
   out_file << std::setw(4) << output_json << std::endl;
 
-//  // write to txt for testing
-//  std::ofstream vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable/poses.txt");
-//  std::ofstream acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable/accelerometer.txt");
-//  std::ofstream gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable/gyroscope.txt");
+  // write to txt for testing
+  //std::ofstream vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/poses.txt");
+  //std::ofstream acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/accelerometer.txt");
+  std::ofstream gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope.txt");
+  std::ofstream gyr_out_trafo("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope_transformed.txt");
+  std::ofstream vis_interp_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/visual_gyroscope.txt");
 
 //  for (auto v : visual_rotations) {
 //    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
@@ -130,5 +134,18 @@ int main(int argc, char* argv[]) {
 //    gyr_out << v.first * 1e9 << " " << v.second[0] <<" "<<v.second[1]<<" "<<v.second[2]<<"\n";
 //  }
 //  gyr_out.close();
+  for (auto v : imu_vel) {
+    gyr_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
+  }
+  gyr_out.close();
+  for (auto v : imu_vel) {
+    Eigen::Vector3d a = R_gyro_to_camera * v;
+    gyr_out_trafo << 1 << " " << a[0] <<" "<<a[1]<<" "<<a[2]<<"\n";
+  }
+  gyr_out_trafo.close();
+  for (auto v : ang_vel) {
+    vis_interp_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
+  }
+  vis_interp_out.close();
   return 0;
 }
