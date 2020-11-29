@@ -12,7 +12,7 @@
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 
 template <int _N, bool OLD_TIME_DERIV = false>
-class CeresCalibrationSplineSplit {
+class CeresRSCalibrationSplineSplit {
  public:
   static constexpr int N = _N;        // Order of the spline.
   static constexpr int DEG = _N - 1;  // Degree of the spline.
@@ -20,36 +20,28 @@ class CeresCalibrationSplineSplit {
   static constexpr double ns_to_s = 1e-9;  ///< Nanosecond to second conversion
   static constexpr double s_to_ns = 1e9;   ///< Second to nanosecond conversion
 
-  CeresCalibrationSplineSplit(int64_t time_interval_so3_ns,
-                              int64_t time_interval_r3_ns,
-                              int64_t start_time_ns = 0)
-      : dt_so3_ns(time_interval_so3_ns), dt_r3_ns(time_interval_r3_ns),  start_t_ns(start_time_ns) {
-    inv_so3_dt = s_to_ns / dt_so3_ns;
-    inv_r3_dt = s_to_ns / dt_r3_ns;
+  CeresRSCalibrationSplineSplit(int64_t time_interval_ns,
+                                int64_t start_time_ns = 0)
+      : dt_ns(time_interval_ns), start_t_ns(start_time_ns) {
+    inv_dt = s_to_ns / dt_ns;
+
     accel_bias.setZero();
     gyro_bias.setZero();
   };
 
   Sophus::SE3d getPose(int64_t time_ns) const {
-    const int64_t st_ns = (time_ns - start_t_ns);
+    int64_t st_ns = (time_ns - start_t_ns);
 
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
                                               << " start_t_ns " << start_t_ns);
 
-    const int64_t s_so3 = st_ns / dt_so3_ns;
-    double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
-    const int64_t s_r3 = st_ns / dt_r3_ns;
-    double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
+    int64_t s = st_ns / dt_ns;
+    double u = double(st_ns % dt_ns) / double(dt_ns);
 
-    BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
-    BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
-
+    BASALT_ASSERT_STREAM(s >= 0, "s " << s);
     BASALT_ASSERT_STREAM(
-        size_t(s_so3 + N) <= so3_knots.size(),
-        "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
-    BASALT_ASSERT_STREAM(
-        size_t(s_r3 + N) <= trans_knots.size(),
-        "s " << s_r3 << " N " << N << " knots.size() " << trans_knots.size());
+        size_t(s + N) <= so3_knots.size(),
+        "s " << s << " N " << N << " knots.size() " << so3_knots.size());
 
     Sophus::SE3d res;
 
@@ -59,20 +51,20 @@ class CeresCalibrationSplineSplit {
     {
       std::vector<const double*> vec;
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(so3_knots[s_so3 + i].data());
+        vec.emplace_back(so3_knots[s + i].data());
       }
 
       CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(
-          &vec[0], u_so3, inv_so3_dt, &rot);
+          &vec[0], u, inv_dt, &rot);
     }
 
     {
       std::vector<const double*> vec;
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(trans_knots[s_r3 + i].data());
+        vec.emplace_back(trans_knots[s + i].data());
       }
 
-      CeresSplineHelper<N>::template evaluate<double, 3, 0>(&vec[0], u_r3, inv_r3_dt,
+      CeresSplineHelper<N>::template evaluate<double, 3, 0>(&vec[0], u, inv_dt,
                                                             &trans);
     }
 
@@ -87,23 +79,23 @@ class CeresCalibrationSplineSplit {
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
                                               << " start_t_ns " << start_t_ns);
 
-    int64_t s_so3 = st_ns / dt_so3_ns;
-    double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
+    int64_t s = st_ns / dt_ns;
+    double u = double(st_ns % dt_ns) / double(dt_ns);
 
-    BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
+    BASALT_ASSERT_STREAM(s >= 0, "s " << s);
     BASALT_ASSERT_STREAM(
-        size_t(s_so3 + N) <= so3_knots.size(),
-        "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
+        size_t(s + N) <= so3_knots.size(),
+        "s " << s << " N " << N << " knots.size() " << so3_knots.size());
 
     Eigen::Vector3d gyro;
 
     std::vector<const double*> vec;
     for (int i = 0; i < N; i++) {
-      vec.emplace_back(so3_knots[s_so3 + i].data());
+      vec.emplace_back(so3_knots[s + i].data());
     }
 
     CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(
-        &vec[0], u_so3, inv_so3_dt, nullptr, &gyro);
+        &vec[0], u, inv_dt, nullptr, &gyro);
 
     return gyro;
   }
@@ -114,21 +106,13 @@ class CeresCalibrationSplineSplit {
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
                                               << " start_t_ns " << start_t_ns);
 
-    const int64_t s_so3 = st_ns / dt_so3_ns;
-    double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
-    const int64_t s_r3 = st_ns / dt_r3_ns;
-    double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
+    int64_t s = st_ns / dt_ns;
+    double u = double(st_ns % dt_ns) / double(dt_ns);
 
-    BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
-    BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
-
+    BASALT_ASSERT_STREAM(s >= 0, "s " << s);
     BASALT_ASSERT_STREAM(
-        size_t(s_so3 + N) <= so3_knots.size(),
-        "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
-    BASALT_ASSERT_STREAM(
-        size_t(s_r3 + N) <= trans_knots.size(),
-        "s " << s_r3 << " N " << N << " knots.size() " << trans_knots.size());
-
+        size_t(s + N) <= so3_knots.size(),
+        "s " << s << " N " << N << " knots.size() " << so3_knots.size());
 
     Eigen::Vector3d accel;
 
@@ -138,20 +122,20 @@ class CeresCalibrationSplineSplit {
     {
       std::vector<const double*> vec;
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(so3_knots[s_so3 + i].data());
+        vec.emplace_back(so3_knots[s + i].data());
       }
 
       CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(
-          &vec[0], u_so3, inv_so3_dt, &rot);
+          &vec[0], u, inv_dt, &rot);
     }
 
     {
       std::vector<const double*> vec;
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(trans_knots[s_r3 + i].data());
+        vec.emplace_back(trans_knots[s + i].data());
       }
 
-      CeresSplineHelper<N>::template evaluate<double, 3, 2>(&vec[0], u_r3, inv_r3_dt,
+      CeresSplineHelper<N>::template evaluate<double, 3, 2>(&vec[0], u, inv_dt,
                                                             &trans_accel_world);
     }
 
@@ -160,13 +144,14 @@ class CeresCalibrationSplineSplit {
     return accel;
   }
 
-  void init(const Sophus::SE3d& init, const int num_knots_so3, int num_knots_r3) {
-    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3, init.so3());
+  void init(const Sophus::SE3d& init, int num_knots) {
+    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots, init.so3());
     trans_knots =
-        Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3, init.translation());
+        Eigen::aligned_vector<Eigen::Vector3d>(num_knots, init.translation());
 
     // Add local parametrization for SO(3) rotation
-    for (int i = 0; i < num_knots_so3; i++) {
+
+    for (int i = 0; i < num_knots; i++) {
       ceres::LocalParameterization* local_parameterization =
           new LieLocalParameterization<Sophus::SO3d>();
 
@@ -192,8 +177,8 @@ class CeresCalibrationSplineSplit {
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
                                               << " start_t_ns " << start_t_ns);
 
-    int64_t s = st_ns / dt_so3_ns;
-    double u = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
+    int64_t s = st_ns / dt_ns;
+    double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
     BASALT_ASSERT_STREAM(
@@ -203,7 +188,7 @@ class CeresCalibrationSplineSplit {
     using FunctorT = CalibGyroCostFunctorSplit<N, Sophus::SO3, OLD_TIME_DERIV>;
 
     FunctorT* functor = new FunctorT(
-        meas, u, inv_so3_dt, weight_so3);
+        meas, u, inv_dt, weight_so3);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -229,25 +214,18 @@ class CeresCalibrationSplineSplit {
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
                                               << " start_t_ns " << start_t_ns);
 
-    int64_t s_so3 = st_ns / dt_so3_ns;
-    double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
-    int64_t s_r3 = st_ns / dt_r3_ns;
-    double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
+    int64_t s = st_ns / dt_ns;
+    double u = double(st_ns % dt_ns) / double(dt_ns);
 
-    BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
-    BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
-
+    BASALT_ASSERT_STREAM(s >= 0, "s " << s);
     BASALT_ASSERT_STREAM(
-        size_t(s_so3 + N) <= so3_knots.size(),
-        "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
-    BASALT_ASSERT_STREAM(
-        size_t(s_r3 + N) <= trans_knots.size(),
-        "s " << s_r3 << " N " << N << " knots.size() " << trans_knots.size());
+        size_t(s + N) <= so3_knots.size(),
+        "s " << s << " N " << N << " knots.size() " << so3_knots.size());
 
     using FunctorT = CalibAccelerationCostFunctorSplit<N>;
 
     FunctorT* functor = new FunctorT(
-        meas, u_r3, inv_r3_dt, u_so3, inv_so3_dt, weight_se3);
+        meas, u, inv_dt, weight_se3);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -264,10 +242,10 @@ class CeresCalibrationSplineSplit {
 
     std::vector<double*> vec;
     for (int i = 0; i < N; i++) {
-      vec.emplace_back(so3_knots[s_so3 + i].data());
+      vec.emplace_back(so3_knots[s + i].data());
     }
     for (int i = 0; i < N; i++) {
-      vec.emplace_back(trans_knots[s_r3 + i].data());
+      vec.emplace_back(trans_knots[s + i].data());
     }
     vec.emplace_back(g.data());
     vec.emplace_back(accel_bias.data());
@@ -278,96 +256,28 @@ class CeresCalibrationSplineSplit {
   void addCornersMeasurement(const CalibCornerData* corners,
                              const theia::Reconstruction* calib,
                              const theia::Camera* cam,
+                             const double cam_readout_s,
                              int cam_id,
                              int64_t time_ns) {
-    const int64_t st_ns = (time_ns - start_t_ns);
+    int64_t st_ns = (time_ns - start_t_ns);
 
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
                                               << " start_t_ns " << start_t_ns);
 
-    const int64_t s_so3 = st_ns / dt_so3_ns;
-    double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
-    const int64_t s_r3 = st_ns / dt_r3_ns;
-    double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
+    int64_t s = st_ns / dt_ns;
+    double u = double(st_ns % dt_ns) / double(dt_ns);
 
-    BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
-    BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
-
+    BASALT_ASSERT_STREAM(s >= 0, "s " << s);
     BASALT_ASSERT_STREAM(
-        size_t(s_so3 + N) <= so3_knots.size(),
-        "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
-    BASALT_ASSERT_STREAM(
-        size_t(s_r3 + N) <= trans_knots.size(),
-        "s " << s_r3 << " N " << N << " knots.size() " << trans_knots.size());
-
-
-    using FunctorT = CalibReprojectionCostFunctorSplit<N, theia::DivisionUndistortionCameraModel>;
-    FunctorT* functor = new FunctorT(corners,
-                                     calib,
-                                     cam,
-                                     u_so3, u_r3,
-                                     inv_so3_dt, inv_r3_dt);
-
-    ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
-        new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
-
-    for (int i = 0; i < N; i++) {
-      cost_function->AddParameterBlock(4);
-    }
-    for (int i = 0; i < N; i++) {
-      cost_function->AddParameterBlock(3);
-    }
-    // T_i_c
-    cost_function->AddParameterBlock(7);
-
-    cost_function->SetNumResiduals(corners->track_ids.size() * 2);
-
-    std::vector<double*> vec;
-    for (int i = 0; i < N; i++) {
-      vec.emplace_back(so3_knots[s_so3 + i].data());
-    }
-    for (int i = 0; i < N; i++) {
-      vec.emplace_back(trans_knots[s_r3 + i].data());
-    }
-    vec.emplace_back(T_i_c.data());
-
-    problem.AddResidualBlock(cost_function, NULL, vec);
-  }
-
-  void addRSCornersMeasurement(const CalibCornerData* corners,
-                             const theia::Reconstruction* calib,
-                             const theia::Camera* cam,
-                             double cam_readout_s,
-                             int cam_id,
-                             int64_t time_ns) {
-    const int64_t st_ns = (time_ns - start_t_ns);
-
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
-
-    const int64_t s_so3 = st_ns / dt_so3_ns;
-    double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
-    const int64_t s_r3 = st_ns / dt_r3_ns;
-    double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
-
-    BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
-    BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
-
-    BASALT_ASSERT_STREAM(
-        size_t(s_so3 + N) <= so3_knots.size(),
-        "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
-    BASALT_ASSERT_STREAM(
-        size_t(s_r3 + N) <= trans_knots.size(),
-        "s " << s_r3 << " N " << N << " knots.size() " << trans_knots.size());
-
+        size_t(s + N) <= so3_knots.size(),
+        "s " << s << " N " << N << " knots.size() " << so3_knots.size());
 
     using FunctorT = CalibRSReprojectionCostFunctorSplit<N, theia::DivisionUndistortionCameraModel>;
     FunctorT* functor = new FunctorT(corners,
                                      calib,
                                      cam,
                                      cam_readout_s,
-                                     u_so3, u_r3,
-                                     inv_so3_dt, inv_r3_dt);
+                                     u, inv_dt);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -385,10 +295,10 @@ class CeresCalibrationSplineSplit {
 
     std::vector<double*> vec;
     for (int i = 0; i < N; i++) {
-      vec.emplace_back(so3_knots[s_so3 + i].data());
+      vec.emplace_back(so3_knots[s + i].data());
     }
     for (int i = 0; i < N; i++) {
-      vec.emplace_back(trans_knots[s_r3 + i].data());
+      vec.emplace_back(trans_knots[s + i].data());
     }
     vec.emplace_back(T_i_c.data());
 
@@ -396,50 +306,45 @@ class CeresCalibrationSplineSplit {
   }
 
   int64_t maxTimeNs() const {
-    return start_t_ns + (so3_knots.size() - N + 1) * dt_so3_ns - 1;
+    return start_t_ns + (so3_knots.size() - N + 1) * dt_ns - 1;
   }
 
   int64_t minTimeNs() const { return start_t_ns; }
 
   double meanReprojection(
       const std::unordered_map<TimeCamId, CalibCornerData>&
-          calib_corners) const {
+          calib_corners,
+      const double cam_readout_s) const {
     double sum_error = 0;
     int num_points = 0;
 
     for (const auto& kv : calib_corners) {
-      const int64_t time_ns = kv.first.frame_id;
+      int64_t time_ns = kv.first.frame_id;
 
       if (time_ns < minTimeNs() || time_ns >= maxTimeNs()) continue;
 
-      const int64_t st_ns = (time_ns - start_t_ns);
+      int64_t st_ns = (time_ns - start_t_ns);
 
       BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns "
                                                 << time_ns << " start_t_ns "
                                                 << start_t_ns);
 
-      const int64_t s_so3 = st_ns / dt_so3_ns;
-      const double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
-      int64_t s_r3 = st_ns / dt_r3_ns;
-      const double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
+      int64_t s = st_ns / dt_ns;
+      double u = double(st_ns % dt_ns) / double(dt_ns);
 
-      BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
-      BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
-
+      BASALT_ASSERT_STREAM(s >= 0, "s " << s);
       BASALT_ASSERT_STREAM(
-          size_t(s_so3 + N) <= so3_knots.size(),
-          "s " << s_so3 << " N " << N << " knots.size() " << so3_knots.size());
-      BASALT_ASSERT_STREAM(
-          size_t(s_r3 + N) <= trans_knots.size(),
-          "s " << s_r3 << " N " << N << " knots.size() " << trans_knots.size());
+          size_t(s + N) <= so3_knots.size(),
+          "s " << s << " N " << N << " knots.size() " << so3_knots.size());
 
-      using FunctorT = CalibReprojectionCostFunctorSplit<N, theia::DivisionUndistortionCameraModel>;
+      using FunctorT = CalibRSReprojectionCostFunctorSplit<N, theia::DivisionUndistortionCameraModel>;
 
       FunctorT* functor =
           new FunctorT(&kv.second,
                        &calib,
                        &calib.View(0)->Camera(),
-                       u_so3, u_r3, inv_so3_dt, inv_r3_dt);
+                       cam_readout_s,
+                       u, inv_dt);
 
       ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
           new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -457,10 +362,10 @@ class CeresCalibrationSplineSplit {
 
       std::vector<const double*> vec;
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(so3_knots[s_so3 + i].data());
+        vec.emplace_back(so3_knots[s + i].data());
       }
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(trans_knots[s_r3 + i].data());
+        vec.emplace_back(trans_knots[s + i].data());
       }
       //vec.emplace_back(calib.T_i_c[kv.first.cam_id].data());
       vec.emplace_back(T_i_c.data());
@@ -524,8 +429,8 @@ class CeresCalibrationSplineSplit {
 
   Sophus::SE3<double> getT_i_c() { return T_i_c; }
  private:
-  int64_t dt_so3_ns, dt_r3_ns, start_t_ns;
-  double inv_so3_dt, inv_r3_dt;
+  int64_t dt_ns, start_t_ns;
+  double inv_dt;
 
   Eigen::aligned_vector<Sophus::SO3d> so3_knots;
   Eigen::aligned_vector<Eigen::Vector3d> trans_knots;

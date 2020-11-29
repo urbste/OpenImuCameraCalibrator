@@ -124,11 +124,18 @@ double SolveClosedForm(
 
     Rs = svd.matrixV() * C * svd.matrixU().transpose();
 
-    bias = mean_vis - Rs * mean_imu;
-
+    // only estimate bias if it is zero,
+    // otherwise we got it from another estimation procedure
+    Eigen::Vector3d bias_est;
+    if (bias.isZero(0)) {
+        bias_est = mean_vis - Rs * mean_imu;
+        bias = bias_est;
+    } else {
+        bias_est.setZero();
+    }
     double error = 0.0;
     for (size_t i = 0; i < angVis.size(); ++i) {
-        Vector3d D = interpolated_angVis[i] - (Rs * angImu[i]  + bias);
+        Vector3d D = interpolated_angVis[i] - (Rs * angImu[i]  + bias_est);
         error += D.squaredNorm();
     }
 
@@ -256,12 +263,16 @@ void EstimateCameraImuAlignment(
       if (fc < fd) {
           b = d;
           R_imu_to_camera = Rsc;
-          gyro_bias = biasc;
+          if (gyro_bias.isZero(0)) {
+            gyro_bias = biasc;
+          }
           error = fc;
       } else {
           a = c;
           R_imu_to_camera = Rsd;
-          gyro_bias = biasd;
+          if (gyro_bias.isZero(0)) {
+            gyro_bias = biasd;
+          }
           error = fd;
       }
 
@@ -273,10 +284,10 @@ void EstimateCameraImuAlignment(
   time_offset_imu_to_camera = (b + a) / 2;
 
   std::cout<<"Finished golden-section search in "<<iter<<" iterations.\n";
-  std::cout<<"Final gyro to camera rotation is: "<<R_imu_to_camera<<"\n";
+  std::cout<<"Final gyro to camera rotation is: \n"<<R_imu_to_camera<<"\n";
   Eigen::Quaterniond qat(R_imu_to_camera);
   std::cout<<"Final gyro to camera quaternion is: "<<qat.w()<<" "<<qat.x()<<" "<< qat.y()<<" "<<qat.z()<<"\n";
-  std::cout<<"Gyro bias is estimated to be: "<<gyro_bias<<"\n";
+  std::cout<<"Gyro bias is estimated to be: "<<gyro_bias[0]<<", "<<gyro_bias[1]<<", "<<gyro_bias[2]<<"\n";
   std::cout<<"Estimated time offset: "<<time_offset_imu_to_camera<<"\n";
   std::cout<<"Final alignment error: "<<error<<"\n";
 

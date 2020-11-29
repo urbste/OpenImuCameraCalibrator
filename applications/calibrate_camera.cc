@@ -38,7 +38,7 @@ DEFINE_double(checker_size_m, 0.023,
               "take far away poses!");
 DEFINE_double(grid_size, 0.04,
               "Only take images that are at least grid_size apart");
-DEFINE_bool(is_stablelized, false, "Indicate if image was stablelized");
+DEFINE_bool(is_stabelized, false, "Indicate if image was stablelized");
 DEFINE_bool(use_also_aruco_corners, false,
             "Indicate if also aruco corners should be added");
 
@@ -439,19 +439,7 @@ int main(int argc, char *argv[]) {
   OpenCamCalib::utils::PrintResult(FLAGS_camera_model_to_calibrate,
                                    recon_calib_dataset);
 
-  std::string output_str = "";
-  std::string size_str = std::to_string(int(FLAGS_downsample_factor));
-  if (FLAGS_camera_model_to_calibrate == "DOUBLE_SPHERE")
-    output_str =
-        FLAGS_save_path_calib_dataset + "/camera_calibration_ds_" + size_str;
-  else if (FLAGS_camera_model_to_calibrate == "DIVISION_UNDISTORTION")
-    output_str =
-        FLAGS_save_path_calib_dataset + "/camera_calibration_div_" + size_str;
-  else if (FLAGS_camera_model_to_calibrate == "PINHOLE")
-    output_str =
-        FLAGS_save_path_calib_dataset + "/camera_calibration_ph_" + size_str;
-
-  theia::WriteReconstruction(recon_calib_dataset, output_str + ".calibdata");
+  theia::WriteReconstruction(recon_calib_dataset, FLAGS_save_path_calib_dataset + ".calibdata");
   nlohmann::json json;
 
   const theia::Camera cam =
@@ -470,7 +458,7 @@ int main(int argc, char *argv[]) {
   const double total_repro_error =
       reproj_error / recon_calib_dataset.NumViews();
   std::cout << "Final reprojection error: " << total_repro_error << std::endl;
-  json["stabelized"] = FLAGS_is_stablelized;
+  json["stabelized"] = FLAGS_is_stabelized;
   json["fps"] = fps;
   json["nr_images_used"] = recon_calib_dataset.NumViews();
   json["final_ba_cost"] = summary.final_cost;
@@ -511,7 +499,7 @@ int main(int argc, char *argv[]) {
     json["intrinsic_type"]["alpha"] = intrinsics
         [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA];
   }
-  std::ofstream calib_txt_output(output_str + ".json");
+  std::ofstream calib_txt_output(FLAGS_save_path_calib_dataset + ".json");
   calib_txt_output << std::setw(4) << json << std::endl;
 
   return 0;

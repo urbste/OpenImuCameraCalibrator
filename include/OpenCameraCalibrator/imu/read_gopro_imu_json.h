@@ -2,6 +2,8 @@
 #pragma once
 
 #include <string>
+#include <Eigen/Geometry>
+
 #include "OpenCameraCalibrator/utils/types.h"
 
 namespace OpenCamCalib {
@@ -15,4 +17,8 @@ bool ReadSplineErrorWeighting(const std::string& path_to_spline_error_weighting_
 bool ReadIMUBias(const std::string& path_to_imu_bias,
                  Eigen::Vector3d& gyro_bias,
                  Eigen::Vector3d& accl_bias);
+
+bool ReadIMU2CamInit(const std::string &path_to_file,
+                     Eigen::Quaterniond &imu_to_cam_rotation,
+                     double& time_offset_imu_to_cam);
 }

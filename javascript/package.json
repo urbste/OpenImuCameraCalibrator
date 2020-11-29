@@ -1,0 +1,14 @@
+{
+  "name": "gopro-metadata-extractor",
+  "version": "0.1.0",
+  "description": "",
+  "main": "extract_metadata.js",
+  "author": "Steffen Urban",
+  "scripts": {},
+  "license": "MIT",
+  "dependencies": {
+    "gpmf-extract": "^0.1.21",
+    "gopro-telemetry": "^1.1.29",
+    "mp4box": "latest"
+  }
+}

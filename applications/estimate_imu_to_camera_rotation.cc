@@ -29,7 +29,10 @@ DEFINE_string(
     gopro_telemetry_json, "",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
 DEFINE_string(
-    gyro_calibration_output, "gyro_to_cam_calibration.json",
+    imu_bias_estimate, "",
+    "Estimate to imu bias values. If empty, we will estimate this.");
+DEFINE_string(
+    imu_rotation_init_output, "gyro_to_cam_calibration.json",
     "Gyroscope to camera calibration output path.");
 
 int main(int argc, char* argv[]) {
@@ -39,6 +42,15 @@ int main(int argc, char* argv[]) {
   theia::Reconstruction pose_dataset;
   CHECK(theia::ReadReconstruction(
         FLAGS_input_pose_calibration_dataset, &pose_dataset));
+
+  Eigen::Vector3d accl_bias, gyro_bias;
+  accl_bias.setZero();
+  gyro_bias.setZero();
+  if (FLAGS_imu_bias_estimate != "") {
+      // IMU Bias
+      std::cout<<"Load IMU bias file: "<<FLAGS_imu_bias_estimate<<std::endl;
+      OpenCamCalib::ReadIMUBias(FLAGS_imu_bias_estimate, gyro_bias, accl_bias);
+  }
 
   // read gopro telemetry
   OpenCamCalib::CameraTelemetryData telemetry_data;
@@ -50,9 +62,9 @@ int main(int argc, char* argv[]) {
   Vec3Map angular_velocities, acclerations;
   for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size(); ++i) {
     angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
-                              telemetry_data.gyroscope.gyro_measurement[i];
+                              telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias;
     acclerations[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
-            telemetry_data.accelerometer.acc_masurement[i];
+            telemetry_data.accelerometer.acc_masurement[i] + accl_bias;
   }
   // get mean hz imu
   double imu_dt_s = 0.0;
@@ -87,7 +99,6 @@ int main(int argc, char* argv[]) {
 
   Eigen::Matrix3d R_gyro_to_camera;
   double time_offset_gyro_to_camera;
-  Eigen::Vector3d gyro_bias;
   Vec3Vector ang_vel, imu_vel;
   OpenCamCalib::filter::EstimateCameraImuAlignment(
       visual_rotations,
@@ -109,7 +120,7 @@ int main(int argc, char* argv[]) {
   output_json["time_offset_gyro_to_cam"] = time_offset_gyro_to_camera;
 
   // write prettified JSON to another file
-  std::ofstream out_file(FLAGS_gyro_calibration_output);
+  std::ofstream out_file(FLAGS_imu_rotation_init_output);
   out_file << std::setw(4) << output_json << std::endl;
 
   // write to txt for testing

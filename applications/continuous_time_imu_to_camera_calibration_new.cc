@@ -18,8 +18,8 @@
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 
-#include "OpenCameraCalibrator/basalt_spline/ceres_calib_spline_split.h"
 #include "OpenCameraCalibrator/basalt_spline/calib_helpers.h"
+#include "OpenCameraCalibrator/basalt_spline/ceres_calib_spline_split.h"
 
 #include "OpenCameraCalibrator/utils/json.h"
 #include "theia/io/reconstruction_reader.h"
@@ -33,24 +33,14 @@
 DEFINE_string(
     gopro_telemetry_json, "",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
-DEFINE_string(input_video, "", "Path to corresponding video file.");
-DEFINE_string(detector_params, "", "Path detector yaml.");
 DEFINE_string(input_calibration_dataset, "",
               "Path to input calibration dataset.");
-DEFINE_double(checker_size_m, 0.039,
-              "Size of one square on the checkerbaord in [m].");
-DEFINE_string(output_path_txt_files_for_testing, "",
-              "Output files for scale estimator.");
 DEFINE_string(gyro_to_cam_initial_calibration, "",
               "Initial gyro to camera calibration json.");
 DEFINE_string(imu_bias_file, "", "IMU bias json");
-DEFINE_string(camera_model_to_calibrate, "DIVISION_UNDISTORTION",
-              "What camera model do you want to calibrate. Options:"
-              "LINEAR_PINHOLE,DIVISION_UNDISTORTION");
 DEFINE_string(spline_error_weighting_json, "",
               "Path to spline error weighting data");
-DEFINE_string(output_path, "",
-              "Output path for results");
+DEFINE_string(output_path, "", "Output path for results");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 
 using json = nlohmann::json;
@@ -58,21 +48,13 @@ using json = nlohmann::json;
 using namespace cv;
 using namespace theia;
 
-
 int main(int argc, char *argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
-  CHECK(FLAGS_spline_error_weighting_json != "")
-      << "You need to provide spline error weighting factors. Create with "
-         "get_sew_for_dataset.py.";
-  OpenCamCalib::SplineWeightingData weight_data;
-  OpenCamCalib::ReadSplineErrorWeighting(FLAGS_spline_error_weighting_json,
-                                         weight_data);
-
   // IMU Bias
   Eigen::Vector3d accl_bias, gyro_bias;
-  OpenCamCalib::ReadIMUBias(FLAGS_imu_bias_file, gyro_bias, accl_bias);
-
+  CHECK(OpenCamCalib::ReadIMUBias(FLAGS_imu_bias_file, gyro_bias, accl_bias))
+      << "Could not open " << FLAGS_imu_bias_file;
 
   // Load camera calibration reconstuction.
   theia::Reconstruction calib_dataset;
@@ -81,31 +63,34 @@ int main(int argc, char *argv[]) {
       << "Could not read Reconstruction file.";
   // read gopro telemetry
   OpenCamCalib::CameraTelemetryData telemetry_data;
-  if (!OpenCamCalib::ReadGoProTelemetry(FLAGS_gopro_telemetry_json,
-                                        telemetry_data)) {
-    std::cout << "Could not read: " << FLAGS_gopro_telemetry_json << std::endl;
-  }
+  CHECK(OpenCamCalib::ReadGoProTelemetry(FLAGS_gopro_telemetry_json,
+                                         telemetry_data))
+      << "Could not read: " << FLAGS_gopro_telemetry_json;
 
-  // read a gyro to cam calibration json
-  std::ifstream in_file(FLAGS_gyro_to_cam_initial_calibration);
-  json gyro_to_cam_calib;
-  in_file >> gyro_to_cam_calib;
-  in_file.close();
-  Eigen::Quaterniond imu2cam(gyro_to_cam_calib["gyro_to_camera_rotation"]["w"],
-                             gyro_to_cam_calib["gyro_to_camera_rotation"]["x"],
-                             gyro_to_cam_calib["gyro_to_camera_rotation"]["y"],
-                             gyro_to_cam_calib["gyro_to_camera_rotation"]["z"]);
+  // read a gyro to cam calibration json to initialize rotation between imu and
+  // camera
+  Eigen::Quaterniond imu2cam;
+  double time_offset_imu_to_cam;
+  CHECK(OpenCamCalib::ReadIMU2CamInit(FLAGS_gyro_to_cam_initial_calibration,
+                                      imu2cam, time_offset_imu_to_cam))
+      << "Could not read: " << FLAGS_gyro_to_cam_initial_calibration;
+  Sophus::SE3<double> T_i_c_init(imu2cam.conjugate(), Eigen::Vector3d(0, 0, 0));
 
-  Sophus::SE3<double> T_i_c_init(imu2cam.conjugate(), Eigen::Vector3d(0,0,0));
-
-
+  CHECK(FLAGS_spline_error_weighting_json != "")
+      << "You need to provide spline error weighting factors. Create with "
+         "get_sew_for_dataset.py.";
+  OpenCamCalib::SplineWeightingData weight_data;
+  CHECK(OpenCamCalib::ReadSplineErrorWeighting(
+      FLAGS_spline_error_weighting_json, weight_data))
+      << "Could not open " << FLAGS_spline_error_weighting_json;
+  // initialize spline parameters
   const double dt_r3 = weight_data.dt_r3;
   const double dt_so3 = weight_data.dt_so3;
-  const double time_offset_imu_to_cam =
-      gyro_to_cam_calib["time_offset_gyro_to_cam"];
-  const double imu_update_rate_hz = 1./(telemetry_data.accelerometer.timestamp_ms[1] -
-          telemetry_data.accelerometer.timestamp_ms[0]);
-  //const double time_offset_cam_to_imu = -time_offset_imu_to_cam;
+  const double imu_update_rate_hz =
+      1. / (telemetry_data.accelerometer.timestamp_ms[1] -
+            telemetry_data.accelerometer.timestamp_ms[0]);
+
+  // Start
   // Number of cameras.
   const auto &view_ids = calib_dataset.ViewIds();
   std::vector<double> timestamps;
@@ -123,31 +108,32 @@ int main(int argc, char *argv[]) {
   double tend = timestamps[result.second - timestamps.begin()];
   const int64_t start_t_ns = t0 * 1e9;
   const int64_t end_t_ns = tend * 1e9;
-  const int64_t dt_ns = std::min(dt_so3, dt_r3) * 1e9;
+  const int64_t dt_so3_ns = dt_so3 * 1e9;
+  const int64_t dt_r3_ns = dt_r3 * 1e9;
+
   const int N = 5;
-  CeresCalibrationSplineSplit<N> calib_spline(dt_ns, start_t_ns);
+  CeresCalibrationSplineSplit<N> calib_spline(dt_so3_ns, dt_r3_ns, start_t_ns);
   calib_spline.setCalib(calib_dataset);
   calib_spline.setT_i_c(T_i_c_init);
   std::unordered_map<TimeCamId, CalibCornerData> calib_corners;
   std::unordered_map<TimeCamId, CalibInitPoseData> calib_init_poses;
   for (const ViewId view_id : view_ids) {
-
     const View &view = *calib_dataset.View(view_id);
     double timestamp = std::stod(view.Name());
-    if (timestamp >= tend ||
-        timestamp < t0)
+    if (timestamp >= tend || timestamp < t0)
       continue;
-    TimeCamId t_c_id(timestamp*1e9, 0);
+    TimeCamId t_c_id(timestamp * 1e9, 0);
     CalibCornerData corner_data;
     const std::vector<theia::TrackId> trackIds = view.TrackIds();
     for (size_t t = 0; t < trackIds.size(); ++t) {
-        corner_data.corners.push_back(*view.GetFeature(trackIds[t]));
+      corner_data.corners.push_back(*view.GetFeature(trackIds[t]));
     }
     corner_data.track_ids = trackIds;
     calib_corners[t_c_id] = corner_data;
     CalibInitPoseData pose_data;
-    pose_data.T_a_c = Sophus::SE3<double>(view.Camera().GetOrientationAsRotationMatrix().transpose(),
-                                          view.Camera().GetPosition());
+    pose_data.T_a_c = Sophus::SE3<double>(
+        view.Camera().GetOrientationAsRotationMatrix().transpose(),
+        view.Camera().GetPosition());
     calib_init_poses[t_c_id] = pose_data;
   }
 
@@ -165,9 +151,13 @@ int main(int argc, char *argv[]) {
 
       if (!g_initialized) {
         for (size_t i = 0;
-             i < telemetry_data.accelerometer.acc_masurement.size() && !g_initialized; i++) {
-          const Eigen::Vector3d ad = telemetry_data.accelerometer.acc_masurement[i] - accl_bias;
-          const int64_t accl_t_ns = telemetry_data.accelerometer.timestamp_ms[i] * 1e9;
+             i < telemetry_data.accelerometer.acc_masurement.size() &&
+             !g_initialized;
+             i++) {
+          const Eigen::Vector3d ad =
+              telemetry_data.accelerometer.acc_masurement[i] + accl_bias;
+          const int64_t accl_t_ns =
+              telemetry_data.accelerometer.timestamp_ms[i] * 1e9;
           if (std::abs(accl_t_ns - timestamp_ns) < 3000000) {
             g_a_init = T_a_i.so3() * ad;
             g_initialized = true;
@@ -180,13 +170,16 @@ int main(int argc, char *argv[]) {
   }
   calib_spline.setG(g_a_init);
 
-  // init from first camera
+  // init spline from first camera
   TimeCamId tcid_init(timestamps[result.first - timestamps.begin()], 0);
   Sophus::SE3d T_w_i_init =
       calib_init_poses.at(tcid_init).T_a_c * T_i_c_init.inverse();
-  calib_spline.init(T_w_i_init, (end_t_ns - start_t_ns) / dt_ns + N);
-  calib_spline.setNoiseLevels(std::sqrt(imu_update_rate_hz)*0.000282,
-                              std::sqrt(imu_update_rate_hz)*0.016);
+  const int num_knots_so3 = (end_t_ns - start_t_ns) / dt_so3_ns + N;
+  const int num_knots_r3 = (end_t_ns - start_t_ns) / dt_r3_ns + N;
+  const double cam_readout = 1.0 / 30.0;
+  std::cout << "Initializing " << num_knots_so3 << " SO3 knots.\n";
+  std::cout << "Initializing " << num_knots_r3 << " R3 knots.\n";
+  calib_spline.init(T_w_i_init, num_knots_so3, num_knots_r3);
 
   int num_gyro = 0;
   int num_accel = 0;
@@ -196,48 +189,60 @@ int main(int argc, char *argv[]) {
   const int sub_sample_imu = 1;
   std::cout << "Trajectory start time: " << t0 << " tend: " << tend
             << std::endl;
-  std::cout << "Knot spacing SO3 / R3: " << dt_so3 << "/"
-            << dt_r3 << "\n";
-  std::cout << "Error weighting SO3 / R3: " << 1./weight_data.var_so3 << "/"
-            << 1./weight_data.var_r3 << "\n";
-  //const std::shared_ptr<theia::CameraIntrinsicsModel> cam = calib_dataset.View(0)->Camera().CameraIntrinsics();
-  // add corners
-  for (const auto& kv : calib_corners) {
-    if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {
-      calib_spline.addCornersMeasurement(&kv.second,
-                                         &calib_dataset,
-                                         &calib_dataset.View(0)->Camera(),
-                                         kv.first.cam_id,
-                                         kv.first.frame_id);
+  std::cout << "Knot spacing SO3 / R3: " << dt_so3 << "/" << dt_r3 << "\n";
+  std::cout << "Error weighting SO3 / R3: " << 1. / weight_data.var_so3 << "/"
+            << 1. / weight_data.var_r3 << "\n";
 
+  // add corners
+  for (const auto &kv : calib_corners) {
+    if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {
+//      if (cam_readout > 0.0) {
+
+//        calib_spline.addRSCornersMeasurement(
+//            &kv.second, &calib_dataset, &calib_dataset.View(0)->Camera(),
+//            cam_readout, kv.first.cam_id, kv.first.frame_id);
+//      } else {
+        calib_spline.addCornersMeasurement(&kv.second, &calib_dataset,
+                                           &calib_dataset.View(0)->Camera(),
+                                           kv.first.cam_id, kv.first.frame_id);
+      //}
       num_corner += kv.second.track_ids.size();
       num_frames++;
     }
   }
 
   // Add Accelerometer
-  for (size_t i = 0; i < telemetry_data.accelerometer.acc_masurement.size(); ++i) {
+  for (size_t i = 0; i < telemetry_data.accelerometer.acc_masurement.size();
+       ++i) {
     if (i % sub_sample_imu == 0) {
-      const double t = (telemetry_data.accelerometer.timestamp_ms[i] / 1000.0 + time_offset_imu_to_cam)* 1e9;
+      const double t = (telemetry_data.accelerometer.timestamp_ms[i] / 1000.0 +
+                        time_offset_imu_to_cam) *
+                       1e9;
       if (t < start_t_ns || t >= end_t_ns)
-          continue;
+        continue;
       ++num_accel;
-      calib_spline.addAccelMeasurement(telemetry_data.accelerometer.acc_masurement[i] - accl_bias, t, weight_data.var_r3);
+      calib_spline.addAccelMeasurement(
+          telemetry_data.accelerometer.acc_masurement[i] + accl_bias, t,
+          weight_data.var_r3);
     }
   }
   // Add Gyroscope
-  for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size(); ++i) {
+  for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size();
+       ++i) {
     if (i % sub_sample_imu == 0) {
-      const double t = (telemetry_data.gyroscope.timestamp_ms[i] / 1000.0 + time_offset_imu_to_cam)* 1e9;
+      const double t = (telemetry_data.gyroscope.timestamp_ms[i] / 1000.0 +
+                        time_offset_imu_to_cam) *
+                       1e9;
       if (t < start_t_ns || t >= end_t_ns)
-          continue;
+        continue;
       ++num_gyro;
-      calib_spline.addGyroMeasurement(telemetry_data.gyroscope.gyro_measurement[i] - gyro_bias, t,weight_data.var_so3);
+      calib_spline.addGyroMeasurement(
+          telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias, t,
+          weight_data.var_so3);
     }
   }
 
-
-  //calib_spline.meanReprojection(calib_corners);
+  // calib_spline.meanReprojection(calib_corners);
   ceres::Solver::Summary summary = calib_spline.optimize();
 
   double mean_reproj = calib_spline.meanReprojection(calib_corners);
@@ -251,10 +256,8 @@ int main(int argc, char *argv[]) {
             << std::endl;
   std::cout << "gyro_bias: " << calib_spline.getGyroBias().transpose()
             << std::endl;
-  std::cout << "T_i_c "
-            << calib_spline.getT_i_c().matrix() << std::endl;
-  std::cout << "mean_reproj: "<<mean_reproj<<std::endl;
-
+  std::cout << "T_i_c " << calib_spline.getT_i_c().matrix() << std::endl;
+  std::cout << "mean_reproj: " << mean_reproj << std::endl;
 
   return 0;
 }
