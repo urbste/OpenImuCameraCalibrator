@@ -190,8 +190,8 @@ int main(int argc, char *argv[]) {
   std::cout << "Trajectory start time: " << t0 << " tend: " << tend
             << std::endl;
   std::cout << "Knot spacing SO3 / R3: " << dt_so3 << "/" << dt_r3 << "\n";
-  std::cout << "Error weighting SO3 / R3: " << 1. / weight_data.var_so3 << "/"
-            << 1. / weight_data.var_r3 << "\n";
+  std::cout << "Error weighting SO3 / R3: " << weight_data.var_so3 << "/"
+            << weight_data.var_r3 << "\n";
 
   // add corners
   for (const auto &kv : calib_corners) {
@@ -216,14 +216,13 @@ int main(int argc, char *argv[]) {
        ++i) {
     if (i % sub_sample_imu == 0) {
       const double t = (telemetry_data.accelerometer.timestamp_ms[i] / 1000.0 +
-                        time_offset_imu_to_cam) *
-                       1e9;
+                        time_offset_imu_to_cam) * 1e9;
       if (t < start_t_ns || t >= end_t_ns)
         continue;
       ++num_accel;
       calib_spline.addAccelMeasurement(
           telemetry_data.accelerometer.acc_masurement[i] + accl_bias, t,
-          weight_data.var_r3);
+          weight_data.var_r3, false);
     }
   }
   // Add Gyroscope
@@ -231,14 +230,13 @@ int main(int argc, char *argv[]) {
        ++i) {
     if (i % sub_sample_imu == 0) {
       const double t = (telemetry_data.gyroscope.timestamp_ms[i] / 1000.0 +
-                        time_offset_imu_to_cam) *
-                       1e9;
+                        time_offset_imu_to_cam) * 1e9;
       if (t < start_t_ns || t >= end_t_ns)
         continue;
       ++num_gyro;
       calib_spline.addGyroMeasurement(
           telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias, t,
-          weight_data.var_so3);
+          weight_data.var_so3, false);
     }
   }
 

@@ -25,8 +25,8 @@ struct CalibAccelerationCostFunctorSplit : public CeresSplineHelper<_N> {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CalibAccelerationCostFunctorSplit(const Eigen::Vector3d &measurement,
-                                    double u_r3, double inv_r3_dt,double u_so3, double inv_so3_dt, double inv_std)
-      : measurement(measurement), u_r3(u_r3), inv_r3_dt(inv_r3_dt), u_so3(u_so3), inv_so3_dt(inv_so3_dt), inv_std(inv_std) {
+                                    double u_r3, double inv_r3_dt,double u_so3, double inv_so3_dt, double inv_std, const bool calib_bias)
+      : measurement(measurement), u_r3(u_r3), inv_r3_dt(inv_r3_dt), u_so3(u_so3), inv_so3_dt(inv_so3_dt), inv_std(inv_std), calib_bias(calib_bias) {
   }
 
   template <class T>
@@ -45,10 +45,14 @@ struct CalibAccelerationCostFunctorSplit : public CeresSplineHelper<_N> {
 
     // Gravity
     Eigen::Map<Vector3 const> const g(sKnots[2 * N]);
-    Eigen::Map<Vector3 const> const bias(sKnots[2 * N + 1]);
-
-    residuals =
-        inv_std * (R_w_i.inverse() * (accel_w + g) - measurement + bias);
+    if (calib_bias) {
+        Eigen::Map<Vector3 const> const bias(sKnots[2 * N + 1]);
+        residuals =
+            inv_std * (R_w_i.inverse() * (accel_w + g) - measurement + bias);
+    } else {
+        residuals =
+            inv_std * (R_w_i.inverse() * (accel_w + g) - measurement);
+    }
 
     return true;
   }
@@ -59,6 +63,7 @@ struct CalibAccelerationCostFunctorSplit : public CeresSplineHelper<_N> {
   double inv_r3_dt;
   double inv_so3_dt;
   double inv_std;
+  bool calib_bias;
 };
 
 template <int _N, template <class> class GroupT, bool OLD_TIME_DERIV>
@@ -76,8 +81,8 @@ struct CalibGyroCostFunctorSplit : public CeresSplineHelper<_N> {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CalibGyroCostFunctorSplit(const Tangentd &measurement, double u_so3,
-                            double inv_so3_dt, double inv_std = 1)
-      : measurement(measurement), u_so3(u_so3), inv_so3_dt(inv_so3_dt), inv_std(inv_std) {}
+                            double inv_so3_dt, double inv_std = 1, bool calib_bias = true)
+      : measurement(measurement), u_so3(u_so3), inv_so3_dt(inv_so3_dt), inv_std(inv_std), calib_bias(calib_bias) {}
 
   template <class T>
   bool operator()(T const *const *sKnots, T *sResiduals) const {
@@ -89,17 +94,21 @@ struct CalibGyroCostFunctorSplit : public CeresSplineHelper<_N> {
 
     CeresSplineHelper<N>::template evaluate_lie<T, GroupT>(
         sKnots, u_so3, inv_so3_dt, nullptr, &rot_vel);
+    if (calib_bias) {
+        Eigen::Map<Tangent const> const bias(sKnots[N]);
 
-    Eigen::Map<Tangent const> const bias(sKnots[N]);
-
-    residuals = inv_std * (rot_vel - measurement + bias);
-
+        residuals = inv_std * (rot_vel - measurement + bias);
+    }
+    else {
+        residuals = inv_std * (rot_vel - measurement);
+    }
     return true;
   }
 
   Tangentd measurement;
   double u_so3, inv_std;
   double inv_so3_dt;
+  bool calib_bias;
 };
 
 template <int _N, class CameraModel>
