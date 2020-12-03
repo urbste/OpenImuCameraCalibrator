@@ -5,6 +5,8 @@ import numpy as np
 from sew import knot_spacing_and_variance
 import matplotlib.pyplot as plt 
 import glob
+from utils import read_imu_data
+
 
 ms_to_sec = 1.0/1000.
 
@@ -25,26 +27,8 @@ def main():
 
     args = parser.parse_args()
 
-    accl = []
-    gyro  = []
-    timestamps = []
-    with open(args.input_json_path, 'r') as json_file:
-        json_data = json.load(json_file)
-        for a in json_data['1']['streams']['ACCL']['samples']:
-            timestamps.append(a['cts']*ms_to_sec)
-            accl.append([a['value'][1], a['value'][2], a['value'][0]])
-        for g in json_data['1']['streams']['GYRO']['samples']:
-            gyro.append([g['value'][1], g['value'][2], g['value'][0]])    
+    _, accl_np, gyro_np, _ = read_imu_data(args.input_json_path, args.remove_sec)
 
-    ms = timestamps[1] - timestamps[0]
-    nr_remove = round(args.remove_sec / ms)
-
-    accl = accl[nr_remove:len(timestamps) - nr_remove]
-    gyro = gyro[nr_remove:len(timestamps) - nr_remove]
-    timestamps = timestamps[nr_remove:len(timestamps) - nr_remove]
-
-    accl_np = np.asarray(accl)
-    gyro_np = np.asarray(gyro) 
 
     # find z direction of accelerometer, search for maximum acceleration (aroung g)
     mean_accl = np.mean(accl_np,0)

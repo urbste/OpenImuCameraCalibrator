@@ -21,7 +21,7 @@ class Constants {
 };
 
 template<typename T>
-const Eigen::Matrix<T, 3, 1> Constants<T>::Gravity = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(-_constants::STANDARD_GRAVITY));
+const Eigen::Matrix<T, 3, 1> Constants<T>::Gravity = Eigen::Matrix<T, 3, 1>( T(0), T(-_constants::STANDARD_GRAVITY),T(0));
 
 } // namespace kontiki
 

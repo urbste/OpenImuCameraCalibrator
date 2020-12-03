@@ -27,17 +27,12 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& obs,
   int flags = Flags::EvalPosition | Flags::EvalOrientation;
   auto eval_obs = trajectory.Evaluate(t_obs, flags);
 
-  // FIXME: We have a ToTrajectory/FromTrajectory function
-  const Vector3 p_ct = camera.relative_position();
-  const Eigen::Quaternion<T> q_ct = camera.relative_orientation();
-
   Vector3 landmark_world = landmark.hnormalized();
-  Vector3 X_in_spline = eval_obs->orientation.conjugate() * (landmark_world -  eval_obs->position);
-  Vector3 X_camera = q_ct * X_in_spline + p_ct;
+  Vector3 X_in_spline = eval_obs->orientation.conjugate() * (landmark_world - eval_obs->position);
+  Vector3 X_camera = camera.FromTrajectory(X_in_spline);
 
   return camera.Project(X_camera);
 }
-
 
   template<typename CameraModel>
   class StaticRsCameraMeasurementXYZ {

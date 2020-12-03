@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
     angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
                               telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias;
     acclerations[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
-            telemetry_data.accelerometer.acc_masurement[i] + accl_bias;
+            telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
   }
   // get mean hz imu
   double imu_dt_s = 0.0;

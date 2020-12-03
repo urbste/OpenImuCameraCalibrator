@@ -43,8 +43,8 @@ class TrajectoryEstimator {
     if (num_threads < 1) {
       num_threads = std::thread::hardware_concurrency();
     }
-
-    options.num_linear_solver_threads = num_threads;
+    options.check_gradients = false;
+    options.gradient_check_relative_precision = 1e-8;
     options.num_threads = num_threads;
 
     options.max_num_iterations = max_iterations;

@@ -62,7 +62,8 @@ int main(int argc, char* argv[]) {
                                   &cam_calib_recon))
       << "Could not read calibration reconstruction file.";
   // get one view for calibration info
-  const theia::Camera camera = cam_calib_recon.View(0)->Camera();
+  const std::vector<theia::ViewId> vids = cam_calib_recon.ViewIds();
+  const theia::Camera camera = cam_calib_recon.View(vids[0])->Camera();
   cv::Mat K_cv = cv::Mat::eye(cv::Size(3, 3), CV_32FC1);
 
   int squaresX = 10;

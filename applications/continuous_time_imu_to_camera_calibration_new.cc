@@ -40,7 +40,9 @@ DEFINE_string(gyro_to_cam_initial_calibration, "",
 DEFINE_string(imu_bias_file, "", "IMU bias json");
 DEFINE_string(spline_error_weighting_json, "",
               "Path to spline error weighting data");
-DEFINE_string(output_path, "", "Output path for results");
+DEFINE_string(output_path, "","");
+DEFINE_string(result_output_json, "",
+              "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 
 using json = nlohmann::json;
@@ -151,11 +153,11 @@ int main(int argc, char *argv[]) {
 
       if (!g_initialized) {
         for (size_t i = 0;
-             i < telemetry_data.accelerometer.acc_masurement.size() &&
+             i < telemetry_data.accelerometer.acc_measurement.size() &&
              !g_initialized;
              i++) {
           const Eigen::Vector3d ad =
-              telemetry_data.accelerometer.acc_masurement[i] + accl_bias;
+              telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
           const int64_t accl_t_ns =
               telemetry_data.accelerometer.timestamp_ms[i] * 1e9;
           if (std::abs(accl_t_ns - timestamp_ns) < 3000000) {
@@ -212,20 +214,25 @@ int main(int argc, char *argv[]) {
   }
 
   // Add Accelerometer
-  for (size_t i = 0; i < telemetry_data.accelerometer.acc_masurement.size();
+  Eigen::aligned_vector<Eigen::Vector3d> accl_data;
+  std::vector<int64_t> timestamps_ns;
+  for (size_t i = 0; i < telemetry_data.accelerometer.acc_measurement.size();
        ++i) {
     if (i % sub_sample_imu == 0) {
       const double t = (telemetry_data.accelerometer.timestamp_ms[i] / 1000.0 +
                         time_offset_imu_to_cam) * 1e9;
       if (t < start_t_ns || t >= end_t_ns)
         continue;
+      accl_data.push_back(telemetry_data.accelerometer.acc_measurement[i]+accl_bias);
+      timestamps_ns.push_back((int64_t)t);
       ++num_accel;
       calib_spline.addAccelMeasurement(
-          telemetry_data.accelerometer.acc_masurement[i] + accl_bias, t,
+          telemetry_data.accelerometer.acc_measurement[i]+accl_bias, t,
           weight_data.var_r3, false);
     }
   }
   // Add Gyroscope
+  Eigen::aligned_vector<Eigen::Vector3d> gyro_data;
   for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size();
        ++i) {
     if (i % sub_sample_imu == 0) {
@@ -233,9 +240,10 @@ int main(int argc, char *argv[]) {
                         time_offset_imu_to_cam) * 1e9;
       if (t < start_t_ns || t >= end_t_ns)
         continue;
+      gyro_data.push_back(telemetry_data.gyroscope.gyro_measurement[i]+gyro_bias);
       ++num_gyro;
       calib_spline.addGyroMeasurement(
-          telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias, t,
+          telemetry_data.gyroscope.gyro_measurement[i]+gyro_bias, t,
           weight_data.var_so3, false);
     }
   }
@@ -244,6 +252,35 @@ int main(int argc, char *argv[]) {
   ceres::Solver::Summary summary = calib_spline.optimize();
 
   double mean_reproj = calib_spline.meanReprojection(calib_corners);
+
+
+  // Evaluate spline for all accelerometer and gyro and output them
+  nlohmann::json json_calib_results_out;
+  for (size_t t = 0; t < timestamps_ns.size(); ++t) {
+      const int64_t t_ns = timestamps_ns[t];
+      const std::string t_ns_s = std::to_string(t_ns);
+      json_calib_results_out[t_ns_s]["gyro_imu"]["x"] = gyro_data[t][0];
+      json_calib_results_out[t_ns_s]["gyro_imu"]["y"] = gyro_data[t][1];
+      json_calib_results_out[t_ns_s]["gyro_imu"]["z"] = gyro_data[t][2];
+      // write out spline estimates
+      Eigen::Vector3d gyro_spline = calib_spline.getGyro(t_ns);
+      json_calib_results_out[t_ns_s]["gyro_spline"]["x"] = gyro_spline[0];
+      json_calib_results_out[t_ns_s]["gyro_spline"]["y"] = gyro_spline[1];
+      json_calib_results_out[t_ns_s]["gyro_spline"]["z"] = gyro_spline[2];
+      // accelerometer
+      json_calib_results_out[t_ns_s]["accl_imu"]["x"] = accl_data[t][0];
+      json_calib_results_out[t_ns_s]["accl_imu"]["y"] = accl_data[t][1];
+      json_calib_results_out[t_ns_s]["accl_imu"]["z"] = accl_data[t][2];
+      // write out spline estimates
+      Eigen::Vector3d accl_spline = calib_spline.getAccel(t_ns);
+      json_calib_results_out[t_ns_s]["accl_spline"]["x"] = accl_spline[0];
+      json_calib_results_out[t_ns_s]["accl_spline"]["y"] = accl_spline[1];
+      json_calib_results_out[t_ns_s]["accl_spline"]["z"] = accl_spline[2];
+  }
+
+  std::ofstream calib_output_json(FLAGS_result_output_json);
+  calib_output_json << std::setw(4) << json_calib_results_out << std::endl;
+  calib_output_json.close();
 
   std::cout << "num_gyro " << num_gyro << " num_accel " << num_accel
             << " num_corner " << num_corner << " num_frames " << num_frames

@@ -51,7 +51,7 @@ class ImuView : public SensorView<T, MetaType> {
     return result->orientation.conjugate()*result->angular_velocity;
   }
 
-  // Standard gyroscope function
+  // Standard accelerometer function
   template<typename TrajectoryModel>
   Vector3 StandardAccelerometer(const type::Trajectory<TrajectoryModel, T> &trajectory, T t) const {
     auto result = trajectory.Evaluate(t + this->time_offset(), Flags::EvalOrientation | Flags::EvalAcceleration);
