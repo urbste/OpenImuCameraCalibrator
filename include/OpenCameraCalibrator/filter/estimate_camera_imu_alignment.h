@@ -33,5 +33,9 @@ void EstimateCameraImuAlignment(
     const double dt_vis, const double dt_imu, Eigen::Matrix3d &R_imu_to_camera,
     double &time_offset_imu_to_camera, Vector3d &gyro_bias,
     Vec3Vector &smoothed_ang_imu, Vec3Vector &smoothed_vis_vel);
-}
+
+int FindMinNearestTimestamp(const double t_imu, const double dt,
+                            const std::vector<double> &vis_timestamps,
+                            double &distance_to_nearest_timestamp);
+} // namespace filter
 } // namespace OpenCamCalib

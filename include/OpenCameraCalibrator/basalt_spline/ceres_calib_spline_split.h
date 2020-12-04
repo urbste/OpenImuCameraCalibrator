@@ -5,6 +5,7 @@
 #include "ceres_local_param.h"
 #include "common_types.h"
 #include "eigen_utils.h"
+#include <thread>
 
 #include "ceres_calib_split_residuals.h"
 #include <ceres/ceres.h>
@@ -160,11 +161,17 @@ public:
     return accel;
   }
 
-  void init(const Sophus::SE3d &init, const int num_knots_so3,
-            int num_knots_r3) {
-    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3, init.so3());
-    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3,
-                                                         init.translation());
+  void initAll(const Eigen::aligned_vector<Sophus::SO3d> &so3_init,
+               const Eigen::aligned_vector<Eigen::Vector3d> &r3_init,
+               const int num_knots_so3, const int num_knots_r3) {
+    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
+    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
+        for (int i = 0; i < so3_init.size(); ++i) {
+            so3_knots[i] = so3_init[i];
+        }
+    for (int i = 0; i < r3_init.size(); ++i) {
+      trans_knots[i] = r3_init[i];
+    }
 
     // Add local parametrization for SO(3) rotation
     for (int i = 0; i < num_knots_so3; i++) {
@@ -186,6 +193,30 @@ public:
     //}
   }
 
+  void init(const Sophus::SE3d &init, const int num_knots_so3,
+            const int num_knots_r3) {
+
+    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3, init.so3());
+    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3,
+                                                         init.translation());
+
+    // Add local parametrization for SO(3) rotation
+    for (int i = 0; i < num_knots_so3; i++) {
+      ceres::LocalParameterization *local_parameterization =
+          new LieLocalParameterization<Sophus::SO3d>();
+
+      problem.AddParameterBlock(so3_knots[i].data(),
+                                Sophus::SO3d::num_parameters,
+                                local_parameterization);
+    }
+
+    ceres::LocalParameterization *local_parameterization =
+        new LieLocalParameterization<Sophus::SE3d>();
+
+    problem.AddParameterBlock(T_i_c.data(), Sophus::SE3d::num_parameters,
+                              local_parameterization);
+  }
+
   void addGyroMeasurement(const Eigen::Vector3d &meas, const int64_t time_ns,
                           const double weight_so3, const bool calib_bias) {
     int64_t st_ns = (time_ns - start_t_ns);
@@ -203,7 +234,8 @@ public:
 
     using FunctorT = CalibGyroCostFunctorSplit<N, Sophus::SO3, OLD_TIME_DERIV>;
 
-    FunctorT *functor = new FunctorT(meas, u, inv_so3_dt, weight_so3, calib_bias);
+    FunctorT *functor =
+        new FunctorT(meas, u, inv_so3_dt, weight_so3, calib_bias);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -250,8 +282,8 @@ public:
 
     using FunctorT = CalibAccelerationCostFunctorSplit<N>;
 
-    FunctorT *functor =
-        new FunctorT(meas, u_r3, inv_r3_dt, u_so3, inv_so3_dt, weight_se3, calib_bias);
+    FunctorT *functor = new FunctorT(meas, u_r3, inv_r3_dt, u_so3, inv_so3_dt,
+                                     weight_se3, calib_bias);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -289,7 +321,7 @@ public:
                              const theia::Reconstruction *calib,
                              const theia::Camera *cam, int cam_id,
                              int64_t time_ns,
-                             const double robust_loss_width=1.345) {
+                             const double robust_loss_width = 1.345) {
     const int64_t st_ns = (time_ns - start_t_ns);
 
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
@@ -310,9 +342,7 @@ public:
                          "s " << s_r3 << " N " << N << " knots.size() "
                               << trans_knots.size());
 
-
-    using FunctorT = CalibReprojectionCostFunctorSplit<
-        N, theia::DivisionUndistortionCameraModel>;
+    using FunctorT = CalibReprojectionCostFunctorSplit<N>;
     FunctorT *functor =
         new FunctorT(corners, calib, cam, u_so3, u_r3, inv_so3_dt, inv_r3_dt);
 
@@ -339,16 +369,16 @@ public:
     }
     vec.emplace_back(T_i_c.data());
 
-    ceres::LossFunction* loss_function = new ceres::HuberLoss(robust_loss_width);
-    //ceres::LossFunctionWrapper* loss_function(, ceres::TAKE_OWNERSHIP);
+    ceres::LossFunction *loss_function =
+        new ceres::HuberLoss(robust_loss_width);
+    // ceres::LossFunctionWrapper* loss_function(, ceres::TAKE_OWNERSHIP);
     problem.AddResidualBlock(cost_function, loss_function, vec);
   }
 
   void addRSCornersMeasurement(const CalibCornerData *corners,
                                const theia::Reconstruction *calib,
                                const theia::Camera *cam, double cam_readout_s,
-                               int cam_id,
-                               int64_t time_ns,
+                               int cam_id, int64_t time_ns,
                                const double robust_loss_width = 1.345) {
     const int64_t st_ns = (time_ns - start_t_ns);
 
@@ -398,7 +428,8 @@ public:
     }
     vec.emplace_back(T_i_c.data());
 
-    ceres::LossFunction* loss_function = new ceres::HuberLoss(robust_loss_width);
+    ceres::LossFunction *loss_function =
+        new ceres::HuberLoss(robust_loss_width);
     problem.AddResidualBlock(cost_function, loss_function, vec);
   }
 
@@ -440,8 +471,7 @@ public:
                            "s " << s_r3 << " N " << N << " knots.size() "
                                 << trans_knots.size());
 
-      using FunctorT = CalibReprojectionCostFunctorSplit<
-          N, theia::DivisionUndistortionCameraModel>;
+      using FunctorT = CalibReprojectionCostFunctorSplit<N>;
 
       FunctorT *functor =
           new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(), u_so3,
@@ -497,8 +527,8 @@ public:
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.max_num_iterations = 100;
-    options.num_threads = 1;
-    //options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
+    options.num_threads = std::thread::hardware_concurrency();
+    // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
     options.minimizer_progress_to_stdout = true;
     // Solve
     ceres::Solver::Summary summary;

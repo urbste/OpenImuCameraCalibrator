@@ -16,7 +16,7 @@ def read_calib_json(file):
 def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     parser.add_argument('--path_results', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro6/1080_60/dataset1/cam_imu/cam_imu_calib_result_GH016390.json', 
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro6/1080_30/dataset1/cam_imu/cam_imu_calib_result_kont_GH016390.json', 
                         help="Path to calibration dataset")
     args = parser.parse_args()
 

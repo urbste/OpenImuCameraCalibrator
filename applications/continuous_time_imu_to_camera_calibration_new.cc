@@ -14,6 +14,7 @@
 #include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/opencv.hpp>
 
+#include "OpenCameraCalibrator/filter/estimate_camera_imu_alignment.h"
 #include "OpenCameraCalibrator/imu/read_gopro_imu_json.h"
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"
@@ -27,6 +28,7 @@
 #include "theia/io/write_ply_file.h"
 #include "theia/sfm/reconstruction.h"
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
+#include <theia/sfm/camera/double_sphere_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
 
 // Input/output files.
@@ -40,10 +42,10 @@ DEFINE_string(gyro_to_cam_initial_calibration, "",
 DEFINE_string(imu_bias_file, "", "IMU bias json");
 DEFINE_string(spline_error_weighting_json, "",
               "Path to spline error weighting data");
-DEFINE_string(output_path, "","");
-DEFINE_string(result_output_json, "",
-              "Path to result json file");
+DEFINE_string(output_path, "", "");
+DEFINE_string(result_output_json, "", "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
+DEFINE_bool(reestimate_biases, false, "If accelerometer and gyroscope biases should be estimated during spline optim");
 
 using json = nlohmann::json;
 
@@ -172,17 +174,52 @@ int main(int argc, char *argv[]) {
   }
   calib_spline.setG(g_a_init);
 
-  // init spline from first camera
+  const int num_knots_so3 = (end_t_ns - start_t_ns) / dt_so3_ns + N;
+  const int num_knots_r3 = (end_t_ns - start_t_ns) / dt_r3_ns + N;
+//  // init spline from first camera
+//  Eigen::aligned_vector<Eigen::Vector3d> r3_init(num_knots_r3);
+//  Eigen::aligned_vector<Sophus::SO3d> so3_init(num_knots_so3);
+//  const double r3_freq_s = (end_t_ns - start_t_ns) / num_knots_so3 * 1e-9;
+//  const double so3_freq_s = (end_t_ns - start_t_ns) / num_knots_r3 * 1e-9;
+//  double dist = 0.0;
+//  const double camera_dt = 1.0 / 30.0;
+//  for (int i = 0; i < num_knots_r3; ++i) {
+//    const double timestamp_knot = i * r3_freq_s;
+
+//    const int index = OpenCamCalib::filter::FindMinNearestTimestamp(
+//        timestamp_knot, camera_dt, timestamps, dist);
+//    const int64_t time_ns = timestamps[index]*1e9;
+//    if (time_ns >= end_t_ns || time_ns < start_t_ns)
+//      continue;
+//    // get closest timestamp in camera timestamps
+//    TimeCamId index_c(time_ns, 0);
+//    Sophus::SE3d T_w_i_init =
+//        calib_init_poses.at(index_c).T_a_c * T_i_c_init.inverse();
+//    r3_init[i] = T_w_i_init.translation();
+//  }
+//  for (int i = 0; i < num_knots_so3; ++i) {
+//    const double timestamp_knot = i * so3_freq_s;
+
+//    const int index = OpenCamCalib::filter::FindMinNearestTimestamp(
+//        timestamp_knot, camera_dt, timestamps, dist);
+//    const int64_t time_ns = timestamps[index]*1e9;
+//    if (time_ns >= end_t_ns || time_ns < start_t_ns)
+//      continue;
+//    // get closest timestamp in camera timestamps
+//    TimeCamId index_c(time_ns, 0);
+//    Sophus::SE3d T_w_i_init =
+//        calib_init_poses.at(index_c).T_a_c * T_i_c_init.inverse();
+//    so3_init[i] = T_w_i_init.so3();
+//  }
+
   TimeCamId tcid_init(timestamps[result.first - timestamps.begin()], 0);
   Sophus::SE3d T_w_i_init =
       calib_init_poses.at(tcid_init).T_a_c * T_i_c_init.inverse();
-  const int num_knots_so3 = (end_t_ns - start_t_ns) / dt_so3_ns + N;
-  const int num_knots_r3 = (end_t_ns - start_t_ns) / dt_r3_ns + N;
   const double cam_readout = 1.0 / 30.0;
   std::cout << "Initializing " << num_knots_so3 << " SO3 knots.\n";
   std::cout << "Initializing " << num_knots_r3 << " R3 knots.\n";
+  //calib_spline.initAll( so3_init, r3_init,num_knots_so3, num_knots_r3);
   calib_spline.init(T_w_i_init, num_knots_so3, num_knots_r3);
-
   int num_gyro = 0;
   int num_accel = 0;
   int num_corner = 0;
@@ -198,15 +235,16 @@ int main(int argc, char *argv[]) {
   // add corners
   for (const auto &kv : calib_corners) {
     if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {
-//      if (cam_readout > 0.0) {
+      //      if (cam_readout > 0.0) {
 
-//        calib_spline.addRSCornersMeasurement(
-//            &kv.second, &calib_dataset, &calib_dataset.View(0)->Camera(),
-//            cam_readout, kv.first.cam_id, kv.first.frame_id);
-//      } else {
-        calib_spline.addCornersMeasurement(&kv.second, &calib_dataset,
-                                           &calib_dataset.View(0)->Camera(),
-                                           kv.first.cam_id, kv.first.frame_id);
+      //        calib_spline.addRSCornersMeasurement(
+      //            &kv.second, &calib_dataset,
+      //            &calib_dataset.View(0)->Camera(), cam_readout,
+      //            kv.first.cam_id, kv.first.frame_id);
+      //      } else {
+      calib_spline.addCornersMeasurement(&kv.second, &calib_dataset,
+                                         &calib_dataset.View(0)->Camera(),
+                                         kv.first.cam_id, kv.first.frame_id);
       //}
       num_corner += kv.second.track_ids.size();
       num_frames++;
@@ -220,15 +258,17 @@ int main(int argc, char *argv[]) {
        ++i) {
     if (i % sub_sample_imu == 0) {
       const double t = (telemetry_data.accelerometer.timestamp_ms[i] / 1000.0 +
-                        time_offset_imu_to_cam) * 1e9;
+                        time_offset_imu_to_cam) *
+                       1e9;
       if (t < start_t_ns || t >= end_t_ns)
         continue;
-      accl_data.push_back(telemetry_data.accelerometer.acc_measurement[i]+accl_bias);
+      accl_data.push_back(telemetry_data.accelerometer.acc_measurement[i] +
+                          accl_bias);
       timestamps_ns.push_back((int64_t)t);
       ++num_accel;
       calib_spline.addAccelMeasurement(
-          telemetry_data.accelerometer.acc_measurement[i]+accl_bias, t,
-          weight_data.var_r3, false);
+          telemetry_data.accelerometer.acc_measurement[i] + accl_bias, t,
+          1./weight_data.var_r3, FLAGS_reestimate_biases);
     }
   }
   // Add Gyroscope
@@ -237,14 +277,16 @@ int main(int argc, char *argv[]) {
        ++i) {
     if (i % sub_sample_imu == 0) {
       const double t = (telemetry_data.gyroscope.timestamp_ms[i] / 1000.0 +
-                        time_offset_imu_to_cam) * 1e9;
+                        time_offset_imu_to_cam) *
+                       1e9;
       if (t < start_t_ns || t >= end_t_ns)
         continue;
-      gyro_data.push_back(telemetry_data.gyroscope.gyro_measurement[i]+gyro_bias);
+      gyro_data.push_back(telemetry_data.gyroscope.gyro_measurement[i] +
+                          gyro_bias);
       ++num_gyro;
       calib_spline.addGyroMeasurement(
-          telemetry_data.gyroscope.gyro_measurement[i]+gyro_bias, t,
-          weight_data.var_so3, false);
+          telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias, t,
+          1./weight_data.var_so3, FLAGS_reestimate_biases);
     }
   }
 
@@ -253,29 +295,28 @@ int main(int argc, char *argv[]) {
 
   double mean_reproj = calib_spline.meanReprojection(calib_corners);
 
-
   // Evaluate spline for all accelerometer and gyro and output them
   nlohmann::json json_calib_results_out;
   for (size_t t = 0; t < timestamps_ns.size(); ++t) {
-      const int64_t t_ns = timestamps_ns[t];
-      const std::string t_ns_s = std::to_string(t_ns);
-      json_calib_results_out[t_ns_s]["gyro_imu"]["x"] = gyro_data[t][0];
-      json_calib_results_out[t_ns_s]["gyro_imu"]["y"] = gyro_data[t][1];
-      json_calib_results_out[t_ns_s]["gyro_imu"]["z"] = gyro_data[t][2];
-      // write out spline estimates
-      Eigen::Vector3d gyro_spline = calib_spline.getGyro(t_ns);
-      json_calib_results_out[t_ns_s]["gyro_spline"]["x"] = gyro_spline[0];
-      json_calib_results_out[t_ns_s]["gyro_spline"]["y"] = gyro_spline[1];
-      json_calib_results_out[t_ns_s]["gyro_spline"]["z"] = gyro_spline[2];
-      // accelerometer
-      json_calib_results_out[t_ns_s]["accl_imu"]["x"] = accl_data[t][0];
-      json_calib_results_out[t_ns_s]["accl_imu"]["y"] = accl_data[t][1];
-      json_calib_results_out[t_ns_s]["accl_imu"]["z"] = accl_data[t][2];
-      // write out spline estimates
-      Eigen::Vector3d accl_spline = calib_spline.getAccel(t_ns);
-      json_calib_results_out[t_ns_s]["accl_spline"]["x"] = accl_spline[0];
-      json_calib_results_out[t_ns_s]["accl_spline"]["y"] = accl_spline[1];
-      json_calib_results_out[t_ns_s]["accl_spline"]["z"] = accl_spline[2];
+    const int64_t t_ns = timestamps_ns[t];
+    const std::string t_ns_s = std::to_string(t_ns);
+    json_calib_results_out[t_ns_s]["gyro_imu"]["x"] = gyro_data[t][0];
+    json_calib_results_out[t_ns_s]["gyro_imu"]["y"] = gyro_data[t][1];
+    json_calib_results_out[t_ns_s]["gyro_imu"]["z"] = gyro_data[t][2];
+    // write out spline estimates
+    Eigen::Vector3d gyro_spline = calib_spline.getGyro(t_ns);
+    json_calib_results_out[t_ns_s]["gyro_spline"]["x"] = gyro_spline[0];
+    json_calib_results_out[t_ns_s]["gyro_spline"]["y"] = gyro_spline[1];
+    json_calib_results_out[t_ns_s]["gyro_spline"]["z"] = gyro_spline[2];
+    // accelerometer
+    json_calib_results_out[t_ns_s]["accl_imu"]["x"] = accl_data[t][0];
+    json_calib_results_out[t_ns_s]["accl_imu"]["y"] = accl_data[t][1];
+    json_calib_results_out[t_ns_s]["accl_imu"]["z"] = accl_data[t][2];
+    // write out spline estimates
+    Eigen::Vector3d accl_spline = calib_spline.getAccel(t_ns);
+    json_calib_results_out[t_ns_s]["accl_spline"]["x"] = accl_spline[0];
+    json_calib_results_out[t_ns_s]["accl_spline"]["y"] = accl_spline[1];
+    json_calib_results_out[t_ns_s]["accl_spline"]["z"] = accl_spline[2];
   }
 
   std::ofstream calib_output_json(FLAGS_result_output_json);
@@ -293,6 +334,28 @@ int main(int argc, char *argv[]) {
             << std::endl;
   std::cout << "T_i_c " << calib_spline.getT_i_c().matrix() << std::endl;
   std::cout << "mean_reproj: " << mean_reproj << std::endl;
+
+  // convert spline to theia output
+  theia::Reconstruction output_spline_recon;
+  for (size_t i = 0; i < timestamps.size(); ++i) {
+      const int64_t t_ns = timestamps[i] * 1e9;
+      Sophus::SE3d spline_pose = calib_spline.getPose(t_ns);
+      theia::ViewId v_id_theia = output_spline_recon.AddView(
+          std::to_string(t_ns), 0, t_ns);
+      theia::View *view = output_spline_recon.MutableView(v_id_theia);
+      view->SetEstimated(true);
+      theia::Camera *camera = view->MutableCamera();
+      camera->SetOrientationFromRotationMatrix(spline_pose.rotationMatrix().transpose());
+      camera->SetPosition(spline_pose.translation());
+  }
+
+  // save spline recon as nvm to perform dense recon
+  const Eigen::Vector3i cam_spline_color(0,255,0);
+  const Eigen::Vector3i cam_recon_calib_color(255,0,0);
+  CHECK(theia::WritePlyFile(FLAGS_output_path+ "/" + "sparse_recon_spline.ply",
+                            output_spline_recon, cam_spline_color, 2));
+  CHECK(theia::WritePlyFile(FLAGS_output_path+ "/" + "sparse_recon_calib_dataset.ply",
+                            calib_dataset, cam_recon_calib_color, 2));
 
   return 0;
 }

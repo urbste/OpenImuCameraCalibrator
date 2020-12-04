@@ -151,9 +151,11 @@ class SensorEntity : public type::Entity<ViewTemplate, MetaType, StoreType> {
     problem.AddParameterBlock(pi_pct.data, pi_pct.size, pi_pct.parameterization);
     parameters.push_back(pi_pct);
 
-    if (relative_position_locked_)
+    if (relative_position_locked_){
       problem.SetParameterBlockConstant(pi_pct.data);
-
+      problem.SetParameterLowerBound(pi_pct.data, 0, -0.1);
+      problem.SetParameterUpperBound(pi_pct.data, 0, 0.1);
+    }
     // Time offset is constrained to (-d, d)
     problem.AddParameterBlock(pi_offset.data, pi_offset.size, pi_offset.parameterization);
     problem.SetParameterLowerBound(pi_offset.data, 0, -this->max_time_offset());

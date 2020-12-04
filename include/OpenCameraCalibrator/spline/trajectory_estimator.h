@@ -37,7 +37,7 @@ class TrajectoryEstimator {
 
   ceres::Solver::Summary Solve(int max_iterations=50, bool progress=true, int num_threads=-1) {
     ceres::Solver::Options options;
-    options.linear_solver_type = ceres::SPARSE_SCHUR;
+    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.minimizer_progress_to_stdout = progress;
 
     if (num_threads < 1) {

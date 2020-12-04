@@ -10,7 +10,7 @@
 namespace kontiki {
 
 namespace _constants {
-  static const double STANDARD_GRAVITY = 9.80665;
+  static const double STANDARD_GRAVITY = 9.81;
 }
 
 template<typename T>

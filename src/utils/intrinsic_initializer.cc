@@ -9,7 +9,7 @@ bool initialize_pinhole_camera(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
     const theia::RansacParameters &ransac_params,
     theia::RansacSummary &ransac_summary, Eigen::Matrix3d &rotation,
-    Eigen::Vector3d &position, double &focal_length) {
+    Eigen::Vector3d &position, double &focal_length, const bool verbose) {
 
   theia::UncalibratedAbsolutePose pose_linear;
   // use -> cv::initCameraMatrix2D()
@@ -25,7 +25,7 @@ bool initialize_pinhole_camera(
   position = pose_linear.position;
   focal_length = pose_linear.focal_length;
   if (ransac_summary.inliers.size() < 10)
-      return false;
+    return false;
   return success;
 }
 
@@ -34,7 +34,7 @@ bool initialize_radial_undistortion_camera(
     const theia::RansacParameters &ransac_params,
     theia::RansacSummary &ransac_summary, const int img_cols,
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
-    double &radial_distortion) {
+    double &radial_distortion, const bool verbose) {
 
   if (correspondences.size() <= 4) {
     return false;
@@ -46,19 +46,21 @@ bool initialize_radial_undistortion_camera(
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
       &pose_division_undist, &ransac_summary);
-  std::cout << "Estimated focal length: " << pose_division_undist.focal_length
-            << std::endl;
-  std::cout << "Estimated radial distortion: "
-            << pose_division_undist.radial_distortion << std::endl
-            << std::endl;
-  std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
-            << std::endl;
+  if (verbose) {
+      std::cout << "Estimated focal length: " << pose_division_undist.focal_length
+                << std::endl;
+      std::cout << "Estimated radial distortion: "
+                << pose_division_undist.radial_distortion << std::endl
+                << std::endl;
+      std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
+                << std::endl;
+  }
   rotation = pose_division_undist.rotation;
-  position = -pose_division_undist.rotation * pose_division_undist.translation;
+  position = -pose_division_undist.rotation.transpose() * pose_division_undist.translation;
   radial_distortion = pose_division_undist.radial_distortion;
   focal_length = pose_division_undist.focal_length;
   if (ransac_summary.inliers.size() < 10)
-      return false;
+    return false;
   return success;
 }
 
@@ -71,7 +73,7 @@ bool initialize_doublesphere_model(
     const theia::RansacParameters &ransac_params, const int img_cols,
     const int img_rows, theia::RansacSummary &ransac_summary,
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position,
-    double &focal_length) {
+    double &focal_length, const bool verbose) {
   // First, initialize the image center at the center of the image.
 
   aligned_map<int, Eigen::Vector2d> id_to_corner;
@@ -91,8 +93,7 @@ bool initialize_doublesphere_model(
   // Now we try to find a non-radial line to initialize the focal length
   const size_t target_cols = charucoboard->getChessboardSize().width;
   const size_t target_rows = charucoboard->getChessboardSize().height;
-  std::cout << "chessboard size" << target_cols << " " << target_rows
-            << std::endl;
+
   for (int r = 0; r < target_rows; ++r) {
     aligned_vector<Eigen::Vector4d> P;
 
@@ -192,9 +193,10 @@ bool initialize_doublesphere_model(
           in_image++;
         }
       }
-      std::cout << "numReprojected " << in_image << " reprojErr "
-                << repro_error / in_image << std::endl;
-
+      if (verbose) {
+          std::cout << "numReprojected " << in_image << " reprojErr "
+                    << repro_error / in_image << std::endl;
+      }
       if (in_image > MIN_CORNERS) {
         double avg_reproj_error = repro_error / in_image;
 
@@ -205,15 +207,17 @@ bool initialize_doublesphere_model(
           rotation = pose.rotation;
           position = pose.position;
           focal_length = 0.5 * gamma0;
-          std::cout << "new min_reproj_error: " << min_reproj_error
+          if (verbose) {
+            std::cout << "new min_reproj_error: " << min_reproj_error
                     << std::endl;
+          }
 
         } // if clause
       }   // if in_image
     }     // if P.size()
   }       // for target cols
   if (ransac_summary.inliers.size() < 10)
-      return false;
+    return false;
   return success;
 } // for target rows
 

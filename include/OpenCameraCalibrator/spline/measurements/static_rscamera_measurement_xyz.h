@@ -140,7 +140,7 @@ Eigen::Matrix<T, 2, 1> reproject_static(const sfm::ObservationXYZ& obs,
         t2 += camera->max_time_offset();
       }
 
-      const double margin = 1e-3;
+      const double margin = 0.0;
 
       estimator.AddTrajectoryForTimes({
                                           {t1 - margin, t1 + camera->readout() + margin},
