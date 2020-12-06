@@ -2,6 +2,7 @@
 
 #include "OpenCameraCalibrator/utils/intrinsic_initializer.h"
 #include "OpenCameraCalibrator/utils/utils.h"
+#include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
 
 namespace OpenCamCalib {
 
@@ -43,6 +44,7 @@ bool initialize_radial_undistortion_camera(
   theia::RadialDistUncalibratedAbsolutePose pose_division_undist;
   meta_data.max_focal_length = 0.5 * img_cols + 150.0;
   meta_data.min_focal_length = 0.5 * img_cols - 150.0;
+
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
       &pose_division_undist, &ransac_summary);
