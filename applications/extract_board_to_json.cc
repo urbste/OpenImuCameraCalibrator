@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
 
   output_json["camera_fps"] = fps;
   output_json["calibration_board_type"] = FLAGS_board_type;
+  output_json["square_size_meter"] = square_length;
 
   std::vector<cv::Point3f> board_pts = board_extractor.GetBoardPts()[0];
   for (size_t i = 0; i < board_pts.size(); ++i) {

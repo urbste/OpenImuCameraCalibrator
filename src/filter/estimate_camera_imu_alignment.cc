@@ -4,6 +4,8 @@
 
 #include "OpenCameraCalibrator/filter/estimate_camera_imu_alignment.h"
 #include "OpenCameraCalibrator/utils/utils.h"
+#include "OpenCameraCalibrator/utils/moving_average.h"
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
@@ -208,8 +210,8 @@ void EstimateCameraImuAlignment(
   }
 
   // calculate moving average to smooth the values a bit
-  OpenCamCalib::utils::SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
-  OpenCamCalib::utils::SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
+  SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
+  SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
 
   // Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
   for (int i = 0; i < angImu.size(); ++i) {
