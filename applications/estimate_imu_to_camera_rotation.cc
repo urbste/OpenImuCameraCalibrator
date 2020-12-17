@@ -48,13 +48,18 @@ int main(int argc, char* argv[]) {
   CHECK(theia::ReadReconstruction(
         FLAGS_input_pose_calibration_dataset, &pose_dataset));
 
+  ImuToCameraRotationEstimator rotation_estimator;
+
   Eigen::Vector3d accl_bias, gyro_bias;
   accl_bias.setZero();
   gyro_bias.setZero();
   if (FLAGS_imu_bias_estimate != "") {
       // IMU Bias
-      std::cout<<"Load IMU bias file: "<<FLAGS_imu_bias_estimate<<std::endl;
+      LOG(INFO)<<"Load IMU bias file: "<<FLAGS_imu_bias_estimate<<std::endl;
       OpenCamCalib::ReadIMUBias(FLAGS_imu_bias_estimate, gyro_bias, accl_bias);
+  } else {
+      // if no bias is given we can also estimate it here
+      rotation_estimator.EnableGyroBiasEstimation();
   }
 
   // read gopro telemetry
@@ -85,8 +90,7 @@ int main(int argc, char* argv[]) {
   Vec3Map visual_translation;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {
     const theia::View* view = pose_dataset.View(pose_dataset.ViewIds()[i]);
-    const double timestamp_s = view->GetTimestamp(); // holds timestamp
-    std::cout<<"timestamp_s: "<<timestamp_s<<std::endl;
+    const double timestamp_s = view->GetTimestamp();
     // cam to world trafo, so transposed rotation matrix
     Eigen::Quaterniond vis_quat(view->Camera().GetOrientationAsRotationMatrix());
     visual_rotations[timestamp_s] = vis_quat;
@@ -109,7 +113,6 @@ int main(int argc, char* argv[]) {
   double time_offset_gyro_to_camera;
   Vec3Vector ang_vel, imu_vel;
 
-  ImuToCameraRotationEstimator rotation_estimator;
   rotation_estimator.SetAngularVelocities(angular_velocities);
   rotation_estimator.SetVisualRotations(visual_rotations);
   rotation_estimator.EstimateCameraImuRotation(cam_dt_s,

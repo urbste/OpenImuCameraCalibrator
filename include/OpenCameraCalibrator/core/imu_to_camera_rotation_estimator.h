@@ -30,11 +30,15 @@ public:
                          const double td, const double dt_imu,
                          Eigen::Matrix3d &Rs, Eigen::Vector3d &bias);
 
+  void EnableGyroBiasEstimation() { estimate_gyro_bias_ = true; }
+
 private:
   //! visual rotations
   QuatMap visual_rotations_;
   //! imu angular velocities
   Vec3Map imu_angular_vel_;
+  //! estimate bias
+  bool estimate_gyro_bias_ = false;
 };
 
 int FindMinNearestTimestamp(const double t_imu, const double dt,

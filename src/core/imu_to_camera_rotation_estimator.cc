@@ -121,13 +121,12 @@ double ImuToCameraRotationEstimator::SolveClosedForm(const Vec3Vector &angVis, c
 
   // only estimate bias if it is zero,
   // otherwise we got it from another estimation procedure
-  Eigen::Vector3d bias_est;
-  if (bias.isZero(0)) {
+  Eigen::Vector3d bias_est(0.0,0.0,0.0);
+  if (estimate_gyro_bias_) {
     bias_est = mean_vis - Rs * mean_imu;
     bias = bias_est;
-  } else {
-    bias_est.setZero();
   }
+
   double error = 0.0;
   for (size_t i = 0; i < angVis.size(); ++i) {
     Vector3d D = interpolated_angVis[i] - (Rs * angImu[i] + bias_est);
@@ -240,6 +239,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
 
     unsigned int iter = 0;
     double error = 0.0;
+
     while (std::abs(c - d) > tolerance) {
 
       Eigen::Matrix3d Rsc, Rsd;
@@ -252,14 +252,14 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
       if (fc < fd) {
         b = d;
         R_imu_to_camera = Rsc;
-        if (gyro_bias.isZero(0)) {
+        if (estimate_gyro_bias_) {
           gyro_bias = biasc;
         }
         error = fc;
       } else {
         a = c;
         R_imu_to_camera = Rsd;
-        if (gyro_bias.isZero(0)) {
+        if (estimate_gyro_bias_) {
           gyro_bias = biasd;
         }
         error = fd;
@@ -273,8 +273,6 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
     time_offset_imu_to_camera = (b + a) / 2;
 
     LOG(INFO) << "Finished golden-section search in " << iter << " iterations.\n";
-    LOG(INFO) << "Final gyro to camera rotation is: \n"
-              << R_imu_to_camera << "\n";
     Eigen::Quaterniond qat(R_imu_to_camera);
     LOG(INFO) << "Final gyro to camera quaternion is: " << qat.w() << " "
               << qat.x() << " " << qat.y() << " " << qat.z() << "\n";
