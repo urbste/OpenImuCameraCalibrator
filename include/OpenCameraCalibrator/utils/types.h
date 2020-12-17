@@ -10,6 +10,27 @@
 
 namespace OpenCamCalib {
 
+template <typename T>
+using aligned_vector = std::vector<T, Eigen::aligned_allocator<T>>;
+
+template <typename T>
+using aligned_deque = std::deque<T, Eigen::aligned_allocator<T>>;
+
+template <typename K, typename V>
+using aligned_map = std::map<K, V, std::less<K>,
+                             Eigen::aligned_allocator<std::pair<K const, V>>>;
+
+template <typename K, typename V>
+using aligned_unordered_map =
+    std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
+                       Eigen::aligned_allocator<std::pair<K const, V>>>;
+
+// alignment stuff
+using QuatVector = aligned_vector<Eigen::Quaterniond>;
+using Vec3Vector = aligned_vector<Eigen::Vector3d>;
+using QuatMap = aligned_map<double, Eigen::Quaterniond>;
+using Vec3Map = aligned_map<double, Eigen::Vector3d>;
+
 struct GPXData {
   std::vector<Eigen::Vector3d> lle;
   std::vector<double> timestamp_utc_unixtime;
@@ -23,8 +44,7 @@ public:
 };
 
 struct CameraGyroData {
-  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
-      gyro_measurement;
+  aligned_vector<Eigen::Vector3d> gyro_measurement;
   std::vector<double> timestamp_ms;
 
 public:
@@ -32,8 +52,7 @@ public:
 };
 
 struct CameraAccData {
-  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
-      acc_measurement;
+  aligned_vector<Eigen::Vector3d> acc_measurement;
   std::vector<double> timestamp_ms;
 
 public:
@@ -55,9 +74,6 @@ struct CameraTelemetryData {
   CameraGyroData gyroscope;
   // GPS
   GPXData gps;
-
-public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 struct IMUCalibData {
@@ -69,20 +85,5 @@ struct IMUCalibData {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-
-template <typename T>
-using aligned_vector = std::vector<T, Eigen::aligned_allocator<T>>;
-
-template <typename T>
-using aligned_deque = std::deque<T, Eigen::aligned_allocator<T>>;
-
-template <typename K, typename V>
-using aligned_map = std::map<K, V, std::less<K>,
-                             Eigen::aligned_allocator<std::pair<K const, V>>>;
-
-template <typename K, typename V>
-using aligned_unordered_map =
-    std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
-                       Eigen::aligned_allocator<std::pair<K const, V>>>;
 
 } // namespace OpenCamCalib

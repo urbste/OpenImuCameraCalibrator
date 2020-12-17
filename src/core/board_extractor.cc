@@ -1,5 +1,5 @@
 
-#include "OpenCameraCalibrator/utils/board_extractor.h"
+#include "OpenCameraCalibrator/core/board_extractor.h"
 
 #include <opencv2/aruco.hpp>
 #include <opencv2/calib3d.hpp>
@@ -11,13 +11,16 @@
 
 #include <algorithm>
 #include <vector>
+#include <ios>
+#include <fstream>
 
 #include "OpenCameraCalibrator/utils/utils.h"
+#include "OpenCameraCalibrator/utils/json.h"
 
 using namespace cv;
 
 namespace OpenCamCalib {
-namespace utils {
+namespace core {
 
 BoardExtractor::BoardExtractor() {}
 
@@ -30,7 +33,7 @@ bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
 
   if (!OpenCamCalib::utils::ReadDetectorParameters(path_to_detector_params,
                                                    detector_params_)) {
-    std::cerr << "Invalid detector parameters file\n";
+    LOG(ERROR) << "Invalid detector parameters file\n";
     return 0;
   }
 
@@ -43,6 +46,11 @@ bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
 
   board_pts3d_.push_back(charucoboard_->chessboardCorners);
   board_type_ = BoardType::CHARUCO;
+
+  square_length_m_ = square_length;
+
+  board_initialized_ = true;
+  return true;
 }
 
 bool BoardExtractor::InitializeRadonBoard(int square_length, int squaresX,
@@ -58,6 +66,9 @@ bool BoardExtractor::InitializeRadonBoard(int square_length, int squaresX,
     }
   }
   board_pts3d_.push_back(board_pts);
+  square_length_m_ = square_length;
+
+  board_initialized_ = true;
   return true;
 }
 
@@ -98,8 +109,84 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
     std::vector<Point2d> corners;
     cv::Mat meta;
     cv::findChessboardCornersSB(image, radon_pattern_size_, corners, radon_flags_, meta);
+  } else {
+      LOG(WARNING) << " Board type does not exist.";
+      return false;
   }
+
+  return true;
 }
+
+bool BoardExtractor::ExtractVideoToJson(const std::string& video_path,
+                                        const std::string& save_path,
+                                        const double img_downsample_factor) {
+    if (!board_initialized_) {
+        LOG(ERROR) << "No board initialized.\n";
+        return false;
+    }
+    if (video_path == "") {
+        LOG(ERROR) << "Video path is empty.\n";
+        return false;
+    }
+
+    nlohmann::json output_json;
+    VideoCapture input_video;
+    input_video.open(video_path);
+    int cnt_wrong = 0;
+    double fps = input_video.get(cv::CAP_PROP_FPS);
+
+    output_json["camera_fps"] = fps;
+    output_json["calibration_board_type"] = board_type_;
+    output_json["square_size_meter"] = square_length_m_;
+
+    std::vector<cv::Point3f> board_pts = GetBoardPts()[0];
+    for (size_t i = 0; i < board_pts.size(); ++i) {
+      output_json["scene_pts"][std::to_string(i)] = {
+          board_pts[i].x, board_pts[i].y, board_pts[i].z};
+    }
+
+    const int total_nr_frames = input_video.get(cv::CAP_PROP_FRAME_COUNT);
+    int frame_cnt = 0;
+    bool set_img_size = false;
+    while (true) {
+      Mat image;
+      if (!input_video.read(image)) {
+        cnt_wrong++;
+        if (cnt_wrong > 500)
+          break;
+        continue;
+      }
+
+      const double timstamp_s = input_video.get(cv::CAP_PROP_POS_MSEC) * 1000.0;
+      const std::string view_s = std::to_string(timstamp_s);
+      ++frame_cnt;
+
+      const double fxfy = 1. / img_downsample_factor;
+      cv::resize(image, image, cv::Size(), fxfy, fxfy);
+
+      aligned_vector<Eigen::Vector2d> corners;
+      std::vector<int> ids;
+      ExtractBoard(image, corners, ids);
+
+
+      for (size_t c = 0; c < ids.size(); ++c) {
+        output_json["views"][view_s]["image_points"][std::to_string(ids[c])] = {corners[c][0],corners[c][1]};
+      }
+     if (!set_img_size) {
+      output_json["image_width"] = image.cols;
+      output_json["image_height"] = image.rows;
+      set_img_size = true;
+     }
+
+     LOG_IF(INFO, frame_cnt % 60==0) << "Extracting corners from frame "<<frame_cnt<<" / "<<total_nr_frames<<"\n";
+    }
+
+    std::vector<std::uint8_t> v_bson = nlohmann::json::to_ubjson(output_json);
+
+    std::ofstream calib_txt_output(save_path, std::ios::out | std::ios::binary);
+    calib_txt_output.write(reinterpret_cast<const char*>(&v_bson[0]), v_bson.size()*sizeof(std::uint8_t));
+}
+
 
 } // namespace utils
 } // namespace OpenCamCalib

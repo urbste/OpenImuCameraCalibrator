@@ -14,7 +14,6 @@
 #include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/opencv.hpp>
 
-#include "OpenCameraCalibrator/filter/estimate_camera_imu_alignment.h"
 #include "OpenCameraCalibrator/imu/read_gopro_imu_json.h"
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"

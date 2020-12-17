@@ -36,7 +36,6 @@ def main():
 
     board_extractor = BoardExtractor("radon", (9,14), 0.5)
 
-
     cap = cv2.VideoCapture(args.path_to_video_file)
     while (cap.isOpened()):
         # Capture frame-by-frame

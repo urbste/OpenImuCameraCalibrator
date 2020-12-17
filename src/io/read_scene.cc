@@ -25,13 +25,13 @@ bool read_scene_bson(const std::string &input_bson,
 }
 
 void scene_points_to_calib_dataset(
-    const nlohmann::json &json, theia::Reconstruction &reconstruction,
-    std::map<int, theia::TrackId> &charuco_id_to_theia_track_id) {
+    const nlohmann::json &json, theia::Reconstruction &reconstruction) {
 
   // fill reconstruction with charuco points
   const auto scene_pts_it = json["scene_pts"];
   for (auto &it : scene_pts_it.items()) {
-    theia::TrackId track_id = reconstruction.AddTrack();
+    const theia::TrackId track_id = (theia::TrackId)std::stoi(it.key());
+    reconstruction.AddTrack(track_id);
     theia::Track *track = reconstruction.MutableTrack(track_id);
     track->SetEstimated(true);
     Eigen::Vector4d *point = track->MutablePoint();
@@ -39,7 +39,6 @@ void scene_points_to_calib_dataset(
     (*point)[1] = static_cast<double>(it.value()[1]);
     (*point)[2] = static_cast<double>(it.value()[2]);
     (*point)[3] = 1.0;
-    charuco_id_to_theia_track_id[std::stoi(it.key())] = track_id;
   }
 }
 

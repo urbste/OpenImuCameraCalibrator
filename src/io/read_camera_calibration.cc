@@ -33,6 +33,8 @@ bool read_camera_calibration(const std::string &input_json,
                       json_content["image_height"]);
   camera.SetPrincipalPoint(json_content["intrinsics"]["principal_pt_x"],
                            json_content["intrinsics"]["principal_pt_y"]);
+  camera.SetFocalLength(json_content["intrinsics"]["focal_length"]);
+
   fps = json_content["fps"];
 
   if (json_content["intrinsic_type"] ==
@@ -41,6 +43,9 @@ bool read_camera_calibration(const std::string &input_json,
         [theia::DivisionUndistortionCameraModel::InternalParametersIndex::
              RADIAL_DISTORTION_1] =
         json_content["intrinsics"]["div_undist_distortion"];
+    camera.mutable_intrinsics()
+        [theia::DivisionUndistortionCameraModel::InternalParametersIndex::ASPECT_RATIO] =
+        json_content["intrinsics"]["aspect_ratio"];
   } else if (json_content["intrinsic_type"] == "DOUBLE_SPHERE") {
     camera.mutable_intrinsics()
         [theia::DoubleSphereCameraModel::InternalParametersIndex::XI] =
@@ -48,7 +53,15 @@ bool read_camera_calibration(const std::string &input_json,
     camera.mutable_intrinsics()
         [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA] =
         json_content["intrinsics"]["alpha"];
+    camera.mutable_intrinsics()
+        [theia::DoubleSphereCameraModel::InternalParametersIndex::ASPECT_RATIO] =
+        json_content["intrinsics"]["aspect_ratio"];
+  } else if (json_content["intrinsic_type"] == "LINEAR_PINHOLE") {
+      camera.mutable_intrinsics()
+          [theia::PinholeCameraModel::InternalParametersIndex::ASPECT_RATIO] =
+          json_content["intrinsics"]["aspect_ratio"];
   }
+
 
   input.close();
   return true;

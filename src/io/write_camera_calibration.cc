@@ -10,14 +10,12 @@
 #include "theia/sfm/camera/double_sphere_camera_model.h"
 #include "theia/sfm/camera/pinhole_camera_model.h"
 
-
 namespace OpenCamCalib {
 namespace io {
 
 bool write_camera_calibration(const std::string &output_file,
-                              const theia::Camera &camera, double fps,
+                              const theia::Camera &camera, const double fps,
                               const int nr_calib_images,
-                              const double final_ba_cost,
                               const double total_reproj_error) {
   std::ofstream json_file(output_file);
   if (!json_file.is_open()) {
@@ -29,7 +27,6 @@ bool write_camera_calibration(const std::string &output_file,
   json_obj["stabelized"] = false;
   json_obj["fps"] = fps;
   json_obj["nr_calib_images"] = nr_calib_images;
-  json_obj["final_ba_cost"] = final_ba_cost;
   json_obj["final_reproj_error"] = total_reproj_error;
   json_obj["image_width"] = camera.ImageWidth();
   json_obj["image_height"] = camera.ImageHeight();
