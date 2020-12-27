@@ -72,9 +72,9 @@ int main(int argc, char* argv[]) {
   // fill measurementes
   Vec3Map angular_velocities, acclerations;
   for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size(); ++i) {
-    angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
+    angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
                               telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias;
-    acclerations[telemetry_data.gyroscope.timestamp_ms[i] / 1000.0] =
+    acclerations[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
             telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
   }
 
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
       imu_dt_s += telemetry_data.gyroscope.timestamp_ms[i] - telemetry_data.gyroscope.timestamp_ms[i-1];
   }
   imu_dt_s /= static_cast<double>(telemetry_data.gyroscope.timestamp_ms.size()-1);
-  imu_dt_s /= 1000.0;
+  imu_dt_s *= 1e-3;
 
   QuatMap visual_rotations;
   Vec3Map visual_translation;

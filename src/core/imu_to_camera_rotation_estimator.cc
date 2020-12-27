@@ -16,7 +16,6 @@ using Eigen::Quaterniond;
 namespace OpenCamCalib {
 namespace core {
 
-
 int FindMinNearestTimestamp(const double t_imu, const double dt,
                             const std::vector<double> &vis_timestamps,
                             double &distance_to_nearest_timestamp) {
@@ -76,10 +75,10 @@ void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
   }
 }
 
-
-double ImuToCameraRotationEstimator::SolveClosedForm(const Vec3Vector &angVis, const Vec3Vector &angImu,
-                       const std::vector<double> timestamps_s, const double td,
-                       const double dt_imu, Matrix3d &Rs, Vector3d &bias) {
+double ImuToCameraRotationEstimator::SolveClosedForm(
+    const Vec3Vector &angVis, const Vec3Vector &angImu,
+    const std::vector<double> timestamps_s, const double td,
+    const double dt_imu, Matrix3d &Rs, Vector3d &bias) {
 
   // offset the angular velocities with td
   std::vector<double> time_with_offset(timestamps_s.size());
@@ -121,7 +120,7 @@ double ImuToCameraRotationEstimator::SolveClosedForm(const Vec3Vector &angVis, c
 
   // only estimate bias if it is zero,
   // otherwise we got it from another estimation procedure
-  Eigen::Vector3d bias_est(0.0,0.0,0.0);
+  Eigen::Vector3d bias_est(0.0, 0.0, 0.0);
   if (estimate_gyro_bias_) {
     bias_est = mean_vis - Rs * mean_imu;
     bias = bias_est;
@@ -137,149 +136,149 @@ double ImuToCameraRotationEstimator::SolveClosedForm(const Vec3Vector &angVis, c
 }
 
 bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
-        const double dt_vis, const double dt_imu, Matrix3d &R_imu_to_camera,
+    const double dt_vis, const double dt_imu, Matrix3d &R_imu_to_camera,
     double &time_offset_imu_to_camera, Vector3d &gyro_bias,
     Vec3Vector &smoothed_ang_imu, Vec3Vector &smoothed_vis_vel) {
 
-    // find start and end points of camera and imu
-    const double start_time_cam = visual_rotations_.begin()->first;
-    const double end_time_cam = visual_rotations_.rbegin()->first;
-    const double start_time_imu = imu_angular_vel_.begin()->first;
-    const double end_time_imu = imu_angular_vel_.rbegin()->first;
+  // find start and end points of camera and imu
+  const double start_time_cam = visual_rotations_.begin()->first;
+  const double end_time_cam = visual_rotations_.rbegin()->first;
+  const double start_time_imu = imu_angular_vel_.begin()->first;
+  const double end_time_imu = imu_angular_vel_.rbegin()->first;
 
-    double t0 =
-        (start_time_cam >= start_time_imu) ? start_time_cam : start_time_imu;
-    double tend = (end_time_cam >= end_time_imu) ? end_time_cam : end_time_imu;
+  double t0 =
+      (start_time_cam >= start_time_imu) ? start_time_cam : start_time_imu;
+  double tend = (end_time_cam >= end_time_imu) ? end_time_cam : end_time_imu;
 
-    // create zero-based maps
-    QuatMap visual_rotations_clamped;
-    Vec3Map imu_angular_vel_clamped;
+  // create zero-based maps
+  QuatMap visual_rotations_clamped;
+  Vec3Map imu_angular_vel_clamped;
 
-    for (auto const &imu_rot : imu_angular_vel_) {
-      if (imu_rot.first >= t0 && imu_rot.first <= tend) {
-        imu_angular_vel_clamped[imu_rot.first - t0] = imu_rot.second;
+  for (auto const &imu_rot : imu_angular_vel_) {
+    if (imu_rot.first >= t0 && imu_rot.first <= tend) {
+      imu_angular_vel_clamped[imu_rot.first - t0] = imu_rot.second;
+    }
+  }
+  Vec3Vector angImu;
+  for (const auto &imu : imu_angular_vel_clamped) {
+    angImu.push_back(imu.second);
+  }
+
+  // interpolate visual rotations
+  for (auto const &v_rot : visual_rotations_) {
+    if (v_rot.first >= t0 && v_rot.first <= tend) {
+      visual_rotations_clamped[v_rot.first - t0] = v_rot.second;
+    }
+  }
+
+  // get vectors of clamped imu angular velocities
+  std::vector<double> tIMU;
+  for (auto const &imu : imu_angular_vel_clamped) {
+    tIMU.push_back(imu.first);
+  }
+
+  std::vector<double> tVis;
+  QuatVector qtVis;
+
+  for (auto const &vis : visual_rotations_clamped) {
+    tVis.push_back(vis.first);
+    qtVis.push_back(vis.second);
+  }
+  QuatVector qtVis_interp;
+  InterpolateQuaternions(tVis, tIMU, qtVis, dt_vis, qtVis_interp);
+
+  // compute angular velocities
+  QuatVector qtDiffs;
+  Vec3Vector angVis;
+  for (size_t i = 1; i < qtVis_interp.size(); ++i) {
+    Quaterniond q;
+    q.w() = qtVis_interp[i].w() - qtVis_interp[i - 1].w();
+    q.x() = qtVis_interp[i].x() - qtVis_interp[i - 1].x();
+    q.y() = qtVis_interp[i].y() - qtVis_interp[i - 1].y();
+    q.z() = qtVis_interp[i].z() - qtVis_interp[i - 1].z();
+    qtDiffs.push_back(q);
+  }
+  qtDiffs.push_back(qtDiffs[qtDiffs.size() - 1]);
+
+  for (size_t i = 0; i < qtDiffs.size(); ++i) {
+    Quaterniond angVisQ = qtDiffs[i] * qtVis_interp[i].inverse();
+    const double diff_dt = -2.0 / dt_imu;
+    Vector3d angVisVec(diff_dt * angVisQ.x(), diff_dt * angVisQ.y(),
+                       diff_dt * angVisQ.z());
+    angVis.push_back(angVisVec);
+  }
+
+  // calculate moving average to smooth the values a bit
+  SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
+  SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
+
+  // Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
+  for (int i = 0; i < angImu.size(); ++i) {
+    x_imu.add(angImu[i][0]);
+    y_imu.add(angImu[i][1]);
+    z_imu.add(angImu[i][2]);
+    smoothed_ang_imu.push_back(
+        Eigen::Vector3d(x_imu.avg(), y_imu.avg(), z_imu.avg()));
+    x_vis.add(angVis[i][0]);
+    y_vis.add(angVis[i][1]);
+    z_vis.add(angVis[i][2]);
+    smoothed_vis_vel.push_back(
+        Eigen::Vector3d(x_vis.avg(), y_vis.avg(), z_vis.avg()));
+  }
+
+  const double gRatio = (1.0 + std::sqrt(5.0)) / 2.0;
+  const double tolerance = 1e-4;
+
+  const double maxOffset = 0.5;
+  double a = -maxOffset;
+  double b = maxOffset;
+
+  double c = b - (b - a) / gRatio;
+  double d = a + (b - a) / gRatio;
+
+  unsigned int iter = 0;
+  double error = 0.0;
+
+  while (std::abs(c - d) > tolerance) {
+
+    Eigen::Matrix3d Rsc, Rsd;
+    Eigen::Vector3d biasc, biasd;
+    const double fc = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU,
+                                      c, dt_imu, Rsc, biasc);
+    const double fd = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU,
+                                      d, dt_imu, Rsd, biasd);
+
+    if (fc < fd) {
+      b = d;
+      R_imu_to_camera = Rsc;
+      if (estimate_gyro_bias_) {
+        gyro_bias = biasc;
       }
-    }
-    Vec3Vector angImu;
-    for (const auto &imu : imu_angular_vel_clamped) {
-      angImu.push_back(imu.second);
-    }
-
-    // interpolate visual rotations
-    for (auto const &v_rot : visual_rotations_) {
-      if (v_rot.first >= t0 && v_rot.first <= tend) {
-        visual_rotations_clamped[v_rot.first - t0] = v_rot.second;
+      error = fc;
+    } else {
+      a = c;
+      R_imu_to_camera = Rsd;
+      if (estimate_gyro_bias_) {
+        gyro_bias = biasd;
       }
+      error = fd;
     }
 
-    // get vectors of clamped imu angular velocities
-    std::vector<double> tIMU;
-    for (auto const &imu : imu_angular_vel_clamped) {
-      tIMU.push_back(imu.first);
-    }
+    c = b - (b - a) / gRatio;
+    d = a + (b - a) / gRatio;
 
-    std::vector<double> tVis;
-    QuatVector qtVis;
+    iter = iter + 1;
+  }
+  time_offset_imu_to_camera = (b + a) / 2;
 
-    for (auto const &vis : visual_rotations_clamped) {
-      tVis.push_back(vis.first);
-      qtVis.push_back(vis.second);
-    }
-    QuatVector qtVis_interp;
-    InterpolateQuaternions(tVis, tIMU, qtVis, dt_vis, qtVis_interp);
-
-    // compute angular velocities
-    QuatVector qtDiffs;
-    Vec3Vector angVis;
-    for (size_t i = 1; i < qtVis_interp.size(); ++i) {
-      Quaterniond q;
-      q.w() = qtVis_interp[i].w() - qtVis_interp[i - 1].w();
-      q.x() = qtVis_interp[i].x() - qtVis_interp[i - 1].x();
-      q.y() = qtVis_interp[i].y() - qtVis_interp[i - 1].y();
-      q.z() = qtVis_interp[i].z() - qtVis_interp[i - 1].z();
-      qtDiffs.push_back(q);
-    }
-    qtDiffs.push_back(qtDiffs[qtDiffs.size() - 1]);
-
-    for (size_t i = 0; i < qtDiffs.size(); ++i) {
-      Quaterniond angVisQ = qtDiffs[i] * qtVis_interp[i].inverse();
-      const double diff_dt = -2.0 / dt_imu;
-      Vector3d angVisVec(diff_dt * angVisQ.x(), diff_dt * angVisQ.y(),
-                         diff_dt * angVisQ.z());
-      angVis.push_back(angVisVec);
-    }
-
-    // calculate moving average to smooth the values a bit
-    SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
-    SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
-
-    // Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
-    for (int i = 0; i < angImu.size(); ++i) {
-      x_imu.add(angImu[i][0]);
-      y_imu.add(angImu[i][1]);
-      z_imu.add(angImu[i][2]);
-      smoothed_ang_imu.push_back(
-          Eigen::Vector3d(x_imu.avg(), y_imu.avg(), z_imu.avg()));
-      x_vis.add(angVis[i][0]);
-      y_vis.add(angVis[i][1]);
-      z_vis.add(angVis[i][2]);
-      smoothed_vis_vel.push_back(
-          Eigen::Vector3d(x_vis.avg(), y_vis.avg(), z_vis.avg()));
-    }
-
-    const double gRatio = (1.0 + std::sqrt(5.0)) / 2.0;
-    const double tolerance = 1e-4;
-
-    const double maxOffset = 0.5;
-    double a = -maxOffset;
-    double b = maxOffset;
-
-    double c = b - (b - a) / gRatio;
-    double d = a + (b - a) / gRatio;
-
-    unsigned int iter = 0;
-    double error = 0.0;
-
-    while (std::abs(c - d) > tolerance) {
-
-      Eigen::Matrix3d Rsc, Rsd;
-      Eigen::Vector3d biasc, biasd;
-      const double fc = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU,
-                                        c, dt_imu, Rsc, biasc);
-      const double fd = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU,
-                                        d, dt_imu, Rsd, biasd);
-
-      if (fc < fd) {
-        b = d;
-        R_imu_to_camera = Rsc;
-        if (estimate_gyro_bias_) {
-          gyro_bias = biasc;
-        }
-        error = fc;
-      } else {
-        a = c;
-        R_imu_to_camera = Rsd;
-        if (estimate_gyro_bias_) {
-          gyro_bias = biasd;
-        }
-        error = fd;
-      }
-
-      c = b - (b - a) / gRatio;
-      d = a + (b - a) / gRatio;
-
-      iter = iter + 1;
-    }
-    time_offset_imu_to_camera = (b + a) / 2;
-
-    LOG(INFO) << "Finished golden-section search in " << iter << " iterations.\n";
-    Eigen::Quaterniond qat(R_imu_to_camera);
-    LOG(INFO) << "Final gyro to camera quaternion is: " << qat.w() << " "
-              << qat.x() << " " << qat.y() << " " << qat.z() << "\n";
-    LOG(INFO) << "Gyro bias is estimated to be: " << gyro_bias[0] << ", "
-              << gyro_bias[1] << ", " << gyro_bias[2] << "\n";
-    LOG(INFO) << "Estimated time offset: " << time_offset_imu_to_camera << "\n";
-    LOG(INFO) << "Final alignment error: " << error << "\n";
+  LOG(INFO) << "Finished golden-section search in " << iter << " iterations.\n";
+  Eigen::Quaterniond qat(R_imu_to_camera);
+  LOG(INFO) << "Final gyro to camera quaternion is: " << qat.w() << " "
+            << qat.x() << " " << qat.y() << " " << qat.z() << "\n";
+  LOG(INFO) << "Gyro bias is estimated to be: " << gyro_bias[0] << ", "
+            << gyro_bias[1] << ", " << gyro_bias[2] << "\n";
+  LOG(INFO) << "Estimated time offset: " << time_offset_imu_to_camera << "\n";
+  LOG(INFO) << "Final alignment error: " << error << "\n";
 }
 
 } // namespace core

@@ -23,8 +23,9 @@
 namespace OpenCamCalib {
 namespace core {
 
-CameraCalibrator::CameraCalibrator(const std::string &camera_model)
-    : camera_model_(camera_model) {
+CameraCalibrator::CameraCalibrator(const std::string &camera_model,
+                                   const bool optimize_board_pts)
+    : camera_model_(camera_model), optimize_board_pts_(optimize_board_pts) {
   ransac_params_.failure_probability = 0.001;
   ransac_params_.use_mle = true;
   ransac_params_.max_iterations = 1000;
@@ -56,17 +57,16 @@ bool CameraCalibrator::AddObservation(const theia::ViewId &view_id,
   return recon_calib_dataset_.AddObservation(view_id, object_point_id, corner);
 }
 
-theia::ViewId
-CameraCalibrator::AddView(const Eigen::Matrix3d &initial_rotation,
-                          const Eigen::Vector3d &initial_translation,
-                          const double &initial_focal_length,
-                          const double &initial_distortion,
-                          const int &image_width, const int &image_height,
-                          const double &timestamp_s,
-                          const theia::CameraIntrinsicsGroupId group_id) {
+theia::ViewId CameraCalibrator::AddView(
+    const Eigen::Matrix3d &initial_rotation,
+    const Eigen::Vector3d &initial_position, const double &initial_focal_length,
+    const double &initial_distortion, const int &image_width,
+    const int &image_height, const double &timestamp_s,
+    const theia::CameraIntrinsicsGroupId group_id) {
   // fill charucoCorners to theia reconstruction
   std::string view_name = std::to_string((uint64_t)(timestamp_s * 1e6));
-  theia::ViewId view_id = recon_calib_dataset_.AddView(view_name, group_id, timestamp_s);
+  theia::ViewId view_id =
+      recon_calib_dataset_.AddView(view_name, group_id, timestamp_s);
   theia::View *theia_view = recon_calib_dataset_.MutableView(view_id);
   theia_view->SetEstimated(true);
 
@@ -74,9 +74,7 @@ CameraCalibrator::AddView(const Eigen::Matrix3d &initial_rotation,
   theia::Camera *cam = theia_view->MutableCamera();
   cam->SetImageSize(image_width, image_height);
   cam->SetPrincipalPoint(image_width / 2.0, image_height / 2.0);
-  const Eigen::Vector3d position =
-      -initial_rotation.transpose() * initial_translation;
-  cam->SetPosition(position);
+  cam->SetPosition(initial_position);
   cam->SetOrientationFromRotationMatrix(initial_rotation);
   cam->SetFocalLength(initial_focal_length);
 
@@ -93,9 +91,9 @@ CameraCalibrator::AddView(const Eigen::Matrix3d &initial_rotation,
     cam->SetCameraIntrinsicsModelType(
         theia::CameraIntrinsicsModelType::DOUBLE_SPHERE);
     cam->mutable_intrinsics()
-        [theia::DoubleSphereCameraModel::InternalParametersIndex::XI] = 1.0;
+        [theia::DoubleSphereCameraModel::InternalParametersIndex::XI] = -0.5;
     cam->mutable_intrinsics()
-        [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA] = 0.0;
+        [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA] = 0.5;
   }
 
   return view_id;
@@ -104,7 +102,7 @@ CameraCalibrator::AddView(const Eigen::Matrix3d &initial_rotation,
 bool CameraCalibrator::RunCalibration() {
   if (recon_calib_dataset_.NumViews() < 10) {
     LOG(ERROR) << "Not enough views for proper calibration!" << std::endl;
-    return 0;
+    return false;
   }
 
   LOG(INFO) << "Using " << recon_calib_dataset_.NumViews()
@@ -112,9 +110,9 @@ bool CameraCalibrator::RunCalibration() {
   // bundle adjust everything
   theia::BundleAdjustmentOptions ba_options;
   ba_options.verbose = false;
-  ba_options.fix_tracks = true;
   ba_options.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options.robust_loss_width = 1.345;
+  //ba_options.linear_solver_type = ceres::LinearSolverType::DEN
 
   /////////////////////////////////////////////////
   /// 1. Optimize focal length and radial distortion, keep principal point fixed
@@ -124,16 +122,17 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
   if (camera_model_ == "DIVISION_UNDISTORTION" ||
-      camera_model_ == "DOUBLE_SPHERE")
+      camera_model_ == "DOUBLE_SPHERE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
+  }
   LOG(INFO) << "Bundle adjusting focal length and radial distortion. Keeping "
                "cam position fixed.\n";
 
-  theia::BundleAdjustmentSummary summary =
-      theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset_);
+  theia::BundleAdjustmentSummary summary = BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
-  RemoveViewsReprojError(2.0);
+  PrintResult();
+  RemoveViewsReprojError(5.0);
 
   /////////////////////////////////////////////////
   /// 2. Optimize principal point keeping everything else fixed
@@ -143,16 +142,16 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
 
-  summary =
-      theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset_);
+  summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
+
 
   if (recon_calib_dataset_.NumViews() < 8) {
     std::cout << "Not enough views left for proper calibration!" << std::endl;
-    return 0;
+    return false;
   }
 
   /////////////////////////////////////////////////
-  /// 3. Full reconstruction
+  /// 3. Full optimization
   /////////////////////////////////////////////////
   ba_options.constant_camera_orientation = false;
   ba_options.constant_camera_position = false;
@@ -160,17 +159,30 @@ bool CameraCalibrator::RunCalibration() {
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS |
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
   if (camera_model_ == "DIVISION_UNDISTORTION" ||
-      camera_model_ == "DOUBLE_SPHERE")
+      camera_model_ == "DOUBLE_SPHERE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
-
-  summary =
-      theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset_);
+  }
+  summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
   RemoveViewsReprojError(1.0);
 
-  summary =
-      theia::BundleAdjustReconstruction(ba_options, &recon_calib_dataset_);
+  if (recon_calib_dataset_.NumViews() < 8) {
+    std::cout << "Not enough views left for proper calibration!" << std::endl;
+    return false;
+  }
+
+  if (optimize_board_pts_) {
+    LOG(INFO) << "Optimizing board points.";
+    ba_options.use_homogeneous_local_point_parametrization = false;
+    ba_options.verbose = true;
+    theia::BundleAdjustTracks(ba_options, recon_calib_dataset_.TrackIds(),
+                              &recon_calib_dataset_);
+    summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
+
+  }
+
+  return true;
 }
 
 bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
@@ -218,6 +230,8 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
     Eigen::Vector3d position;
     bool success_init = false;
     double focal_length = 0.0, radial_distortion = 0.0;
+    LOG(INFO) << "Initializing " << camera_model_ << " camera model.\n";
+
     if (camera_model_ == "LINEAR_PINHOLE") {
       success_init = initialize_pinhole_camera(
           correspondences, ransac_params_, ransac_summary, rotation, position,
@@ -254,15 +268,13 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
     saved_poses.push_back(position);
 
     theia::ViewId view_id =
-        AddView(rotation, -rotation * position, focal_length, radial_distortion,
+        AddView(rotation, position, focal_length, radial_distortion,
                 image_width, image_height, timestamp_s);
 
     for (int i = 0; i < board_pt3_ids.size(); ++i) {
       AddObservation(view_id, board_pt3_ids[i], corners[i]);
     }
   }
-  // remove views that failed to initialize
-  RemoveViewsReprojError(10.0);
 
   if (!RunCalibration()) {
     LOG(ERROR) << "Calibration failed.\n";
@@ -296,6 +308,31 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
         output_path + ".json", cam, scene_json["camera_fps"],
         recon_calib_dataset_.NumViews(), total_repro_error))
         << "Could not write calibration file.\n";
+  }
+  PrintResult();
+}
+
+void CameraCalibrator::PrintResult() {
+  const theia::Camera cam =
+      recon_calib_dataset_.View(recon_calib_dataset_.ViewIds()[0])->Camera();
+  LOG(INFO) << "Focal Length:" << cam.FocalLength()
+            << "px Principal Point: " << cam.PrincipalPointX() << "/"
+            << cam.PrincipalPointY() << "px.";
+  if (camera_model_ == "DIVISION_UNDISTORTION") {
+    LOG(INFO)
+        << "Distortion: "
+        << cam.intrinsics()[theia::DivisionUndistortionCameraModel::
+                                InternalParametersIndex::RADIAL_DISTORTION_1]
+        << "\n";
+  } else if (camera_model_ == "DOUBLE_SPHERE") {
+    LOG(INFO)
+        << "XI: "
+        << cam.intrinsics()
+               [theia::DoubleSphereCameraModel::InternalParametersIndex::XI]
+        << " ALPHA: "
+        << cam.intrinsics()
+               [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA]
+        << "\n";
   }
 }
 

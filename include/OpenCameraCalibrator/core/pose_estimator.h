@@ -20,7 +20,7 @@ public:
 
 class PoseEstimator {
 public:
-  PoseEstimator();
+    PoseEstimator();
 
   bool EstimatePosePinhole(
       const theia::ViewId& view_id,
@@ -37,6 +37,10 @@ public:
     pose_dataset = pose_dataset_;
   }
 
+  void OptimizeBoardPoints();
+
+  void OptimizeAllPoses();
+
 private:
   //! Pose datasets
   theia::Reconstruction pose_dataset_;
@@ -46,6 +50,8 @@ private:
 
   //! Ransac parameters for initial pose estimation
   theia::RansacParameters ransac_params_;
+
+
 };
 
 } // namespace core

@@ -42,7 +42,7 @@ DEFINE_string(save_path_calib_dataset, "",
               "Where to save the recon dataset to.");
 DEFINE_double(grid_size, 0.04,
               "Only take images that are at least grid_size apart");
-DEFINE_bool(optimize_scene_points, false,
+DEFINE_bool(optimize_board_points, false,
             "If in the end also the scene points should be adjusted. (if the "
             "board is not planar)");
 DEFINE_bool(verbose, false, "If more stuff should be printed");
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
   CHECK(read_scene_bson(FLAGS_input_corners, scene_json))
       << "Failed to load " << FLAGS_input_corners;
 
-  CameraCalibrator camera_calibrator(FLAGS_camera_model_to_calibrate);
+  CameraCalibrator camera_calibrator(FLAGS_camera_model_to_calibrate, FLAGS_optimize_board_points);
   camera_calibrator.SetGridSize(FLAGS_grid_size);
   if (FLAGS_verbose) {
     camera_calibrator.SetVerbose();

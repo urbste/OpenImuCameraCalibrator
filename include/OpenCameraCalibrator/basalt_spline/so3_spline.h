@@ -121,7 +121,7 @@ class So3Spline {
   /// @return minimum time represented by spline in nanoseconds
   int64_t minTimeNs() const { return start_t_ns; }
 
-  /// @brief Gererate random trajectory
+  /// @brief Generate random trajectory
   ///
   /// @param[in] n number of knots to generate
   /// @param[in] static_init if true the first N knots will be the same

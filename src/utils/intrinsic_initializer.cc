@@ -17,11 +17,12 @@ bool initialize_pinhole_camera(
   const bool success = theia::EstimateUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, &pose_linear,
       &ransac_summary);
-  std::cout << "Estimated focal length: " << pose_linear.focal_length
-            << std::endl;
-  std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
-            << std::endl;
-
+  if (verbose) {
+    std::cout << "Estimated focal length: " << pose_linear.focal_length
+              << std::endl;
+    std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
+              << std::endl;
+  }
   rotation = pose_linear.rotation;
   position = pose_linear.position;
   focal_length = pose_linear.focal_length;
@@ -42,26 +43,27 @@ bool initialize_radial_undistortion_camera(
   }
   theia::RadialDistUncalibratedAbsolutePoseMetaData meta_data;
   theia::RadialDistUncalibratedAbsolutePose pose_division_undist;
-  meta_data.max_focal_length = 0.5 * img_cols + 150.0;
-  meta_data.min_focal_length = 0.5 * img_cols - 150.0;
+  meta_data.max_focal_length = 0.5 * img_cols + 300.0;
+  meta_data.min_focal_length = 0.5 * img_cols - 300.0;
 
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
       &pose_division_undist, &ransac_summary);
   if (verbose) {
-      std::cout << "Estimated focal length: " << pose_division_undist.focal_length
-                << std::endl;
-      std::cout << "Estimated radial distortion: "
-                << pose_division_undist.radial_distortion << std::endl
-                << std::endl;
-      std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
-                << std::endl;
+    std::cout << "Estimated focal length: " << pose_division_undist.focal_length
+              << std::endl;
+    std::cout << "Estimated radial distortion: "
+              << pose_division_undist.radial_distortion << std::endl
+              << std::endl;
+    std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
+              << std::endl;
   }
   rotation = pose_division_undist.rotation;
-  position = -pose_division_undist.rotation.transpose() * pose_division_undist.translation;
+  position = -pose_division_undist.rotation.transpose() *
+             pose_division_undist.translation;
   radial_distortion = pose_division_undist.radial_distortion;
   focal_length = pose_division_undist.focal_length;
-  if (ransac_summary.inliers.size() < 10)
+  if (ransac_summary.inliers.size() < 8)
     return false;
   return success;
 }
@@ -74,8 +76,8 @@ bool initialize_doublesphere_model(
     cv::Ptr<cv::aruco::CharucoBoard> &charucoboard,
     const theia::RansacParameters &ransac_params, const int img_cols,
     const int img_rows, theia::RansacSummary &ransac_summary,
-    Eigen::Matrix3d &rotation, Eigen::Vector3d &position,
-    double &focal_length, const bool verbose) {
+    Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
+    const bool verbose) {
   // First, initialize the image center at the center of the image.
 
   aligned_map<int, Eigen::Vector2d> id_to_corner;
@@ -196,8 +198,8 @@ bool initialize_doublesphere_model(
         }
       }
       if (verbose) {
-          std::cout << "numReprojected " << in_image << " reprojErr "
-                    << repro_error / in_image << std::endl;
+        std::cout << "numReprojected " << in_image << " reprojErr "
+                  << repro_error / in_image << std::endl;
       }
       if (in_image > MIN_CORNERS) {
         double avg_reproj_error = repro_error / in_image;
@@ -211,7 +213,7 @@ bool initialize_doublesphere_model(
           focal_length = 0.5 * gamma0;
           if (verbose) {
             std::cout << "new min_reproj_error: " << min_reproj_error
-                    << std::endl;
+                      << std::endl;
           }
 
         } // if clause

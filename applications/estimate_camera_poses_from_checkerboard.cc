@@ -32,6 +32,8 @@ DEFINE_string(input_corners, "", "Path to save charuco board to.");
 DEFINE_string(camera_calibration_json, "", "Path to camera calibration json.");
 DEFINE_string(output_pose_dataset, "",
               "Path to write the pose calibration dataset to.");
+DEFINE_bool(optimize_board_points, false,
+              "If board points should be optimized.");
 
 int main(int argc, char *argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
@@ -51,6 +53,11 @@ int main(int argc, char *argv[]) {
   PoseEstimator pose_estimator;
   pose_estimator.EstimatePosesFromJson(scene_json, camera);
   LOG(INFO) << "Finished pose estimation.\n";
+
+  if (FLAGS_optimize_board_points) {
+      pose_estimator.OptimizeBoardPoints();
+      pose_estimator.OptimizeAllPoses();
+  }
 
   theia::Reconstruction pose_dataset;
   pose_estimator.GetPoseDataset(pose_dataset);

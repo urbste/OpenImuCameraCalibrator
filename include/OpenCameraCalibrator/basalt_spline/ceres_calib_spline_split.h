@@ -21,6 +21,14 @@ public:
   static constexpr double ns_to_s = 1e-9; ///< Nanosecond to second conversion
   static constexpr double s_to_ns = 1e9;  ///< Second to nanosecond conversion
 
+  CeresCalibrationSplineSplit()
+      : dt_so3_ns(0.1 * 1e9), dt_r3_ns(0.1 * 1e9), start_t_ns(0.0) {
+    inv_so3_dt = s_to_ns / dt_so3_ns;
+    inv_r3_dt = s_to_ns / dt_r3_ns;
+    accel_bias.setZero();
+    gyro_bias.setZero();
+  }
+
   CeresCalibrationSplineSplit(int64_t time_interval_so3_ns,
                               int64_t time_interval_r3_ns,
                               int64_t start_time_ns = 0)
@@ -30,7 +38,20 @@ public:
     inv_r3_dt = s_to_ns / dt_r3_ns;
     accel_bias.setZero();
     gyro_bias.setZero();
-  };
+  }
+
+  void init_times(int64_t time_interval_so3_ns, int64_t time_interval_r3_ns,
+                  int64_t start_time_ns = 0) {
+
+    dt_so3_ns = time_interval_so3_ns;
+    dt_r3_ns = time_interval_r3_ns;
+    start_t_ns = start_time_ns;
+
+    inv_so3_dt = s_to_ns / dt_so3_ns;
+    inv_r3_dt = s_to_ns / dt_r3_ns;
+    accel_bias.setZero();
+    gyro_bias.setZero();
+  }
 
   Sophus::SE3d getPose(int64_t time_ns) const {
     const int64_t st_ns = (time_ns - start_t_ns);
@@ -166,9 +187,9 @@ public:
                const int num_knots_so3, const int num_knots_r3) {
     so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
     trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
-        for (int i = 0; i < so3_init.size(); ++i) {
-            so3_knots[i] = so3_init[i];
-        }
+    for (int i = 0; i < so3_init.size(); ++i) {
+      so3_knots[i] = so3_init[i];
+    }
     for (int i = 0; i < r3_init.size(); ++i) {
       trans_knots[i] = r3_init[i];
     }

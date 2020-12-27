@@ -10,7 +10,7 @@ namespace core {
 
 class CameraCalibrator {
 public:
-  CameraCalibrator(const std::string &camera_model);
+  CameraCalibrator(const std::string &camera_model, const bool optimize_board_pts);
 
   bool RunCalibration();
 
@@ -26,7 +26,7 @@ public:
                       const Eigen::Vector2d &corner);
 
   theia::ViewId AddView(const Eigen::Matrix3d &initial_rotation,
-                        const Eigen::Vector3d &initial_translation,
+                        const Eigen::Vector3d &initial_position,
                         const double &initial_focal_length,
                         const double &initial_distortion,
                         const int &image_width, const int &image_height,
@@ -42,6 +42,8 @@ public:
   //! pose in a voxel
   void SetGridSize(const double grid_size = 0.04) { grid_size_ = grid_size; }
 
+  //! Print result
+  void PrintResult();
 private:
   //! holds all calibration information like views and features
   theia::Reconstruction recon_calib_dataset_;
@@ -57,6 +59,9 @@ private:
 
   //! voxel grid size
   double grid_size_;
+
+  //! also optimize board points in the end (e.g. for printed boards)
+  bool optimize_board_pts_ = true;
 };
 
 } // namespace core

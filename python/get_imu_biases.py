@@ -14,7 +14,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('--input_json_path', 
                         help="path to metadata json",
-                        default='')
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_30/dataset1/imu_bias/GX010019.json')
     parser.add_argument('--output_path', 
                         help="output path",
                         default='')

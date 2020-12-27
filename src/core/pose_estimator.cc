@@ -22,7 +22,6 @@ PoseEstimator::PoseEstimator() {
   ransac_params_.error_thresh = 0.5;
 
   // bundle adjustment options
-  ba_options_.fix_tracks = true;
   ba_options_.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options_.robust_loss_width = 1.345;
   ba_options_.intrinsics_to_optimize = theia::OptimizeIntrinsicsType::NONE;
@@ -72,8 +71,9 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
                                           const theia::Camera &camera,
                                           const double max_reproj_error) {
 
-  const double image_diag = std::sqrt(camera.ImageWidth()*camera.ImageWidth() +
-                                      camera.ImageHeight()*camera.ImageHeight());
+  const double image_diag =
+      std::sqrt(camera.ImageWidth() * camera.ImageWidth() +
+                camera.ImageHeight() * camera.ImageHeight());
   const double scaled_max_reproj_error = max_reproj_error / image_diag;
   // get scene points and fill them into
   io::scene_points_to_calib_dataset(scene_json, pose_dataset_);
@@ -83,8 +83,8 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
   int processed_frames = 0;
 
   for (const auto &view : views.items()) {
-    const double timestamp_us = std::stod(view.key()); // to seconds
-    const double timestamp_s = timestamp_us * 1e-6;    // to seconds
+    const double timestamp_us = std::stod(view.key());
+    const double timestamp_s = timestamp_us * 1e-6; // to seconds
     const auto image_points = view.value()["image_points"];
     std::vector<int> board_pts3_ids;
     aligned_vector<Eigen::Vector2d> corners;
@@ -147,5 +147,23 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     ++processed_frames;
   }
 }
+
+void PoseEstimator::OptimizeBoardPoints() {
+  ba_options_.constant_camera_orientation = true;
+  ba_options_.constant_camera_position = true;
+
+  theia::BundleAdjustTracks(ba_options_, pose_dataset_.TrackIds(),
+                            &pose_dataset_);
+}
+
+void PoseEstimator::OptimizeAllPoses() {
+
+  ba_options_.constant_camera_orientation = false;
+  ba_options_.constant_camera_position = false;
+
+  theia::BundleAdjustViews(ba_options_, pose_dataset_.ViewIds(),
+                           &pose_dataset_);
+}
+
 } // namespace core
 } // namespace OpenCamCalib

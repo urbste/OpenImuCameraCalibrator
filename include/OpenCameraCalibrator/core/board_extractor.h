@@ -48,6 +48,9 @@ public:
   //! Returns the 3d board points
   std::vector<std::vector<cv::Point3f>> GetBoardPts() { return board_pts3d_; }
 
+  //! Set verbose plot
+  void SetVerbosePlot() { verbose_plot_ = true; }
+
 private:
   //! Board type
   BoardType board_type_;
@@ -66,15 +69,19 @@ private:
 
   //! radon board extraction flags
   int radon_flags_;
-
   //! radon board size
   cv::Size radon_pattern_size_;
+  //! radon board pt continuous index
+  std::vector<int> radon_board_indices_;
 
   //! if a board is already initialized
   bool board_initialized_ = false;
 
   //! square size in meter
   double square_length_m_;
+
+  //! display extracted corners
+  bool verbose_plot_ = false;
 };
 
 }
