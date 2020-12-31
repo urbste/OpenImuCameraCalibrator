@@ -20,8 +20,8 @@ def main():
 
     timestamps_np, accl_np, gyro_np,camera_fps = read_imu_data(args.path_to_json)
 
-    r3_dt, r3_var = knot_spacing_and_variance(accl_np.T, timestamps_np, args.q_r3, min_dt=0.01, max_dt=0.25, verbose=False)
-    so3_dt, so3_var = knot_spacing_and_variance(gyro_np.T, timestamps_np, args.q_so3, min_dt=0.01, max_dt=0.25, verbose=False)
+    r3_dt, r3_var = knot_spacing_and_variance(accl_np.T, timestamps_np, args.q_r3, min_dt=0.01, max_dt=0.3, verbose=False)
+    so3_dt, so3_var = knot_spacing_and_variance(gyro_np.T, timestamps_np, args.q_so3, min_dt=0.01, max_dt=0.3, verbose=False)
 
     print("Knot spacing SO3:               {:.3f} seconds at quality level q_so3={}".format(so3_dt,args.q_so3))
     print("Knot spacing  R3:               {:.3f} seconds at quality level q_r3={}".format(r3_dt,args.q_r3))

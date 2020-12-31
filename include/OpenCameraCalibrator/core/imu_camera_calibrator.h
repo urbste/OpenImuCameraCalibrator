@@ -68,7 +68,7 @@ private:
     double cam_readout_s_;
 
     //! is gravity direction in sensor frame is initialized
-    bool gravity_initialized_;
+    bool gravity_initialized_ = false;
 
     //! gravity in sensor frame
     Eigen::Vector3d gravity_init_;
@@ -78,7 +78,7 @@ private:
     //! -
     std::unordered_map<TimeCamId, CalibCornerData> calib_corners_;
     std::unordered_map<TimeCamId, CalibInitPoseData> calib_init_poses_;
-
+    std::unordered_map<TimeCamId, CalibInitPoseData> spline_init_poses_;
 
 };
 

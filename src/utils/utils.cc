@@ -10,11 +10,22 @@
 
 #include <algorithm>
 #include <vector>
+#include <fstream>
 
 using namespace cv;
 
 namespace OpenCamCalib {
 namespace utils {
+
+
+bool DoesFileExist(const std::string &path) {
+  std::ifstream file(path);
+  if (file.is_open()) {
+    file.close();
+    return true;
+  }
+  return false;
+}
 
 bool ReadDetectorParameters(std::string filename,
                             Ptr<aruco::DetectorParameters>& params) {
@@ -41,12 +52,12 @@ bool ReadDetectorParameters(std::string filename,
   fs["maxErroneousBitsInBorderRate"] >> params->maxErroneousBitsInBorderRate;
   fs["minOtsuStdDev"] >> params->minOtsuStdDev;
   fs["errorCorrectionRate"] >> params->errorCorrectionRate;
-  fs["useAruco3Detection"] >> params->useAruco3Detection;
-  if (params->useAruco3Detection) {
-      params->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX;
-  }
-  fs["cameraMotionSpeed"] >> params->cameraMotionSpeed;
-  fs["useGlobalThreshold"] >> params->useGlobalThreshold;
+//  fs["useAruco3Detection"] >> params->useAruco3Detection;
+//  if (params->useAruco3Detection) {
+//      params->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX;
+//  }
+//  fs["cameraMotionSpeed"] >> params->cameraMotionSpeed;
+//  fs["useGlobalThreshold"] >> params->useGlobalThreshold;
   return true;
 }
 

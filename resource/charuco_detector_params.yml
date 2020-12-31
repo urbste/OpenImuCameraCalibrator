@@ -15,7 +15,7 @@ minMarkerDistanceRate: 0.05
 cornerRefinementMethod: 1
 cornerRefinementWinSize: 5
 cornerRefinementMaxIterations: 10
-cornerRefinementMinAccuracy: 0.1
+cornerRefinementMinAccuracy: 0.01
 markerBorderBits: 1
 perspectiveRemovePixelPerCell: 8
 perspectiveRemoveIgnoredMarginPerCell: 0.13
@@ -25,7 +25,7 @@ errorCorrectionRate: 0.6
 # new functionality
 useAruco3Detection: 0
 minSideLengthCanonicalImg: 16
-minMarkerLengthRatioOriginalImg: 0.01
-cameraMotionSpeed: 1.0
-useGlobalThreshold: 1
+minMarkerLengthRatioOriginalImg: 0.0
+cameraMotionSpeed: 0.5
+useGlobalThreshold: 0
 

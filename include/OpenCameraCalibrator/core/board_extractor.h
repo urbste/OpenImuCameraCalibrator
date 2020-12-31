@@ -43,10 +43,12 @@ public:
                               int squaresX, int squaresY, int dictionaryId);
 
   //! Initializes a Radon checkerboard
-  bool InitializeRadonBoard(int square_length, int squaresX, int squaresY);
+  bool InitializeRadonBoard(float square_length, int squaresX, int squaresY);
 
   //! Returns the 3d board points
   std::vector<std::vector<cv::Point3f>> GetBoardPts() { return board_pts3d_; }
+
+  std::vector<int> GetRadonBoardIDs() { return radon_board_indices_; }
 
   //! Set verbose plot
   void SetVerbosePlot() { verbose_plot_ = true; }

@@ -58,6 +58,10 @@ void ImuCameraCalibrator::InitSpline(
         view.Camera().GetOrientationAsRotationMatrix().transpose(),
         view.Camera().GetPosition());
     calib_init_poses_[t_c_id] = pose_data;
+
+    Sophus::SE3d T_w_i_init =
+        calib_init_poses_.at(t_c_id).T_a_c * T_i_c_init.inverse();
+    spline_init_poses_[t_c_id] = T_w_i_init;
   }
 
   nr_knots_so3_ = (end_t_ns - start_t_ns) / dt_so3_ns + SPLINE_N;
@@ -94,13 +98,13 @@ void ImuCameraCalibrator::InitSpline(
        ++i) {
     const double t = telemetry_data.accelerometer.timestamp_ms[i] * 1e-3 +
                      time_offset_imu_to_cam;
-    if (t < start_t_ns || t >= end_t_ns)
+    if (t < t0_s_ || t >= tend_s_)
       continue;
 
     const Eigen::Vector3d accl_unbiased =
         telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
     trajectory_.addAccelMeasurement(accl_unbiased, t * 1e9,
-                                    1. / spline_weight_data_.var_r3, false);
+                                    1. /spline_weight_data_.var_r3, false);
     accl_measurements[t] = accl_unbiased;
   }
 
@@ -109,7 +113,7 @@ void ImuCameraCalibrator::InitSpline(
        ++i) {
     const double t = telemetry_data.gyroscope.timestamp_ms[i] * 1e-3 +
                      time_offset_imu_to_cam;
-    if (t < start_t_ns || t >= end_t_ns)
+    if (t < t0_s_ || t >= tend_s_)
       continue;
 
     const Eigen::Vector3d gyro_unbiased =
@@ -139,9 +143,9 @@ void ImuCameraCalibrator::InitializeGravity(
              i++) {
           const Eigen::Vector3d ad =
               telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
-          const int64_t accl_t_ns =
-              telemetry_data.accelerometer.timestamp_ms[i] * 1e6;
-          if (std::abs(accl_t_ns - timestamp_ns) < 3000000) {
+          const int64_t accl_t =
+              telemetry_data.accelerometer.timestamp_ms[i] * 1e-3;
+          if (std::abs(accl_t - cam_timestamps_[j]) < 1e-2) {
             gravity_init_ = T_a_i.so3() * ad;
             gravity_initialized_ = true;
             std::cout << "g_a initialized with " << gravity_init_.transpose()

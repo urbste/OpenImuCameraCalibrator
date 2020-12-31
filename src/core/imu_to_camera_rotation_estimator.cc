@@ -229,7 +229,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   const double gRatio = (1.0 + std::sqrt(5.0)) / 2.0;
   const double tolerance = 1e-4;
 
-  const double maxOffset = 0.5;
+  const double maxOffset = 1.0;
   double a = -maxOffset;
   double b = maxOffset;
 

@@ -21,13 +21,13 @@ int main(int argc, char* argv[]) {
 
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
-  int squaresX = 8;
-  int squaresY = 5;
-  int squareLength = 150;
+  int squaresX = 9;
+  int squaresY = 7;
+  int squareLength = 300;
   int markerLength = 100;
   int dictionaryId = cv::aruco::DICT_ARUCO_ORIGINAL;
   int margins = squareLength - markerLength;
-  int borderBits = 2;
+  int borderBits = 1;
   bool showImage = true;
 
   Ptr<aruco::Dictionary> dictionary =
@@ -49,8 +49,8 @@ int main(int argc, char* argv[]) {
       waitKey(0);
   }
 
-  std::cout<<FLAGS_save_charuco_image+"board8x5.png"<<std::endl;
-  imwrite(FLAGS_save_charuco_image+"/board8x5.png", boardImage);
+  std::cout<<FLAGS_save_charuco_image+"board_9x7.png"<<std::endl;
+  imwrite(FLAGS_save_charuco_image+"/board_9x7.png", boardImage);
 
   return 0;
 }

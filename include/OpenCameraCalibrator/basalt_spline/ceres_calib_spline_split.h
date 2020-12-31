@@ -182,8 +182,7 @@ public:
     return accel;
   }
 
-  void initAll(const Eigen::aligned_vector<Sophus::SO3d> &so3_init,
-               const Eigen::aligned_vector<Eigen::Vector3d> &r3_init,
+  void initAll(const std::unordered_map<TimeCamId, CalibInitPoseData> init_spline_poses,
                const int num_knots_so3, const int num_knots_r3) {
     so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
     trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
@@ -547,7 +546,7 @@ public:
   ceres::Solver::Summary optimize() {
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-    options.max_num_iterations = 100;
+    options.max_num_iterations = 50;
     options.num_threads = std::thread::hardware_concurrency();
     // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
     options.minimizer_progress_to_stdout = true;

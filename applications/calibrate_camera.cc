@@ -37,7 +37,7 @@ using namespace OpenCamCalib::io;
 DEFINE_string(input_corners, "", "Path to save charuco board to.");
 DEFINE_string(camera_model_to_calibrate, "DOUBLE_SPHERE",
               "What camera model do you want to calibrate. Options:"
-              "LINEAR_PINHOLE,DIVISION_UNDISTORTION,DOUBLE_SPHERE");
+              "LINEAR_PINHOLE,DIVISION_UNDISTORTION,DOUBLE_SPHERE,EXTENDED_UNIFIED,FISHEYE");
 DEFINE_string(save_path_calib_dataset, "",
               "Where to save the recon dataset to.");
 DEFINE_double(grid_size, 0.04,

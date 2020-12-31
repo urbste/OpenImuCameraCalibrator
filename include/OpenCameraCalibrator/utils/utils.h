@@ -14,6 +14,8 @@
 namespace OpenCamCalib {
 namespace utils {
 
+bool DoesFileExist(const std::string &path);
+
 bool ReadDetectorParameters(std::string filename,
                             cv::Ptr<cv::aruco::DetectorParameters>& params);
 

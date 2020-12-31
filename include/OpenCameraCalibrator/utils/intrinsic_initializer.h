@@ -33,7 +33,7 @@ bool initialize_pinhole_camera(
 bool initialize_radial_undistortion_camera(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
     const theia::RansacParameters &ransac_params,
-    theia::RansacSummary &ransac_summary, const int img_cols,
+    theia::RansacSummary &ransac_summary, const cv::Size& img_size,
     Eigen::Matrix3d &R, Eigen::Vector3d &t, double &focal_length,
     double &radial_distortion, const bool verbose = false);
 
@@ -41,8 +41,8 @@ bool initialize_radial_undistortion_camera(
 // https://gitlab.com/VladyslavUsenko/basalt/-/blob/master/src/calibration/calibraiton_helper.cpp
 bool initialize_doublesphere_model(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
-    std::vector<int> charuco_ids,
-    cv::Ptr<cv::aruco::CharucoBoard> &charucoboard,
+    const std::vector<int> board_ids,
+    const cv::Size &board_size,
     const theia::RansacParameters &ransac_params, const int img_cols,
     const int img_rows, theia::RansacSummary &ransac_summary,
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,

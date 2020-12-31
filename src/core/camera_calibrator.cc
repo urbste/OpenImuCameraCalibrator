@@ -7,11 +7,14 @@
 #include <theia/sfm/bundle_adjustment/bundle_adjuster.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjustment.h>
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
+#include <theia/sfm/camera/extended_unified_camera_model.h>
+#include <theia/sfm/camera/fisheye_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/solvers/ransac.h>
+#include <theia/io/write_ply_file.h>
 
 #include "OpenCameraCalibrator/io/read_scene.h"
 #include "OpenCameraCalibrator/io/write_camera_calibration.h"
@@ -77,23 +80,25 @@ theia::ViewId CameraCalibrator::AddView(
   cam->SetPosition(initial_position);
   cam->SetOrientationFromRotationMatrix(initial_rotation);
   cam->SetFocalLength(initial_focal_length);
+  cam->SetCameraIntrinsicsModelType(
+      theia::StringToCameraIntrinsicsModelType(camera_model_));
 
   if (camera_model_ == "LINEAR_PINHOLE") {
-    cam->SetCameraIntrinsicsModelType(
-        theia::CameraIntrinsicsModelType::PINHOLE);
   } else if (camera_model_ == "DIVISION_UNDISTORTION") {
-    cam->SetCameraIntrinsicsModelType(
-        theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
-    cam->mutable_intrinsics()
-        [theia::DivisionUndistortionCameraModel::InternalParametersIndex::
-             RADIAL_DISTORTION_1] = initial_distortion;
+    cam->CameraIntrinsics()->SetParameter(
+        theia::DivisionUndistortionCameraModel::RADIAL_DISTORTION_1,
+        initial_distortion);
   } else if (camera_model_ == "DOUBLE_SPHERE") {
-    cam->SetCameraIntrinsicsModelType(
-        theia::CameraIntrinsicsModelType::DOUBLE_SPHERE);
-    cam->mutable_intrinsics()
-        [theia::DoubleSphereCameraModel::InternalParametersIndex::XI] = -0.5;
-    cam->mutable_intrinsics()
-        [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA] = 0.5;
+    cam->CameraIntrinsics()->SetParameter(
+          theia::DoubleSphereCameraModel::XI, -0.25);
+    cam->CameraIntrinsics()->SetParameter(
+        theia::DoubleSphereCameraModel::ALPHA, 0.6);
+  } else if (camera_model_ == "EXTENDED_UNIFIED") {
+      cam->CameraIntrinsics()->SetParameter(
+          theia::ExtendedUnifiedCameraModel::ALPHA, 0.1);
+      cam->CameraIntrinsics()->SetParameter(
+          theia::ExtendedUnifiedCameraModel::BETA, 1.2);
+  } else if (camera_model_ == "FISHEYE") {
   }
 
   return view_id;
@@ -109,10 +114,9 @@ bool CameraCalibrator::RunCalibration() {
             << " in bundle adjustment\n";
   // bundle adjust everything
   theia::BundleAdjustmentOptions ba_options;
-  ba_options.verbose = false;
+  ba_options.verbose = true;
   ba_options.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options.robust_loss_width = 1.345;
-  //ba_options.linear_solver_type = ceres::LinearSolverType::DEN
 
   /////////////////////////////////////////////////
   /// 1. Optimize focal length and radial distortion, keep principal point fixed
@@ -121,15 +125,14 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
-  if (camera_model_ == "DIVISION_UNDISTORTION" ||
-      camera_model_ == "DOUBLE_SPHERE") {
+  if (camera_model_ != "LINEAR_PINHOLE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
-  LOG(INFO) << "Bundle adjusting focal length and radial distortion. Keeping "
-               "cam position fixed.\n";
+  LOG(INFO) << "Bundle adjusting focal length and radial distortion.\n";
 
-  theia::BundleAdjustmentSummary summary = BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
+  theia::BundleAdjustmentSummary summary = BundleAdjustViews(
+      ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
   PrintResult();
   RemoveViewsReprojError(5.0);
@@ -137,13 +140,14 @@ bool CameraCalibrator::RunCalibration() {
   /////////////////////////////////////////////////
   /// 2. Optimize principal point keeping everything else fixed
   /////////////////////////////////////////////////
+  LOG(INFO) << "Optimizing principal point.";
   ba_options.constant_camera_orientation = true;
   ba_options.constant_camera_position = true;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
 
-  summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
-
+  summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(),
+                                     &recon_calib_dataset_);
 
   if (recon_calib_dataset_.NumViews() < 8) {
     std::cout << "Not enough views left for proper calibration!" << std::endl;
@@ -158,12 +162,12 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS |
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
-  if (camera_model_ == "DIVISION_UNDISTORTION" ||
-      camera_model_ == "DOUBLE_SPHERE") {
+  if (camera_model_ == "LINEAR_PINHOLE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
-  summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
+  summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(),
+                                     &recon_calib_dataset_);
 
   RemoveViewsReprojError(1.0);
 
@@ -178,8 +182,8 @@ bool CameraCalibrator::RunCalibration() {
     ba_options.verbose = true;
     theia::BundleAdjustTracks(ba_options, recon_calib_dataset_.TrackIds(),
                               &recon_calib_dataset_);
-    summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
-
+    summary = theia::BundleAdjustViews(
+        ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
   }
 
   return true;
@@ -236,22 +240,22 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
       success_init = initialize_pinhole_camera(
           correspondences, ransac_params_, ransac_summary, rotation, position,
           focal_length, verbose_);
-    } else if (camera_model_ == "DIVISION_UNDISTORTION" ||
-               camera_model_ == "DOUBLE_SPHERE") {
-      success_init = initialize_radial_undistortion_camera(
-          correspondences, ransac_params_, ransac_summary, image_width,
-          rotation, position, focal_length, radial_distortion, verbose_);
-      if (camera_model_ == "DOUBLE_SPHERE") {
-        focal_length *= 0.5;
-      }
     } else {
-      LOG(ERROR) << "THIS CAMERA MODEL (" << camera_model_
-                 << ") DOES NOT EXIST!\n";
-      LOG(ERROR) << "CHOOSE BETWEEN: LINEAR_PINHOLE, DIVISION_UNDISTORTION or "
-                    "DOUBLE_SPHERE\n";
-      return false;
-    }
+        //if (camera_model_ == "DIVISION_UNDISTORTION" | camera_model_ == "FISHEYE") {
+        success_init = initialize_radial_undistortion_camera(
+                correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
+                rotation, position, focal_length, radial_distortion, verbose_);
+        //} else if (camera_model_ == "EXTENDED_UNIFIED" | camera_model_ == "DOUBLE_SPHERE") {
+       //     success_init = initialize_doublesphere_model(
+        //        correspondences, board_pt3_ids, cv::Size(14,9), ransac_params_, image_width, image_height,
+        //        ransac_summary, rotation, position, focal_length, verbose_);
+        //}
 
+
+      //if (camera_model_ == "DOUBLE_SPHERE") {
+      //  focal_length *= 0.75;
+      //}
+    }
     // check if a very close by pose is already present
     bool take_image = true;
     for (int i = 0; i < saved_poses.size(); ++i) {
@@ -275,6 +279,8 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
       AddObservation(view_id, board_pt3_ids[i], corners[i]);
     }
   }
+
+  theia::WritePlyFile(output_path+"_ransac_pose.ply",recon_calib_dataset_,Eigen::Vector3i(255,0,0), 1);
 
   if (!RunCalibration()) {
     LOG(ERROR) << "Calibration failed.\n";
@@ -333,8 +339,30 @@ void CameraCalibrator::PrintResult() {
         << cam.intrinsics()
                [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA]
         << "\n";
+  } else if (camera_model_ == "EXTENDED_UNIFIED") {
+    LOG(INFO) << "ALPHA: "
+              << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::
+                                      InternalParametersIndex::ALPHA]
+              << " BETA: "
+              << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::
+                                      InternalParametersIndex::BETA]
+              << "\n";
+  } else if (camera_model_ == "FISHEYE") {
+    LOG(INFO)
+        << "Radial distortion 1: "
+        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+                                RADIAL_DISTORTION_1]
+        << " Radial distortion 2: "
+        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+                                RADIAL_DISTORTION_2]
+        << " Radial distortion 3: "
+        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+                                RADIAL_DISTORTION_3]
+        << " Radial distortion 4: "
+        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+                                RADIAL_DISTORTION_4]
+        << "\n";
   }
 }
-
 } // namespace core
 } // namespace OpenCamCalib

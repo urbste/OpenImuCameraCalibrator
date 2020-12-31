@@ -11,6 +11,9 @@
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/camera/double_sphere_camera_model.h>
+#include <theia/sfm/camera/extended_unified_camera_model.h>
+#include <theia/sfm/camera/fisheye_camera_model.h>
+
 #include <theia/sfm/reconstruction.h>
 
 #include <third_party/Sophus/sophus/so3.hpp>
@@ -164,39 +167,25 @@ struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<_N> {
           (T_c_w_matrix * calib->Track(corners->track_ids[i])->Point())
               .hnormalized();
       T reprojection[2];
-//      intr[CameraModel::InternalParametersIndex::FOCAL_LENGTH] =
-//          T(cam->intrinsics()
-//                [CameraModel::InternalParametersIndex::FOCAL_LENGTH]);
-//      intr[CameraModel::InternalParametersIndex::ASPECT_RATIO] =
-//          T(cam->intrinsics()
-//                [CameraModel::InternalParametersIndex::ASPECT_RATIO]);
-//      intr[CameraModel::InternalParametersIndex::PRINCIPAL_POINT_X] =
-//          T(cam->intrinsics()
-//                [CameraModel::InternalParametersIndex::PRINCIPAL_POINT_X]);
-//      intr[CameraModel::InternalParametersIndex::PRINCIPAL_POINT_Y] =
-//          T(cam->intrinsics()
-//                [CameraModel::InternalParametersIndex::PRINCIPAL_POINT_Y]);
-//      if (cam_model.Type() == theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION){
-//          intr[CameraModel::InternalParametersIndex::RADIAL_DISTORTION_1] =
-//              T(cam->intrinsics()
-//                    [CameraModel::InternalParametersIndex::RADIAL_DISTORTION_1]);
-//      } else if (cam_model.Type() == theia::CameraIntrinsicsModelType::DOUBLE_SPHERE) {
-//          intr[CameraModel::InternalParametersIndex::XI] =
-//              T(cam->intrinsics()
-//                    [CameraModel::InternalParametersIndex::XI]);
-//          intr[CameraModel::InternalParametersIndex::ALPHA] =
-//              T(cam->intrinsics()
-//                    [CameraModel::InternalParametersIndex::ALPHA]);
-//      }
+      bool success = false;
       if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION == cam->GetCameraIntrinsicsModelType()) {
-          theia::DivisionUndistortionCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
+          success = theia::DivisionUndistortionCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
       } else if (theia::CameraIntrinsicsModelType::DOUBLE_SPHERE == cam->GetCameraIntrinsicsModelType()) {
-          theia::DoubleSphereCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
+          success = theia::DoubleSphereCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
       } else if (theia::CameraIntrinsicsModelType::PINHOLE == cam->GetCameraIntrinsicsModelType()) {
-          theia::PinholeCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
+          success = theia::PinholeCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::FISHEYE == cam->GetCameraIntrinsicsModelType()) {
+          success = theia::FisheyeCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::EXTENDED_UNIFIED == cam->GetCameraIntrinsicsModelType()) {
+          success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(intr, p3d.data(), reprojection);
       }
-      sResiduals[2 * i + 0] = reprojection[0] - T(corners->corners[i][0]);
-      sResiduals[2 * i + 1] = reprojection[1] - T(corners->corners[i][1]);
+      if (!success) {
+          sResiduals[2 * i + 0] = T(1e10);
+          sResiduals[2 * i + 1] = T(1e10);
+      } else {
+          sResiduals[2 * i + 0] = reprojection[0] - T(corners->corners[i][0]);
+          sResiduals[2 * i + 1] = reprojection[1] - T(corners->corners[i][1]);
+      }
     }
 
     return true;

@@ -53,7 +53,7 @@ bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
   return true;
 }
 
-bool BoardExtractor::InitializeRadonBoard(int square_length, int squaresX,
+bool BoardExtractor::InitializeRadonBoard(float square_length, int squaresX,
                                           int squaresY) {
   radon_pattern_size_ = cv::Size(squaresX, squaresY);
   radon_flags_ =
@@ -111,18 +111,18 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
   } else if (board_type_ == BoardType::RADON) {
     std::vector<Point2d> radon_corners;
     cv::Mat meta;
-    bool success = cv::findChessboardCornersSB(image, radon_pattern_size_, radon_corners,
-                                   radon_flags_, meta);
+    bool success = cv::findChessboardCornersSB(
+        image, radon_pattern_size_, radon_corners, radon_flags_, meta);
     if (!success)
-        return false;
+      return false;
     int lf = 0;
-    for (int i=0; i < radon_pattern_size_.height; ++i) {
-        for (int j=0; j < radon_pattern_size_.width; ++j) {
-            if ((int)meta.at<uchar>(i,j) >= 0) {
-                object_pt_ids.push_back(radon_board_indices_[lf]);
-            }
-            lf++;
+    for (int i = 0; i < radon_pattern_size_.height; ++i) {
+      for (int j = 0; j < radon_pattern_size_.width; ++j) {
+        if ((int)meta.at<uchar>(i, j) >= 0) {
+          object_pt_ids.push_back(radon_board_indices_[lf]);
         }
+        lf++;
+      }
     }
     for (int i = 0; i < radon_corners.size(); ++i) {
       corners.push_back(
@@ -159,9 +159,17 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
   output_json["square_size_meter"] = square_length_m_;
 
   std::vector<cv::Point3f> board_pts = GetBoardPts()[0];
-  for (size_t i = 0; i < board_pts.size(); ++i) {
-    output_json["scene_pts"][std::to_string(i)] = {
-        board_pts[i].x, board_pts[i].y, board_pts[i].z};
+  if (board_type_ == BoardType::CHARUCO) {
+    for (size_t i = 0; i < board_pts.size(); ++i) {
+      output_json["scene_pts"][std::to_string(i)] = {
+          board_pts[i].x, board_pts[i].y, board_pts[i].z};
+    }
+  } else if (board_type_ == BoardType::RADON) {
+    std::vector<int> board_ids = GetRadonBoardIDs();
+    for (size_t i = 0; i < board_ids.size(); ++i) {
+      output_json["scene_pts"][board_ids[i]] = {
+          board_pts[i].x, board_pts[i].y, board_pts[i].z};
+    }
   }
 
   const int total_nr_frames = input_video.get(cv::CAP_PROP_FRAME_COUNT);
@@ -202,13 +210,14 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
         << total_nr_frames << "\n";
 
     if (verbose_plot_) {
-      for (int i=0; i < corners.size(); ++i) {
-        cv::drawMarker(image, cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
-                       cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 3);
+      for (int i = 0; i < corners.size(); ++i) {
+        cv::drawMarker(
+            image, cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
+            cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 3);
 
         cv::putText(image, std::to_string(ids[i]),
-                    cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])), cv::FONT_HERSHEY_PLAIN, 1,
-                    cv::Scalar(0, 0, 255));
+                    cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
+                    cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 255));
       }
       cv::putText(image, "Number corners: " + std::to_string(corners.size()),
                   cv::Point(10, 20), cv::FONT_HERSHEY_COMPLEX_SMALL, 2,

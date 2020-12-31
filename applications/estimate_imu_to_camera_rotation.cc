@@ -136,40 +136,40 @@ int main(int argc, char* argv[]) {
   std::ofstream out_file(FLAGS_imu_rotation_init_output);
   out_file << std::setw(4) << output_json << std::endl;
 
-//  // write to txt for testing
-//  //std::ofstream vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/poses.txt");
-//  //std::ofstream acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/accelerometer.txt");
-//  std::ofstream gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope.txt");
-//  std::ofstream gyr_out_trafo("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope_transformed.txt");
-//  std::ofstream vis_interp_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/visual_gyroscope.txt");
+  // write to txt for testing
+  //std::ofstream vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/poses.txt");
+  //std::ofstream acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/accelerometer.txt");
+  //std::ofstream gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope_original.txt");
+  std::ofstream gyr_out_trafo("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/gyroscope_transformed.txt");
+  std::ofstream vis_interp_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/visual_gyroscope.txt");
 
-////  for (auto v : visual_rotations) {
-////    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
-////    vis_out << v.first * 1e9 << " " << pos[0] <<" "<<pos[1]<<" "<<
-////               pos[2]<<" "<<v.second.w()<< " " <<
-////               v.second.x()<< " " << v.second.y()<< " " << v.second.z()<<"\n";
-////  }
-////  vis_out.close();
-////  for (auto a : acclerations) {
-////    acc_out << a.first * 1e9 << " " << a.second[0] <<" "<<a.second[1]<<" "<<a.second[2]<<"\n";
-////  }
-////  acc_out.close();
-////  for (auto v : angular_velocities) {
-////    gyr_out << v.first * 1e9 << " " << v.second[0] <<" "<<v.second[1]<<" "<<v.second[2]<<"\n";
-////  }
-////  gyr_out.close();
+//  for (auto v : visual_rotations) {
+//    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
+//    vis_out << v.first * 1e9 << " " << pos[0] <<" "<<pos[1]<<" "<<
+//               pos[2]<<" "<<v.second.w()<< " " <<
+//               v.second.x()<< " " << v.second.y()<< " " << v.second.z()<<"\n";
+//  }
+//  vis_out.close();
+//  for (auto a : acclerations) {
+//    acc_out << a.first * 1e9 << " " << a.second[0] <<" "<<a.second[1]<<" "<<a.second[2]<<"\n";
+//  }
+//  acc_out.close();
+//  for (auto v : angular_velocities) {
+//    gyr_out << v.first * 1e9 << " " << v.second[0] <<" "<<v.second[1]<<" "<<v.second[2]<<"\n";
+//  }
+//  gyr_out.close();
 //  for (auto v : imu_vel) {
 //    gyr_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
 //  }
 //  gyr_out.close();
-//  for (auto v : imu_vel) {
-//    Eigen::Vector3d a = R_gyro_to_camera * v;
-//    gyr_out_trafo << 1 << " " << a[0] <<" "<<a[1]<<" "<<a[2]<<"\n";
-//  }
-//  gyr_out_trafo.close();
-//  for (auto v : ang_vel) {
-//    vis_interp_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
-//  }
-//  vis_interp_out.close();
+  for (auto v : imu_vel) {
+    Eigen::Vector3d a = R_gyro_to_camera * v;
+    gyr_out_trafo << 1 << " " << a[0] <<" "<<a[1]<<" "<<a[2]<<"\n";
+  }
+  gyr_out_trafo.close();
+  for (auto v : ang_vel) {
+    vis_interp_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
+  }
+  vis_interp_out.close();
   return 0;
 }

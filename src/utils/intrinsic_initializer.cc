@@ -4,6 +4,8 @@
 #include "OpenCameraCalibrator/utils/utils.h"
 #include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
 
+#include <opencv2/core/eigen.hpp>
+
 namespace OpenCamCalib {
 
 bool initialize_pinhole_camera(
@@ -34,7 +36,7 @@ bool initialize_pinhole_camera(
 bool initialize_radial_undistortion_camera(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
     const theia::RansacParameters &ransac_params,
-    theia::RansacSummary &ransac_summary, const int img_cols,
+    theia::RansacSummary &ransac_summary, const cv::Size &img_size,
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
     double &radial_distortion, const bool verbose) {
 
@@ -43,8 +45,8 @@ bool initialize_radial_undistortion_camera(
   }
   theia::RadialDistUncalibratedAbsolutePoseMetaData meta_data;
   theia::RadialDistUncalibratedAbsolutePose pose_division_undist;
-  meta_data.max_focal_length = 0.5 * img_cols + 300.0;
-  meta_data.min_focal_length = 0.5 * img_cols - 300.0;
+  meta_data.max_focal_length = 0.5 * img_size.width + 0.15 * img_size.width;
+  meta_data.min_focal_length = 0.5 * img_size.width - 0.15 * img_size.width;
 
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
@@ -58,9 +60,54 @@ bool initialize_radial_undistortion_camera(
     std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
               << std::endl;
   }
+
+//  // undistort points and solve again with OpenCV preserving directions
+//  theia::Camera cam;
+//  cam.SetCameraIntrinsicsModelType(
+//      theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
+//  cam.SetFocalLength(pose_division_undist.focal_length);
+//  cam.SetPrincipalPoint(img_size.width / 2.0, img_size.height / 2.0);
+//  cam.MutableCameraIntrinsics()->SetParameter(
+//      theia::DivisionUndistortionCameraModel::RADIAL_DISTORTION_1,
+//      pose_division_undist.radial_distortion);
+//  cam.SetImageSize(img_size.width, img_size.height);
+
+//  std::vector<cv::Point3d> pts3(ransac_summary.inliers.size());
+//  std::vector<cv::Point2d> pts2(ransac_summary.inliers.size());
+//  for (int i = 0; i < ransac_summary.inliers.size(); ++i) {
+//    pts3[i].x = correspondences[ransac_summary.inliers[i]].world_point[0];
+//    pts3[i].y = correspondences[ransac_summary.inliers[i]].world_point[1];
+//    pts3[i].z = correspondences[ransac_summary.inliers[i]].world_point[2];
+
+//    Eigen::Vector3d ray = cam.PixelToNormalizedCoordinates(
+//        correspondences[ransac_summary.inliers[i]].feature);
+//    ray /= ray[2];
+
+//    pts2[i].x = ray[0];
+//    pts2[i].y = ray[1];
+//  }
+//  cv::Mat K = cv::Mat::zeros(3, 3, CV_64FC1);
+//  K.at<double>(0,0) = 1.0; K.at<double>(1,1) = 1.0; K.at<double>(2,2) = 1.0;
+//  cv::Mat dist_coeffs = cv::Mat::zeros(1, 5, CV_64FC1);
+//  cv::Mat rvec, tvec, Rcv;
+//  cv::solvePnP(pts3, pts2, K, dist_coeffs, rvec, tvec, false,
+//               cv::SOLVEPNP_SQPNP);
+//  cv::Rodrigues(rvec, Rcv);
+//  Eigen::Matrix3d R;
+//  Eigen::Vector3d t;
+//  cv::cv2eigen(Rcv, R);
+//  cv::cv2eigen(tvec, t);
+//  std::cout<<"tvec: "<<tvec<<"\n";
+//  std::cout<<"pose_division_undist.translation:"<<pose_division_undist.translation<<"\n";
+//  std::cout<<"R: "<<R<<"\n";
+//  std::cout<<"pose_division_undist.rotation:"<<pose_division_undist.rotation<<"\n";
+
+//  if (pose_division_undist.translation[2] < 0.0) {
+//      pose_division_undist.translation[2]  *= -1.;
+//  }
+
   rotation = pose_division_undist.rotation;
-  position = -pose_division_undist.rotation.transpose() *
-             pose_division_undist.translation;
+  position = -pose_division_undist.rotation.transpose() * pose_division_undist.translation;
   radial_distortion = pose_division_undist.radial_distortion;
   focal_length = pose_division_undist.focal_length;
   if (ransac_summary.inliers.size() < 8)
@@ -72,8 +119,7 @@ bool initialize_radial_undistortion_camera(
 // https://gitlab.com/VladyslavUsenko/basalt/-/blob/master/src/calibration/calibraiton_helper.cpp
 bool initialize_doublesphere_model(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
-    std::vector<int> charuco_ids,
-    cv::Ptr<cv::aruco::CharucoBoard> &charucoboard,
+    const std::vector<int> board_ids, const cv::Size &board_size,
     const theia::RansacParameters &ransac_params, const int img_cols,
     const int img_rows, theia::RansacSummary &ransac_summary,
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
@@ -81,8 +127,8 @@ bool initialize_doublesphere_model(
   // First, initialize the image center at the center of the image.
 
   aligned_map<int, Eigen::Vector2d> id_to_corner;
-  for (size_t i = 0; i < charuco_ids.size(); i++) {
-    id_to_corner[charuco_ids[i]] = correspondences[i].feature;
+  for (size_t i = 0; i < board_ids.size(); i++) {
+    id_to_corner[board_ids[i]] = correspondences[i].feature;
   }
 
   const double _xi = 1.0;
@@ -95,8 +141,8 @@ bool initialize_doublesphere_model(
   bool success = false;
 
   // Now we try to find a non-radial line to initialize the focal length
-  const size_t target_cols = charucoboard->getChessboardSize().width;
-  const size_t target_rows = charucoboard->getChessboardSize().height;
+  const size_t target_cols = board_size.width;
+  const size_t target_rows = board_size.height;
 
   for (int r = 0; r < target_rows; ++r) {
     aligned_vector<Eigen::Vector4d> P;
@@ -153,22 +199,18 @@ bool initialize_doublesphere_model(
 
       // undistort points with intrinsic guess
       theia::Camera cam;
+
       cam.SetCameraIntrinsicsModelType(
           theia::CameraIntrinsicsModelType::DOUBLE_SPHERE);
-      double *intrinsics = cam.mutable_intrinsics();
-      intrinsics[theia::DoubleSphereCameraModel::InternalParametersIndex::
-                     FOCAL_LENGTH] = 0.5 * gamma;
-      intrinsics[theia::DoubleSphereCameraModel::InternalParametersIndex::
-                     PRINCIPAL_POINT_X] = _cu;
-      intrinsics[theia::DoubleSphereCameraModel::InternalParametersIndex::
-                     PRINCIPAL_POINT_Y] = _cv;
-      intrinsics[theia::DoubleSphereCameraModel::InternalParametersIndex::
-                     ASPECT_RATIO] = 1.0;
-      intrinsics[theia::DoubleSphereCameraModel::InternalParametersIndex::XI] =
-          0.5 * _xi;
-      intrinsics
-          [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA] =
-              0.0;
+      std::shared_ptr<theia::CameraIntrinsicsModel> intrinsics =
+          cam.MutableCameraIntrinsics();
+      intrinsics->SetFocalLength(0.5 * gamma);
+      intrinsics->SetPrincipalPoint(_cu, _cv);
+      intrinsics->SetParameter(
+          theia::DoubleSphereCameraModel::InternalParametersIndex::XI,
+          0.5 * _xi);
+      intrinsics->SetParameter(
+          theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA, 0.0);
 
       std::vector<theia::FeatureCorrespondence2D3D> correspondences_new =
           correspondences;

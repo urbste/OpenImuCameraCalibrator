@@ -17,8 +17,9 @@ bool read_scene_bson(const std::string &input_bson,
   // read the contents of the file into the vector
   std::uint8_t cont;
   std::vector<std::uint8_t> uson_file_content;
-  while (input_corner_json.read(reinterpret_cast<char *>(&cont), sizeof(cont)))
+  while (input_corner_json.read(reinterpret_cast<char *>(&cont), sizeof(cont))) {
     uson_file_content.push_back(cont);
+  }
   scene_json = nlohmann::json::from_ubjson(uson_file_content);
   input_corner_json.close();
   return true;
@@ -27,7 +28,7 @@ bool read_scene_bson(const std::string &input_bson,
 void scene_points_to_calib_dataset(
     const nlohmann::json &json, theia::Reconstruction &reconstruction) {
 
-  // fill reconstruction with charuco points
+  // fill reconstruction with board points
   const auto scene_pts_it = json["scene_pts"];
   for (auto &it : scene_pts_it.items()) {
     const theia::TrackId track_id = (theia::TrackId)std::stoi(it.key());
