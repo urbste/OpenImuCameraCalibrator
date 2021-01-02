@@ -12,6 +12,9 @@
 
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 
+#include "OpenCameraCalibrator/utils/utils.h"
+#include "OpenCameraCalibrator/utils/types.h"
+
 template <int _N, bool OLD_TIME_DERIV = false>
 class CeresCalibrationSplineSplit {
 public:
@@ -182,15 +185,58 @@ public:
     return accel;
   }
 
-  void initAll(const std::unordered_map<TimeCamId, CalibInitPoseData> init_spline_poses,
+  void initAll(const std::unordered_map<TimeCamId, CalibInitPoseData>& init_spline_poses,
                const int num_knots_so3, const int num_knots_r3) {
-    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
-    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
-    for (int i = 0; i < so3_init.size(); ++i) {
-      so3_knots[i] = so3_init[i];
+
+      so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
+      trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
+
+    // first interpolate spline poses for imu update rate
+      // create zero-based maps
+      OpenCamCalib::QuatMap quat_vis_map;
+      OpenCamCalib::Vec3Map translations_map;
+
+      // get sorted poses
+      for (auto const &data : init_spline_poses) {
+          const double t_s = data.first.frame_id * ns_to_s;
+          quat_vis_map[t_s] = data.second.T_a_c.so3().unit_quaternion();
+          translations_map[t_s] = data.second.T_a_c.translation();
+      }
+
+      OpenCamCalib::QuatVector quat_vis;
+      OpenCamCalib::Vec3Vector translations;
+      std::vector<double> t_vis;
+      for (auto const& q : quat_vis_map) {
+          quat_vis.push_back(q.second);
+          t_vis.push_back(q.first);
+      }
+
+      for (auto const& t : translations_map) {
+          translations.push_back(t.second);
+      }
+
+      // get time at which we want to interpolate
+      std::vector<double> t_so3_spline, t_r3_spline;
+      for (int i=0; i < num_knots_so3; ++i) {
+        const double t = i * dt_so3_ns * ns_to_s;
+        t_so3_spline.push_back(t);
+      }
+
+      for (int i=0; i < num_knots_r3; ++i) {
+        const double t = i * dt_r3_ns * ns_to_s;
+        t_r3_spline.push_back(t);
+      }
+
+      OpenCamCalib::QuatVector interp_spline_quats;
+      OpenCamCalib::Vec3Vector interpo_spline_trans;
+      OpenCamCalib::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis, dt_so3_ns * ns_to_s, interp_spline_quats);
+      OpenCamCalib::utils::InterpolateVector3d(t_vis, t_r3_spline, translations, dt_r3_ns * ns_to_s, interpo_spline_trans);
+
+    for (int i = 0; i < num_knots_so3; ++i) {
+      so3_knots[i] = Sophus::SO3d(interp_spline_quats[i]);
     }
-    for (int i = 0; i < r3_init.size(); ++i) {
-      trans_knots[i] = r3_init[i];
+    for (int i = 0; i < num_knots_r3; ++i) {
+      trans_knots[i] = interpo_spline_trans[i];
     }
 
     // Add local parametrization for SO(3) rotation
@@ -202,15 +248,11 @@ public:
                                 Sophus::SO3d::num_parameters,
                                 local_parameterization);
     }
-
-    // Local parametrization of T_i_c
-    // for (size_t i = 0; i < T_i_c.size(); i++) {
     ceres::LocalParameterization *local_parameterization =
         new LieLocalParameterization<Sophus::SE3d>();
 
     problem.AddParameterBlock(T_i_c.data(), Sophus::SE3d::num_parameters,
                               local_parameterization);
-    //}
   }
 
   void init(const Sophus::SE3d &init, const int num_knots_so3,
@@ -562,7 +604,8 @@ public:
     return Sophus::SE3d(so3_knots[i], trans_knots[i]);
   }
 
-  size_t numKnots() { return so3_knots.size(); }
+  size_t numSO3Knots() { return so3_knots.size(); }
+  size_t numSE3Knots() { return trans_knots.size(); }
 
   void setTracks(const std::vector<theia::TrackId> &a) { track_ids = a; }
   void setCalib(const theia::Reconstruction &c) { calib = c; }

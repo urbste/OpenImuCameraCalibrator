@@ -4,6 +4,8 @@
 
 #include <glog/logging.h>
 
+#include "OpenCameraCalibrator/utils/utils.h"
+
 using Eigen::Matrix;
 using Eigen::Matrix3d;
 using Eigen::Vector3d;
@@ -16,65 +18,6 @@ using Eigen::Quaterniond;
 namespace OpenCamCalib {
 namespace core {
 
-int FindMinNearestTimestamp(const double t_imu, const double dt,
-                            const std::vector<double> &vis_timestamps,
-                            double &distance_to_nearest_timestamp) {
-  double dist = std::numeric_limits<double>::max();
-  int idx = 0;
-  for (int i = 0; i < vis_timestamps.size(); ++i) {
-    double new_dist = std::abs(t_imu - vis_timestamps[i]);
-    if (new_dist < dist) {
-      distance_to_nearest_timestamp = new_dist;
-      idx = i;
-      dist = new_dist;
-      // if we are between two timestamps we can break here,
-      // because there will be no closer timestamp
-      if (std::abs(dist) < dt)
-        break;
-    }
-  }
-
-  return idx;
-}
-
-Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
-                       double fraction) {
-  return (1.0 - fraction) * v0 + fraction * v1;
-}
-
-void InterpolateQuaternions(std::vector<double> t_vis_s,
-                            std::vector<double> t_imu_s,
-                            const QuatVector &input_qtVis,
-                            const double vis_dt_s,
-                            QuatVector &interpolated_vis_quat) {
-  for (size_t i = 0; i < t_imu_s.size(); ++i) {
-    double dist_to_nearest_vis_t;
-    int nearest_vis_idx = FindMinNearestTimestamp(t_imu_s[i], vis_dt_s, t_vis_s,
-                                                  dist_to_nearest_vis_t);
-    double fraction = dist_to_nearest_vis_t / vis_dt_s;
-    interpolated_vis_quat.push_back(input_qtVis[nearest_vis_idx].slerp(
-        fraction, input_qtVis[nearest_vis_idx + 1]));
-  }
-}
-
-void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
-                         const Vec3Vector &input_vec, const double dt,
-                         Vec3Vector &interpolated_vec) {
-
-  for (size_t i = 0; i < t_new.size(); ++i) {
-    double dist_to_nearest_vis_t;
-    int nearest_vis_idx =
-        FindMinNearestTimestamp(t_new[i], dt, t_old, dist_to_nearest_vis_t);
-    double fraction = dist_to_nearest_vis_t / dt;
-    if (fraction > 1.0)
-      interpolated_vec.push_back(input_vec[nearest_vis_idx]);
-    else
-      interpolated_vec.push_back(lerp3d(input_vec[nearest_vis_idx],
-                                        input_vec[nearest_vis_idx + 1],
-                                        fraction));
-  }
-}
-
 double ImuToCameraRotationEstimator::SolveClosedForm(
     const Vec3Vector &angVis, const Vec3Vector &angImu,
     const std::vector<double> timestamps_s, const double td,
@@ -86,7 +29,7 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
     time_with_offset[i] = timestamps_s[i] - td;
   }
   Vec3Vector interpolated_angVis;
-  InterpolateVector3d(time_with_offset, timestamps_s, angVis, dt_imu,
+  OpenCamCalib::utils::InterpolateVector3d(time_with_offset, timestamps_s, angVis, dt_imu,
                       interpolated_angVis);
 
   // compute mean vectors
@@ -185,7 +128,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
     qtVis.push_back(vis.second);
   }
   QuatVector qtVis_interp;
-  InterpolateQuaternions(tVis, tIMU, qtVis, dt_vis, qtVis_interp);
+  OpenCamCalib::utils::InterpolateQuaternions(tVis, tIMU, qtVis, dt_vis, qtVis_interp);
 
   // compute angular velocities
   QuatVector qtDiffs;

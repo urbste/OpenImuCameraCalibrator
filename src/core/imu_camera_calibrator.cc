@@ -59,23 +59,26 @@ void ImuCameraCalibrator::InitSpline(
         view.Camera().GetPosition());
     calib_init_poses_[t_c_id] = pose_data;
 
+
     Sophus::SE3d T_w_i_init =
         calib_init_poses_.at(t_c_id).T_a_c * T_i_c_init.inverse();
-    spline_init_poses_[t_c_id] = T_w_i_init;
-  }
+    CalibInitPoseData spline_pose_data;
+    spline_pose_data.T_a_c = T_w_i_init;
+    spline_init_poses_[t_c_id] = spline_pose_data;
+  } 
 
   nr_knots_so3_ = (end_t_ns - start_t_ns) / dt_so3_ns + SPLINE_N;
   nr_knots_r3_ = (end_t_ns - start_t_ns) / dt_r3_ns + SPLINE_N;
 
-  TimeCamId tcid_init(
-      cam_timestamps_[result.first - cam_timestamps_.begin()] * 1e9, 0);
-  Sophus::SE3d T_w_i_init =
-      calib_init_poses_.at(tcid_init).T_a_c * T_i_c_init.inverse();
+//  TimeCamId tcid_init(
+//      cam_timestamps_[result.first - cam_timestamps_.begin()] * 1e9, 0);
+//  Sophus::SE3d T_w_i_init =
+//      calib_init_poses_.at(tcid_init).T_a_c * T_i_c_init.inverse();
   std::cout << "Initializing " << nr_knots_so3_ << " SO3 knots.\n";
   std::cout << "Initializing " << nr_knots_r3_ << " R3 knots.\n";
 
-  trajectory_.init(T_w_i_init, nr_knots_so3_, nr_knots_r3_);
-
+  //trajectory_.init(T_w_i_init, nr_knots_so3_, nr_knots_r3_);
+  trajectory_.initAll(spline_init_poses_, nr_knots_so3_, nr_knots_r3_);
   // add corners
   for (const auto &kv : calib_corners_) {
     if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {

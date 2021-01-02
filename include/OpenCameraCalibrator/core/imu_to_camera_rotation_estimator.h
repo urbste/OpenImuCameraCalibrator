@@ -41,22 +41,5 @@ private:
   bool estimate_gyro_bias_ = false;
 };
 
-int FindMinNearestTimestamp(const double t_imu, const double dt,
-                            const std::vector<double> &vis_timestamps,
-                            double &distance_to_nearest_timestamp);
-
-Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
-                       double fraction);
-
-void InterpolateQuaternions(std::vector<double> t_vis_s,
-                            std::vector<double> t_imu_s,
-                            const QuatVector &input_qtVis,
-                            const double vis_dt_s,
-                            QuatVector &interpolated_vis_quat);
-
-void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
-                         const Vec3Vector &input_vec, const double dt,
-                         Vec3Vector &interpolated_vec);
-
 } // namespace core
 } // namespace OpenCamCalib

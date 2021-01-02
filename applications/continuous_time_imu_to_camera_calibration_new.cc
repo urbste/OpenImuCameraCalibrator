@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
   std::cout << "gyro_bias: " << imu_cam_calibrator.trajectory_.getGyroBias().transpose()
             << std::endl;
   std::cout << "T_i_c " << imu_cam_calibrator.trajectory_.getT_i_c().matrix() << std::endl;
-  std::cout << "mean_reproj: " << mean_reproj_err << std::endl;
+  //std::cout << "mean_reproj: " << mean_reproj_err << std::endl;
 
   // convert spline to theia output
   theia::Reconstruction output_spline_recon;
