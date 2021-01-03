@@ -585,13 +585,13 @@ public:
     return sum_error / num_points;
   }
 
-  ceres::Solver::Summary optimize() {
+  ceres::Solver::Summary optimize(const int iterations) {
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-    options.max_num_iterations = 50;
+    options.max_num_iterations = iterations;
     options.num_threads = std::thread::hardware_concurrency();
     // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
-    options.minimizer_progress_to_stdout = true;
+    options.minimizer_progress_to_stdout = false;
     // Solve
     ceres::Solver::Summary summary;
     Solve(options, &problem, &summary);

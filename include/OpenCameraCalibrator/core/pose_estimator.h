@@ -20,11 +20,13 @@ public:
 
 class PoseEstimator {
 public:
-    PoseEstimator();
+  PoseEstimator();
 
   bool EstimatePosePinhole(
-      const theia::ViewId& view_id,
-      const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
+      const theia::ViewId &view_id,
+      const std::vector<theia::FeatureCorrespondence2D3D>
+          &correspondences_undist,
+      const std::vector<theia::FeatureCorrespondence2D3D> &correspondences_dist,
       const std::vector<int> &board_pts3_ids);
 
   bool EstimatePosesFromJson(const nlohmann::json &scene_json,
@@ -50,8 +52,6 @@ private:
 
   //! Ransac parameters for initial pose estimation
   theia::RansacParameters ransac_params_;
-
-
 };
 
 } // namespace core

@@ -25,7 +25,7 @@ public:
     void InitializeGravity(const OpenCamCalib::CameraTelemetryData& telemetry_data,
                            const Eigen::Vector3d& accl_bias);
 
-    double Optimize();
+    double Optimize(const int iterations);
 
     void ToTheiaReconDataset(theia::Reconstruction& output_recon);
 
