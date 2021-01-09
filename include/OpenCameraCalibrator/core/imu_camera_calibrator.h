@@ -14,7 +14,7 @@ const int SPLINE_N = 4;
 
 class ImuCameraCalibrator {
 public:
-    ImuCameraCalibrator() {}
+    ImuCameraCalibrator(const bool reestimate_biases) { reestimate_biases_ = reestimate_biases;}
     void InitSpline(const theia::Reconstruction &calib_dataset,
                     const Sophus::SE3<double>& T_i_c_init,
                     const OpenCamCalib::SplineWeightingData& spline_weight_data,
@@ -28,6 +28,8 @@ public:
     double Optimize(const int iterations);
 
     void ToTheiaReconDataset(theia::Reconstruction& output_recon);
+
+    void ClearSpline();
 
     CeresCalibrationSplineSplit<SPLINE_N> trajectory_;
 
@@ -74,6 +76,10 @@ private:
     Eigen::Vector3d gravity_init_;
 
     Sophus::SE3<double> T_i_c_init_;
+
+    //! is gravity direction in sensor frame is initialized
+    bool reestimate_biases_ = false;
+
 
     //! -
     std::unordered_map<TimeCamId, CalibCornerData> calib_corners_;

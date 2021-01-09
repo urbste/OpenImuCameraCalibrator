@@ -12,8 +12,8 @@
 
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 
-#include "OpenCameraCalibrator/utils/utils.h"
 #include "OpenCameraCalibrator/utils/types.h"
+#include "OpenCameraCalibrator/utils/utils.h"
 
 template <int _N, bool OLD_TIME_DERIV = false>
 class CeresCalibrationSplineSplit {
@@ -185,52 +185,54 @@ public:
     return accel;
   }
 
-  void initAll(const std::unordered_map<TimeCamId, CalibInitPoseData>& init_spline_poses,
-               const int num_knots_so3, const int num_knots_r3) {
+  void initAll(
+      const std::unordered_map<TimeCamId, CalibInitPoseData> &init_spline_poses,
+      const int num_knots_so3, const int num_knots_r3) {
 
-      so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
-      trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
+    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
+    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
 
     // first interpolate spline poses for imu update rate
-      // create zero-based maps
-      OpenCamCalib::QuatMap quat_vis_map;
-      OpenCamCalib::Vec3Map translations_map;
+    // create zero-based maps
+    OpenCamCalib::QuatMap quat_vis_map;
+    OpenCamCalib::Vec3Map translations_map;
 
-      // get sorted poses
-      for (auto const &data : init_spline_poses) {
-          const double t_s = data.first.frame_id * ns_to_s;
-          quat_vis_map[t_s] = data.second.T_a_c.so3().unit_quaternion();
-          translations_map[t_s] = data.second.T_a_c.translation();
-      }
+    // get sorted poses
+    for (auto const &data : init_spline_poses) {
+      const double t_s = data.first.frame_id * ns_to_s;
+      quat_vis_map[t_s] = data.second.T_a_c.so3().unit_quaternion();
+      translations_map[t_s] = data.second.T_a_c.translation();
+    }
 
-      OpenCamCalib::QuatVector quat_vis;
-      OpenCamCalib::Vec3Vector translations;
-      std::vector<double> t_vis;
-      for (auto const& q : quat_vis_map) {
-          quat_vis.push_back(q.second);
-          t_vis.push_back(q.first);
-      }
+    OpenCamCalib::QuatVector quat_vis;
+    OpenCamCalib::Vec3Vector translations;
+    std::vector<double> t_vis;
+    for (auto const &q : quat_vis_map) {
+      quat_vis.push_back(q.second);
+      t_vis.push_back(q.first);
+    }
 
-      for (auto const& t : translations_map) {
-          translations.push_back(t.second);
-      }
+    for (auto const &t : translations_map) {
+      translations.push_back(t.second);
+    }
 
-      // get time at which we want to interpolate
-      std::vector<double> t_so3_spline, t_r3_spline;
-      for (int i=0; i < num_knots_so3; ++i) {
-        const double t = i * dt_so3_ns * ns_to_s;
-        t_so3_spline.push_back(t);
-      }
+    // get time at which we want to interpolate
+    std::vector<double> t_so3_spline, t_r3_spline;
+    for (int i = 0; i < num_knots_so3; ++i) {
+      const double t = i * dt_so3_ns * ns_to_s;
+      t_so3_spline.push_back(t);
+    }
 
-      for (int i=0; i < num_knots_r3; ++i) {
-        const double t = i * dt_r3_ns * ns_to_s;
-        t_r3_spline.push_back(t);
-      }
+    for (int i = 0; i < num_knots_r3; ++i) {
+      const double t = i * dt_r3_ns * ns_to_s;
+      t_r3_spline.push_back(t);
+    }
 
-      OpenCamCalib::QuatVector interp_spline_quats;
-      OpenCamCalib::Vec3Vector interpo_spline_trans;
-      OpenCamCalib::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis, dt_so3_ns * ns_to_s, interp_spline_quats);
-      OpenCamCalib::utils::InterpolateVector3d(t_vis, t_r3_spline, translations, dt_r3_ns * ns_to_s, interpo_spline_trans);
+    OpenCamCalib::QuatVector interp_spline_quats;
+    OpenCamCalib::Vec3Vector interpo_spline_trans;
+    OpenCamCalib::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis,
+                                                interp_spline_quats);
+    OpenCamCalib::utils::InterpolateVector3d(t_vis, t_r3_spline, translations,interpo_spline_trans);
 
     for (int i = 0; i < num_knots_so3; ++i) {
       so3_knots[i] = Sophus::SO3d(interp_spline_quats[i]);
@@ -591,7 +593,7 @@ public:
     options.max_num_iterations = iterations;
     options.num_threads = std::thread::hardware_concurrency();
     // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
-    options.minimizer_progress_to_stdout = false;
+    options.minimizer_progress_to_stdout = true;
     // Solve
     ceres::Solver::Summary summary;
     Solve(options, &problem, &summary);
@@ -623,6 +625,12 @@ public:
   Eigen::Vector3d getAccelBias() { return accel_bias; }
 
   Sophus::SE3<double> getT_i_c() { return T_i_c; }
+
+  void Clear() {
+      so3_knots.clear();
+      trans_knots.clear();
+      track_ids.clear();
+  }
 
 private:
   int64_t dt_so3_ns, dt_r3_ns, start_t_ns;

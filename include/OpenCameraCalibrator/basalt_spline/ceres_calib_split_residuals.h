@@ -183,8 +183,8 @@ struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<_N> {
           sResiduals[2 * i + 0] = T(1e10);
           sResiduals[2 * i + 1] = T(1e10);
       } else {
-          sResiduals[2 * i + 0] = reprojection[0] - T(corners->corners[i][0]);
-          sResiduals[2 * i + 1] = reprojection[1] - T(corners->corners[i][1]);
+          sResiduals[2 * i + 0] = (reprojection[0] - T(corners->corners[i][0]));
+          sResiduals[2 * i + 1] = (reprojection[1] - T(corners->corners[i][1]));
       }
     }
 

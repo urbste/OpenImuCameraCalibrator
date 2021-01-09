@@ -18,6 +18,9 @@ using Eigen::Quaterniond;
 namespace OpenCamCalib {
 namespace core {
 
+constexpr double HUBER_K = 1.345;
+constexpr double HUBER_K2 = HUBER_K * HUBER_K;
+
 double ImuToCameraRotationEstimator::SolveClosedForm(
     const Vec3Vector &angVis, const Vec3Vector &angImu,
     const std::vector<double> timestamps_s, const double td,
@@ -29,8 +32,8 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
     time_with_offset[i] = timestamps_s[i] - td;
   }
   Vec3Vector interpolated_angVis;
-  OpenCamCalib::utils::InterpolateVector3d(time_with_offset, timestamps_s, angVis, dt_imu,
-                      interpolated_angVis);
+  OpenCamCalib::utils::InterpolateVector3d(time_with_offset, timestamps_s,
+                                           angVis, interpolated_angVis);
 
   // compute mean vectors
   Vector3d mean_vis(0.0, 0.0, 0.0);
@@ -69,10 +72,24 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
     bias = bias_est;
   }
 
-  double error = 0.0;
+  // threshold outliers
+  // first get error vector
+  std::vector<double> errors(angVis.size());
   for (size_t i = 0; i < angVis.size(); ++i) {
     Vector3d D = interpolated_angVis[i] - (Rs * angImu[i] + bias_est);
-    error += D.squaredNorm();
+    errors[i] = D.squaredNorm();
+  }
+  // get median error
+  //const double med_error = utils::MedianOfDoubleVec(errors);
+  double error = 0.0;
+  for (size_t i = 0; i < angVis.size(); ++i) {
+    const Vector3d D = interpolated_angVis[i] - (Rs * angImu[i] + bias_est);
+    const double err = D.squaredNorm();
+    if (err > HUBER_K) {
+      error += 2.0 * HUBER_K * std::sqrt(err) - HUBER_K2;
+    } else {
+      error += err;
+    }
   }
 
   return error;
@@ -127,8 +144,9 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
     tVis.push_back(vis.first);
     qtVis.push_back(vis.second);
   }
+
   QuatVector qtVis_interp;
-  OpenCamCalib::utils::InterpolateQuaternions(tVis, tIMU, qtVis, dt_vis, qtVis_interp);
+  OpenCamCalib::utils::InterpolateQuaternions(tVis, tIMU, qtVis, qtVis_interp);
 
   // compute angular velocities
   QuatVector qtDiffs;

@@ -22,15 +22,13 @@ class PoseEstimator {
 public:
   PoseEstimator();
 
-  bool EstimatePosePinhole(
-      const theia::ViewId &view_id,
+  bool EstimatePosePinhole(const theia::ViewId &view_id,
       const std::vector<theia::FeatureCorrespondence2D3D>
           &correspondences_undist,
-      const std::vector<theia::FeatureCorrespondence2D3D> &correspondences_dist,
       const std::vector<int> &board_pts3_ids);
 
   bool EstimatePosesFromJson(const nlohmann::json &scene_json,
-                             const theia::Camera &camera,
+                             const theia::Camera camera,
                              const double max_reproj_error = 3.0);
 
   void GetPosesAndTimestampsSorted(std::map<uint64_t, Pose> poses);

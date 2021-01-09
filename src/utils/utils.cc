@@ -4,19 +4,18 @@
 #include <opencv2/aruco.hpp>
 #include <opencv2/opencv.hpp>
 
-#include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 #include <theia/sfm/camera/double_sphere_camera_model.h>
+#include <theia/sfm/camera/pinhole_camera_model.h>
 
 #include <algorithm>
-#include <vector>
 #include <fstream>
+#include <vector>
 
 using namespace cv;
 
 namespace OpenCamCalib {
 namespace utils {
-
 
 bool DoesFileExist(const std::string &path) {
   std::ifstream file(path);
@@ -28,9 +27,10 @@ bool DoesFileExist(const std::string &path) {
 }
 
 bool ReadDetectorParameters(std::string filename,
-                            Ptr<aruco::DetectorParameters>& params) {
+                            Ptr<aruco::DetectorParameters> &params) {
   FileStorage fs(filename, FileStorage::READ);
-  if (!fs.isOpened()) return false;
+  if (!fs.isOpened())
+    return false;
   fs["adaptiveThreshWinSizeMin"] >> params->adaptiveThreshWinSizeMin;
   fs["adaptiveThreshWinSizeMax"] >> params->adaptiveThreshWinSizeMax;
   fs["adaptiveThreshWinSizeStep"] >> params->adaptiveThreshWinSizeStep;
@@ -52,16 +52,16 @@ bool ReadDetectorParameters(std::string filename,
   fs["maxErroneousBitsInBorderRate"] >> params->maxErroneousBitsInBorderRate;
   fs["minOtsuStdDev"] >> params->minOtsuStdDev;
   fs["errorCorrectionRate"] >> params->errorCorrectionRate;
-//  fs["useAruco3Detection"] >> params->useAruco3Detection;
-//  if (params->useAruco3Detection) {
-//      params->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX;
-//  }
-//  fs["cameraMotionSpeed"] >> params->cameraMotionSpeed;
-//  fs["useGlobalThreshold"] >> params->useGlobalThreshold;
+  //  fs["useAruco3Detection"] >> params->useAruco3Detection;
+  //  if (params->useAruco3Detection) {
+  //      params->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX;
+  //  }
+  //  fs["cameraMotionSpeed"] >> params->cameraMotionSpeed;
+  //  fs["useGlobalThreshold"] >> params->useGlobalThreshold;
   return true;
 }
 
-double MedianOfDoubleVec(std::vector<double>& double_vec) {
+double MedianOfDoubleVec(std::vector<double> &double_vec) {
   assert(!double_vec.empty());
   if (double_vec.size() % 2 == 0) {
     const auto median_it1 = double_vec.begin() + double_vec.size() / 2 - 1;
@@ -124,7 +124,6 @@ void PrintResult(const std::string cam_type,
   }
 }
 
-
 std::string CameraIDToString(const int theia_enum) {
   if (theia_enum == (int)theia::CameraIntrinsicsModelType::DOUBLE_SPHERE) {
     return "DOUBLE_SPHERE";
@@ -135,7 +134,7 @@ std::string CameraIDToString(const int theia_enum) {
   }
 }
 
-double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
+double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
                             const theia::ViewId v_id) {
   const theia::View *v = recon_dataset.View(v_id);
   std::vector<theia::TrackId> track_ids = v->TrackIds();
@@ -166,9 +165,9 @@ std::vector<std::string> load_images(const std::string &img_dir_path) {
   return img_paths;
 }
 
-int FindMinNearestTimestamp(const double t_imu, const double dt,
-                            const std::vector<double> &vis_timestamps,
-                            double &distance_to_nearest_timestamp) {
+int FindClosestTimestamp(const double t_imu,
+                         const std::vector<double> &vis_timestamps,
+                         double &distance_to_nearest_timestamp) {
   double dist = std::numeric_limits<double>::max();
   int idx = 0;
   for (int i = 0; i < vis_timestamps.size(); ++i) {
@@ -177,10 +176,9 @@ int FindMinNearestTimestamp(const double t_imu, const double dt,
       distance_to_nearest_timestamp = new_dist;
       idx = i;
       dist = new_dist;
-      // if we are between two timestamps we can break here,
-      // because there will be no closer timestamp
-      if (std::abs(dist) < dt)
-        break;
+      if (distance_to_nearest_timestamp == 0.0) {
+          break;
+      }
     }
   }
 
@@ -192,38 +190,46 @@ Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
   return (1.0 - fraction) * v0 + fraction * v1;
 }
 
-void InterpolateQuaternions(std::vector<double> t_vis_s,
-                            std::vector<double> t_imu_s,
-                            const QuatVector &input_qtVis,
-                            const double vis_dt_s,
-                            QuatVector &interpolated_vis_quat) {
-  for (size_t i = 0; i < t_imu_s.size(); ++i) {
+void InterpolateQuaternions(std::vector<double> t_old,
+                            std::vector<double> t_new,
+                            const QuatVector &input_q,
+                            QuatVector &interpolated_q) {
+  for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
-    int nearest_vis_idx = FindMinNearestTimestamp(t_imu_s[i], vis_dt_s, t_vis_s,
-                                                  dist_to_nearest_vis_t);
-    double fraction = dist_to_nearest_vis_t / vis_dt_s;
-    interpolated_vis_quat.push_back(input_qtVis[nearest_vis_idx].slerp(
-        fraction, input_qtVis[nearest_vis_idx + 1]));
+    int nearest_old_idx =
+        FindClosestTimestamp(t_new[i], t_old, dist_to_nearest_vis_t);
+    if (nearest_old_idx < t_new.size()) {
+      const double fraction =
+          dist_to_nearest_vis_t /
+          (t_old[nearest_old_idx + 1] - t_old[nearest_old_idx]);
+      interpolated_q.push_back(input_q[nearest_old_idx].slerp(
+          fraction, input_q[nearest_old_idx + 1]));
+    } else {
+      interpolated_q.push_back(input_q[nearest_old_idx]);
+    }
   }
 }
 
 void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
-                         const Vec3Vector &input_vec, const double dt,
+                         const Vec3Vector &input_vec,
                          Vec3Vector &interpolated_vec) {
 
   for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
-    int nearest_vis_idx =
-        FindMinNearestTimestamp(t_new[i], dt, t_old, dist_to_nearest_vis_t);
-    double fraction = dist_to_nearest_vis_t / dt;
-    if (fraction > 1.0)
-      interpolated_vec.push_back(input_vec[nearest_vis_idx]);
-    else
-      interpolated_vec.push_back(lerp3d(input_vec[nearest_vis_idx],
-                                        input_vec[nearest_vis_idx + 1],
+    int nearest_old_idx =
+        FindClosestTimestamp(t_new[i], t_old, dist_to_nearest_vis_t);
+    const double fraction =
+        dist_to_nearest_vis_t /
+        (t_old[nearest_old_idx + 1] - t_old[nearest_old_idx]);
+    if (nearest_old_idx < t_new.size()) {
+      interpolated_vec.push_back(lerp3d(input_vec[nearest_old_idx],
+                                        input_vec[nearest_old_idx + 1],
                                         fraction));
+    } else {
+      interpolated_vec.push_back(input_vec[nearest_old_idx]);
+    }
   }
 }
 
-}  // namespace utils
-}  // namespace OpenCamCalib
+} // namespace utils
+} // namespace OpenCamCalib

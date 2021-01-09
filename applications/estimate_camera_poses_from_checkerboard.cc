@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
   PoseEstimator pose_estimator;
   pose_estimator.EstimatePosesFromJson(scene_json, camera);
   LOG(INFO) << "Finished pose estimation.\n";
-
+  pose_estimator.OptimizeAllPoses();
   if (FLAGS_optimize_board_points) {
       pose_estimator.OptimizeBoardPoints();
       pose_estimator.OptimizeAllPoses();

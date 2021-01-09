@@ -145,7 +145,7 @@ async function extractInfo(input, output) {
     console.log(`Read stream data from ${path.basename(input)}`);
     const extracted = await extractVideoData(videoData, mp4boxfile);
     console.log(`Extracted information for ${path.basename(input)}`);
-    const telemetry = await goproTelemetry(extracted, {'stream': ['ACCL','GYRO','GPS5','GPSF','GPSP','SROT'], 
+    const telemetry = await goproTelemetry(extracted, {'stream': ['ACCL','GYRO','GPS5','GPSF','GPSP','SROT','CORI','IORI','GRAV','MAGN'], 
                 'repeatSticky': true, 'promisify': true, 'ellisoid': true, 'geoidHeight':true});
     console.log(`Generated telemetry for ${path.basename(input)}`);
     fs.writeFileSync(output, JSON.stringify(telemetry));

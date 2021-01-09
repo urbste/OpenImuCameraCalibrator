@@ -169,7 +169,7 @@ bool CameraCalibrator::RunCalibration() {
   summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(),
                                      &recon_calib_dataset_);
 
-  RemoveViewsReprojError(1.0);
+  RemoveViewsReprojError(2.0);
 
   if (recon_calib_dataset_.NumViews() < 8) {
     std::cout << "Not enough views left for proper calibration!" << std::endl;
@@ -241,20 +241,9 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
           correspondences, ransac_params_, ransac_summary, rotation, position,
           focal_length, verbose_);
     } else {
-        //if (camera_model_ == "DIVISION_UNDISTORTION" | camera_model_ == "FISHEYE") {
         success_init = initialize_radial_undistortion_camera(
                 correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
                 rotation, position, focal_length, radial_distortion, verbose_);
-        //} else if (camera_model_ == "EXTENDED_UNIFIED" | camera_model_ == "DOUBLE_SPHERE") {
-       //     success_init = initialize_doublesphere_model(
-        //        correspondences, board_pt3_ids, cv::Size(14,9), ransac_params_, image_width, image_height,
-        //        ransac_summary, rotation, position, focal_length, verbose_);
-        //}
-
-
-      //if (camera_model_ == "DOUBLE_SPHERE") {
-      //  focal_length *= 0.75;
-      //}
     }
     // check if a very close by pose is already present
     bool take_image = true;

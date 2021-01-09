@@ -28,7 +28,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro6/1080_60/dataset1', 
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_60_fisheye/dataset1', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -38,11 +38,11 @@ def main():
                         default='/home/steffen/Projects/OpenCameraCalibrator')   
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
-                        default=1, type=float)
+                        default=2, type=float)
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['LINEAR_PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="DIVISION_UNDISTORTION", type=str)
+                        default="FISHEYE", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.022, 
@@ -60,9 +60,9 @@ def main():
     parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=2.0, type=float)
-    parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=0, type=int)
-    parser.add_argument("--optimize_board_points", help="if board points should be optimized durch camera calibration and after pose estimation.", default=0, type=int)
-    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=1, type=int)
+    parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=1, type=int)
+    parser.add_argument("--optimize_board_points", help="if board points should be optimized durch camera calibration and after pose estimation.", default=1, type=int)
+    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
 
     args = parser.parse_args()
 
@@ -168,7 +168,7 @@ def main():
                     "--grid_size=" + str(args.voxel_grid_size),
                     "--optimize_board_points="+str(args.optimize_board_points),
                     "--verbose=" + str(args.verbose),
-                    "--logtostderr=1"])
+                    "--logtostderr=0"])
     error_cam_calib = cam_calib.wait()
     print("Finished camera calibration.")
     print("==================================================================")
@@ -235,9 +235,9 @@ def main():
     print("Pose estimation estimation took {:.2f}s.".format(time.time()-start))
     print("==================================================================")
 
-    # #
-    # # 5. Estimate spline error weighting parameters
-    # #   
+    #
+    # 5. Estimate spline error weighting parameters
+    #   
     py_spline_file = pjoin(args.path_to_src,"python","get_sew_for_dataset.py")
     print("==================================================================")
     print("Estimating Spline error weighting and knot spacing.")
@@ -247,7 +247,7 @@ def main():
                        "--path_to_json=" + gopro_telemetry,
                        "--output_path=" + spline_weighting_json,
                        "--q_so3=" + str(0.98),
-                       "--q_r3=" + str(0.96)])
+                       "--q_r3=" + str(0.98)])
     error_spline_init = spline_init.wait()  
     print("==================================================================")
     print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
@@ -281,21 +281,24 @@ def main():
     spline_init = Popen([pjoin(bin_path,"continuous_time_imu_to_camera_calibration_new"),
                        "--gyro_to_cam_initial_calibration=" + imu_cam_calibration_json,
                        "--gopro_telemetry_json=" + gopro_telemetry,
-                       "--input_calibration_dataset=" + pose_calib_dataset,
+                       "--input_pose_dataset=" + pose_calib_dataset,
+                       "--input_corners=" + cam_imu_corners_json,
+                       "--camera_calibration_json=" + calib_dataset_json,
                        "--imu_bias_file=" + imu_bias_json,
                        "--output_path=" + cam_imu_path,
                        "--spline_error_weighting_json=" + spline_weighting_json,
                        "--result_output_json=" + cam_imu_result_json,
                        "--reestimate_biases="+str(args.reestimate_bias_spline_opt),
-                       "--logtostderr=1"])
+                       "--logtostderr=1",
+                       "--debug_video_path="+cam_imu_video[0]])
     error_spline_init = spline_init.wait()  
     print("==================================================================")
     print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
     print("==================================================================")
 
-    # #
-    # # 8. Print results
-    # #   
+    #
+    # 8. Print results
+    #   
     py_spline_file = pjoin(args.path_to_src,"python","print_result_stats.py")
     print("==================================================================")
     print("Print results.")

@@ -107,7 +107,7 @@ void ImuCameraCalibrator::InitSpline(
     const Eigen::Vector3d accl_unbiased =
         telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
     trajectory_.addAccelMeasurement(accl_unbiased, t * 1e9,
-                                    1. /spline_weight_data_.var_r3, false);
+                                    1. / spline_weight_data_.var_r3, reestimate_biases_);
     accl_measurements[t] = accl_unbiased;
   }
 
@@ -122,7 +122,7 @@ void ImuCameraCalibrator::InitSpline(
     const Eigen::Vector3d gyro_unbiased =
         telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias;
     trajectory_.addGyroMeasurement(gyro_unbiased, t * 1e9,
-                                   1. / spline_weight_data_.var_so3, false);
+                                   1. / spline_weight_data_.var_so3, reestimate_biases_);
     gyro_measurements[t] = gyro_unbiased;
   }
 }
@@ -161,10 +161,10 @@ void ImuCameraCalibrator::InitializeGravity(
   trajectory_.setG(gravity_init_);
 }
 
-double ImuCameraCalibrator::Optimize() {
-  ceres::Solver::Summary summary = trajectory_.optimize();
+double ImuCameraCalibrator::Optimize(const int iterations) {
+  ceres::Solver::Summary summary = trajectory_.optimize(iterations);
 
-  double mean_reproj = trajectory_.meanReprojection(calib_corners_);
+  return trajectory_.meanReprojection(calib_corners_);
 }
 
 void ImuCameraCalibrator::ToTheiaReconDataset(Reconstruction &output_recon) {
@@ -181,6 +181,16 @@ void ImuCameraCalibrator::ToTheiaReconDataset(Reconstruction &output_recon) {
         spline_pose.rotationMatrix().transpose());
     camera->SetPosition(spline_pose.translation());
   }
+}
+
+void ImuCameraCalibrator::ClearSpline() {
+    cam_timestamps_.clear();
+    gyro_measurements.clear();
+    accl_measurements.clear();
+    calib_corners_.clear();
+    calib_init_poses_.clear();
+    spline_init_poses_.clear();
+    trajectory_.Clear();
 }
 
 } // namespace core

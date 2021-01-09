@@ -16,22 +16,22 @@ def read_file(base_path, file):
     # read txt
     return array
 
-#gyr = read_file(base_path, "gyroscope.txt")
+
+vis_q = read_file(base_path, "visual_gyroscope_all.txt")
 vis_acc = read_file(base_path, "visual_gyroscope.txt")
 gyr_trafo = read_file(base_path, "gyroscope_transformed.txt")
 
-
-#plt.plot(gyr[:,0], 'r')
+#plt.plot(vis_q[:,0], 'r')
 plt.plot(vis_acc[:,0],'g')
 plt.plot(gyr_trafo[:,0],'b--')
 plt.show()
 
-#plt.plot(gyr[:,1], 'r')
+#plt.plot(vis_q[:,1], 'r')
 plt.plot(vis_acc[:,1],'g')
 plt.plot(gyr_trafo[:,1],'b--')
 plt.show()
 
-#plt.plot(gyr[:,2], 'r')
+#plt.plot(vis_q[:,2], 'r')
 plt.plot(vis_acc[:,2],'g')
 plt.plot(gyr_trafo[:,2],'b--')
 plt.show()

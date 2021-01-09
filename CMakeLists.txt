@@ -43,7 +43,6 @@ file(GLOB_RECURSE CAMCALIB_HEADER_FILES ${CMAKE_SOURCE_DIR}/include/*.h)
 
 include_directories(thirdparty/Sophus)
 
-
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/include
     ${THEIA_INCLUDE_DIRS}
