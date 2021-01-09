@@ -28,7 +28,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_60_fisheye/dataset1', 
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro6/1080_60/dataset2', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -42,7 +42,7 @@ def main():
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['LINEAR_PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="FISHEYE", type=str)
+                        default="DIVISION_UNDISTORTION", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.022, 
@@ -61,7 +61,7 @@ def main():
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=2.0, type=float)
     parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=1, type=int)
-    parser.add_argument("--optimize_board_points", help="if board points should be optimized durch camera calibration and after pose estimation.", default=1, type=int)
+    parser.add_argument("--optimize_board_points", help="if board points should be optimized during camera calibration and after pose estimation.", default=1, type=int)
     parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
 
     args = parser.parse_args()

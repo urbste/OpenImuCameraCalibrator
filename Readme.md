@@ -25,13 +25,13 @@ python python/run_gopro_calibration.py --path_calib_dataset=/your/path --checker
 This section provides some results on my cameras. You can use this to verify your own results or use them as initial values for your application.
 Dataset | Camera | Setting | Camera model | Intrinsics (f, cx, cy) | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy,qz) (tx,ty,tz)_m | Final mean reproj error |
 |--|--|--|--|--|--|--|--|--|
-| Dataset 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Division Undistortion | (869.96, 975.68, 543.73) dist: -3.586e-07 | -0.0813s | 0.01/0.0573 | (0.005904,-0.006493,-0.7094,0.70472), (-0.0016,-0.0185,-0.0054) | 1.86 pixel |
-| Dataset 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified| (872.00, 975.18, 543.479) Alpha: 0.4589 Beta: 1.2047  | -0.0813s | 0.01/0.0573 | (0.00573,-0.00617,-0.7097,0.7044),(-0.0015, -0.0185,-0.0053) | 1.86 pixel |
-| Dataset 3 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified| (871.94, 960.91, 551.49) Alpha: 0.60101 Beta: 0.8661  | -0.0815s | 0.01/0.0599 | (0.0016,-0.0004,-0.7119,0.7022),(-0.0005,-0.0188,-0.0061) | 1.94 pixel |
-| Dataset 1 | GoPro 9 | 960x540 / 120fps / Wide | Extended Unified| (438.51, 482.44, 276.41) Alpha: 0.5042 Beta: 1.1104  | -0.0564s | 0.01/0.0667 | (.0027,-0.0005,-0.7107,0.703428),(-0.0006, -0.0212,  -0.0046) | 0.7411 pixel |
-| Dataset 1 Fisheye | GoPro 9 Max Lens Mod Fisheye* | 1920x1080 / 60fps / Wide | Extended Unified |   | s | | | pixel |
+| Dataset 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Division Undistortion | (869.96, 975.68, 543.73) Dist: -3.586e-07 | -0.0813s | 0.01/0.0573 | (0.005904,-0.006493,-0.7094,0.70472), (-0.0016,-0.0185,-0.0054) | 1.86 pixel |
+| Dataset 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified | (872.00, 975.18, 543.479) Alpha: 0.4589 Beta: 1.2047  | -0.0813s | 0.01/0.0573 | (0.00573,-0.00617,-0.7097,0.7044),(-0.0015, -0.0185,-0.0053) | 1.86 pixel |
+| Dataset 3 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified | (871.94, 960.91, 551.49) Alpha: 0.60101 Beta: 0.8661  | -0.0815s | 0.01/0.0599 | (0.0016,-0.0004,-0.7119,0.7022),(-0.0005,-0.0188,-0.0061) | 1.94 pixel |
+| Dataset 1 | GoPro 9 | 960x540 / 120fps / Wide | Extended Unified | (438.51, 482.44, 276.41) Alpha: 0.5042 Beta: 1.1104  | -0.0564s | 0.01/0.0667 | (0.0027,-0.0005,-0.7107,0.703428),(-0.0006, -0.0212,  -0.0046) | 0.7411 pixel |
+| Dataset 1 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (438.18, 274.54, 276.41) Dist: -1.4747e-06  | -0.0129s | 0.025/0.089| (0.011,-0.0070,0.7065,-0.7075),(0.0012, -0.0167, 0.009) | 1.22 pixel |
+| Dataset 2 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (437.35, 474.16, 274.48) Dist: -1.4558e-06  | -0.0129s | 0.01/0.062| (0.009,-0.009,0.705,-0.7085),(0.006,-0.0156, 0.006) | 0.80 pixel |
 
-* This actually means that I put on the MaxLens Mod but did not tell the GoPro that I did. This will lead to a nice circular fisheye image.
 
 ## Installation instructions
 ToDo
