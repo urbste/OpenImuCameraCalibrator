@@ -6,6 +6,7 @@ endif (COMMAND cmake_policy)
 project(OpenCameraCalibrator C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+# c++17 is important, otherwise template deduction in so3 spline will fail
 set(CMAKE_CXX_STANDARD 17)
 # getting some weird errors with alignment in theia view->features_
 # add_definitions(-DEIGEN_MAX_ALIGN_BYTES=0)
@@ -45,8 +46,8 @@ include_directories(thirdparty/Sophus)
 
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/include
-    ${THEIA_INCLUDE_DIRS}
-    ${OpenCV_INCLUDE_DIRS})
+                    ${THEIA_INCLUDE_DIRS}
+                    ${OpenCV_INCLUDE_DIRS})
 
 add_library(OpenCameraCalibrator STATIC ${CAMCALIB_SOURCE_FILES})
 add_subdirectory(applications)

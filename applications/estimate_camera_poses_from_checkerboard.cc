@@ -1,21 +1,24 @@
-#include <algorithm>
-#include <chrono> // NOLINT
-#include <dirent.h>
-#include <fstream>
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <gflags/gflags.h>
 #include <iostream>
-#include <ostream>
 #include <string>
-#include <time.h>
 #include <vector>
 
-#include <opencv2/aruco.hpp>
-#include <opencv2/aruco/charuco.hpp>
-#include <opencv2/aruco/dictionary.hpp>
-#include <opencv2/opencv.hpp>
-
 #include "OpenCameraCalibrator/core/pose_estimator.h"
-#include "OpenCameraCalibrator/imu/read_gopro_imu_json.h"
 #include "OpenCameraCalibrator/io/read_camera_calibration.h"
 #include "OpenCameraCalibrator/io/read_scene.h"
 #include "OpenCameraCalibrator/utils/types.h"
@@ -23,9 +26,8 @@
 
 #include <theia/io/reconstruction_writer.h>
 
-using namespace cv;
-using namespace OpenCamCalib::core;
-using namespace OpenCamCalib::io;
+using namespace OpenICC::core;
+using namespace OpenICC::io;
 
 // Input/output files.
 DEFINE_string(input_corners, "", "Path to save charuco board to.");

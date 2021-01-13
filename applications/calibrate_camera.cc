@@ -1,38 +1,27 @@
-#include <algorithm>
-#include <chrono> // NOLINT
-#include <fstream>
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <gflags/gflags.h>
-#include <string>
-#include <time.h>
-#include <vector>
 
-#include <opencv2/aruco/charuco.hpp>
-#include <opencv2/aruco/dictionary.hpp>
-#include <opencv2/opencv.hpp>
-#include <theia/io/reconstruction_writer.h>
-#include <theia/sfm/bundle_adjustment/bundle_adjuster.h>
-#include <theia/sfm/bundle_adjustment/bundle_adjustment.h>
-#include <theia/sfm/camera/division_undistortion_camera_model.h>
-#include <theia/sfm/camera/pinhole_camera_model.h>
-#include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
-#include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
-#include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
-#include <theia/sfm/reconstruction.h>
-#include <theia/solvers/ransac.h>
-
-#include "OpenCameraCalibrator/core/camera_calibrator.h"
 #include "OpenCameraCalibrator/io/read_scene.h"
-#include "OpenCameraCalibrator/io/write_camera_calibration.h"
+#include "OpenCameraCalibrator/core/camera_calibrator.h"
 #include "OpenCameraCalibrator/utils/intrinsic_initializer.h"
 #include "OpenCameraCalibrator/utils/json.h"
-#include "OpenCameraCalibrator/utils/types.h"
-#include "OpenCameraCalibrator/utils/utils.h"
 
-using namespace cv;
-using namespace OpenCamCalib;
-using namespace OpenCamCalib::utils;
-using namespace OpenCamCalib::core;
-using namespace OpenCamCalib::io;
+using namespace OpenICC;
+using namespace OpenICC::core;
 
 DEFINE_string(input_corners, "", "Path to save charuco board to.");
 DEFINE_string(camera_model_to_calibrate, "DOUBLE_SPHERE",
@@ -52,7 +41,7 @@ int main(int argc, char *argv[]) {
   ::google::InitGoogleLogging(argv[0]);
 
   nlohmann::json scene_json;
-  CHECK(read_scene_bson(FLAGS_input_corners, scene_json))
+  CHECK(io::read_scene_bson(FLAGS_input_corners, scene_json))
       << "Failed to load " << FLAGS_input_corners;
 
   CameraCalibrator camera_calibrator(FLAGS_camera_model_to_calibrate, FLAGS_optimize_board_points);
@@ -62,6 +51,7 @@ int main(int argc, char *argv[]) {
   }
   camera_calibrator.CalibrateCameraFromJson(scene_json,
                                             FLAGS_save_path_calib_dataset);
+  camera_calibrator.PrintResult();
 
   return 0;
 }

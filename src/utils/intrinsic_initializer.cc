@@ -1,12 +1,35 @@
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <opencv2/aruco/charuco.hpp>
 
 #include "OpenCameraCalibrator/utils/intrinsic_initializer.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 #include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
+#include "theia/sfm/camera/division_undistortion_camera_model.h"
+#include "theia/sfm/camera/double_sphere_camera_model.h"
+#include "theia/sfm/camera/pinhole_camera_model.h"
+
+#include <theia/sfm/estimators/estimate_calibrated_absolute_pose.h>
+#include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
+#include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
 
 #include <opencv2/core/eigen.hpp>
 
-namespace OpenCamCalib {
+namespace OpenICC {
+namespace utils {
 
 bool initialize_pinhole_camera(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
@@ -60,51 +83,6 @@ bool initialize_radial_undistortion_camera(
     std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
               << std::endl;
   }
-
-//  // undistort points and solve again with OpenCV preserving directions
-//  theia::Camera cam;
-//  cam.SetCameraIntrinsicsModelType(
-//      theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
-//  cam.SetFocalLength(pose_division_undist.focal_length);
-//  cam.SetPrincipalPoint(img_size.width / 2.0, img_size.height / 2.0);
-//  cam.MutableCameraIntrinsics()->SetParameter(
-//      theia::DivisionUndistortionCameraModel::RADIAL_DISTORTION_1,
-//      pose_division_undist.radial_distortion);
-//  cam.SetImageSize(img_size.width, img_size.height);
-
-//  std::vector<cv::Point3d> pts3(ransac_summary.inliers.size());
-//  std::vector<cv::Point2d> pts2(ransac_summary.inliers.size());
-//  for (int i = 0; i < ransac_summary.inliers.size(); ++i) {
-//    pts3[i].x = correspondences[ransac_summary.inliers[i]].world_point[0];
-//    pts3[i].y = correspondences[ransac_summary.inliers[i]].world_point[1];
-//    pts3[i].z = correspondences[ransac_summary.inliers[i]].world_point[2];
-
-//    Eigen::Vector3d ray = cam.PixelToNormalizedCoordinates(
-//        correspondences[ransac_summary.inliers[i]].feature);
-//    ray /= ray[2];
-
-//    pts2[i].x = ray[0];
-//    pts2[i].y = ray[1];
-//  }
-//  cv::Mat K = cv::Mat::zeros(3, 3, CV_64FC1);
-//  K.at<double>(0,0) = 1.0; K.at<double>(1,1) = 1.0; K.at<double>(2,2) = 1.0;
-//  cv::Mat dist_coeffs = cv::Mat::zeros(1, 5, CV_64FC1);
-//  cv::Mat rvec, tvec, Rcv;
-//  cv::solvePnP(pts3, pts2, K, dist_coeffs, rvec, tvec, false,
-//               cv::SOLVEPNP_SQPNP);
-//  cv::Rodrigues(rvec, Rcv);
-//  Eigen::Matrix3d R;
-//  Eigen::Vector3d t;
-//  cv::cv2eigen(Rcv, R);
-//  cv::cv2eigen(tvec, t);
-//  std::cout<<"tvec: "<<tvec<<"\n";
-//  std::cout<<"pose_division_undist.translation:"<<pose_division_undist.translation<<"\n";
-//  std::cout<<"R: "<<R<<"\n";
-//  std::cout<<"pose_division_undist.rotation:"<<pose_division_undist.rotation<<"\n";
-
-//  if (pose_division_undist.translation[2] < 0.0) {
-//      pose_division_undist.translation[2]  *= -1.;
-//  }
 
   rotation = pose_division_undist.rotation;
   position = -pose_division_undist.rotation.transpose() * pose_division_undist.translation;
@@ -267,5 +245,5 @@ bool initialize_doublesphere_model(
   return success;
 } // for target rows
 
-//
-} // namespace OpenCamCalib
+} // namespace utils
+} // namespace OpenICC

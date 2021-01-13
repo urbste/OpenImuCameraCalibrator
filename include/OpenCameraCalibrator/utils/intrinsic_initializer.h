@@ -1,28 +1,35 @@
-// created by Steffen Urban Juli 2020
-#pragma once
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
-#include <opencv2/aruco.hpp>
-#include <opencv2/opencv.hpp>
+#pragma once
 
 #include <algorithm>
 #include <vector>
 
 #include <Eigen/Core>
 
+#include <opencv2/opencv.hpp>
+
 #include "OpenCameraCalibrator/utils/types.h"
 
-#include "theia/sfm/camera/division_undistortion_camera_model.h"
-#include "theia/sfm/camera/double_sphere_camera_model.h"
-#include "theia/sfm/camera/pinhole_camera_model.h"
-
-#include <theia/sfm/estimators/estimate_calibrated_absolute_pose.h>
-#include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
-#include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/sfm/reconstruction.h>
 #include <theia/solvers/ransac.h>
 
-namespace OpenCamCalib {
+namespace OpenICC {
+namespace utils {
 
 bool initialize_pinhole_camera(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
@@ -37,7 +44,8 @@ bool initialize_radial_undistortion_camera(
     Eigen::Matrix3d &R, Eigen::Vector3d &t, double &focal_length,
     double &radial_distortion, const bool verbose = false);
 
-// took that initialization from basalt
+// took that initialization from basalt,
+// however at the moment working with initialize_radial_undistortion_camera
 // https://gitlab.com/VladyslavUsenko/basalt/-/blob/master/src/calibration/calibraiton_helper.cpp
 bool initialize_doublesphere_model(
     const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
@@ -48,4 +56,5 @@ bool initialize_doublesphere_model(
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
     const bool verbose = false);
 
-} // namespace OpenCamCalib
+} // namespace utils
+} // namespace OpenICC

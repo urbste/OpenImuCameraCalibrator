@@ -41,8 +41,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "third_party/Sophus/sophus/se3.hpp"
 
-#include "eigen_utils.h"
-
 namespace Sophus {
 
 /// @brief Decoupled version of logmap for SE(3)

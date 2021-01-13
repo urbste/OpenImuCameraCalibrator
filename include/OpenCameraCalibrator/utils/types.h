@@ -1,4 +1,18 @@
-// created by Steffen Urban November 2019
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #pragma once
 
 #include <Eigen/Core>
@@ -8,8 +22,11 @@
 #include <unordered_map>
 #include <vector>
 
-namespace OpenCamCalib {
+#include "third_party/Sophus/sophus/so3.hpp"
 
+namespace OpenICC {
+
+// alignment stuff
 template <typename T>
 using aligned_vector = std::vector<T, Eigen::aligned_allocator<T>>;
 
@@ -25,26 +42,28 @@ using aligned_unordered_map =
     std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
                        Eigen::aligned_allocator<std::pair<K const, V>>>;
 
-// alignment stuff
-using QuatVector = aligned_vector<Eigen::Quaterniond>;
-using Vec3Vector = aligned_vector<Eigen::Vector3d>;
-using QuatMap = aligned_map<double, Eigen::Quaterniond>;
-using Vec3Map = aligned_map<double, Eigen::Vector3d>;
+using quat_vector = aligned_vector<Eigen::Quaterniond>;
+using vec4_vector = aligned_vector<Eigen::Vector4d>;
+using vec3_vector = aligned_vector<Eigen::Vector3d>;
+using vec2_vector = aligned_vector<Eigen::Vector2d>;
+using quat_map = aligned_map<double, Eigen::Quaterniond>;
+using vec3_map = aligned_map<double, Eigen::Vector3d>;
+using so3_vector = aligned_vector<Sophus::SO3d>;
 
 struct GPXData {
-  std::vector<Eigen::Vector3d> lle;
+  vec3_vector lle;
   std::vector<double> timestamp_utc_unixtime;
   std::vector<double> timestamp_ms;
   std::vector<double> precision;
   std::vector<double> geoid_height;
-  std::vector<Eigen::Vector2d> vel2d_vel3d;
+  vec2_vector vel2d_vel3d;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 struct CameraGyroData {
-  aligned_vector<Eigen::Vector3d> gyro_measurement;
+  vec3_vector gyro_measurement;
   std::vector<double> timestamp_ms;
 
 public:
@@ -52,7 +71,7 @@ public:
 };
 
 struct CameraAccData {
-  aligned_vector<Eigen::Vector3d> acc_measurement;
+  vec3_vector acc_measurement;
   std::vector<double> timestamp_ms;
 
 public:
@@ -86,4 +105,4 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-} // namespace OpenCamCalib
+} // namespace OpenICC

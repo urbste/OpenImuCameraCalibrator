@@ -1,3 +1,18 @@
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "OpenCameraCalibrator/core/imu_to_camera_rotation_estimator.h"
 
 #include "OpenCameraCalibrator/utils/moving_average.h"
@@ -15,14 +30,14 @@ using Eigen::MatrixXd;
 using Matrix63d = Eigen::Matrix<double, 6, 3>;
 using Eigen::Quaterniond;
 
-namespace OpenCamCalib {
+namespace OpenICC {
 namespace core {
 
 constexpr double HUBER_K = 1.345;
 constexpr double HUBER_K2 = HUBER_K * HUBER_K;
 
 double ImuToCameraRotationEstimator::SolveClosedForm(
-    const Vec3Vector &angVis, const Vec3Vector &angImu,
+    const vec3_vector &angVis, const vec3_vector &angImu,
     const std::vector<double> timestamps_s, const double td,
     const double dt_imu, Matrix3d &Rs, Vector3d &bias) {
 
@@ -31,8 +46,8 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
   for (size_t i = 0; i < timestamps_s.size(); ++i) {
     time_with_offset[i] = timestamps_s[i] - td;
   }
-  Vec3Vector interpolated_angVis;
-  OpenCamCalib::utils::InterpolateVector3d(time_with_offset, timestamps_s,
+  vec3_vector interpolated_angVis;
+  OpenICC::utils::InterpolateVector3d(time_with_offset, timestamps_s,
                                            angVis, interpolated_angVis);
 
   // compute mean vectors
@@ -98,7 +113,7 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
 bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
     const double dt_vis, const double dt_imu, Matrix3d &R_imu_to_camera,
     double &time_offset_imu_to_camera, Vector3d &gyro_bias,
-    Vec3Vector &smoothed_ang_imu, Vec3Vector &smoothed_vis_vel) {
+    vec3_vector &smoothed_ang_imu, vec3_vector &smoothed_vis_vel) {
 
   // find start and end points of camera and imu
   const double start_time_cam = visual_rotations_.begin()->first;
@@ -111,15 +126,15 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   double tend = (end_time_cam >= end_time_imu) ? end_time_cam : end_time_imu;
 
   // create zero-based maps
-  QuatMap visual_rotations_clamped;
-  Vec3Map imu_angular_vel_clamped;
+  quat_map visual_rotations_clamped;
+  vec3_map imu_angular_vel_clamped;
 
   for (auto const &imu_rot : imu_angular_vel_) {
     if (imu_rot.first >= t0 && imu_rot.first <= tend) {
       imu_angular_vel_clamped[imu_rot.first - t0] = imu_rot.second;
     }
   }
-  Vec3Vector angImu;
+  vec3_vector angImu;
   for (const auto &imu : imu_angular_vel_clamped) {
     angImu.push_back(imu.second);
   }
@@ -138,19 +153,19 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   }
 
   std::vector<double> tVis;
-  QuatVector qtVis;
+  quat_vector qtVis;
 
   for (auto const &vis : visual_rotations_clamped) {
     tVis.push_back(vis.first);
     qtVis.push_back(vis.second);
   }
 
-  QuatVector qtVis_interp;
-  OpenCamCalib::utils::InterpolateQuaternions(tVis, tIMU, qtVis, qtVis_interp);
+  quat_vector qtVis_interp;
+  OpenICC::utils::InterpolateQuaternions(tVis, tIMU, qtVis, qtVis_interp);
 
   // compute angular velocities
-  QuatVector qtDiffs;
-  Vec3Vector angVis;
+  quat_vector qtDiffs;
+  vec3_vector angVis;
   for (size_t i = 1; i < qtVis_interp.size(); ++i) {
     Quaterniond q;
     q.w() = qtVis_interp[i].w() - qtVis_interp[i - 1].w();
@@ -173,7 +188,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   SimpleMovingAverage x_imu(15), y_imu(15), z_imu(15);
   SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
 
-  // Vec3Vector smoothed_ang_imu, smoothed_vis_vel;
+  // vec3_vector smoothed_ang_imu, smoothed_vis_vel;
   for (int i = 0; i < angImu.size(); ++i) {
     x_imu.add(angImu[i][0]);
     y_imu.add(angImu[i][1]);
@@ -243,4 +258,4 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
 }
 
 } // namespace core
-} // namespace OpenCamCalib
+} // namespace OpenICC

@@ -1,4 +1,18 @@
-// created by Steffen Urban November 2019
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #pragma once
 
 #include <opencv2/aruco.hpp>
@@ -13,7 +27,7 @@
 
 #include "OpenCameraCalibrator/utils/types.h"
 
-namespace OpenCamCalib {
+namespace OpenICC {
 namespace utils {
 
 bool DoesFileExist(const std::string &path);
@@ -42,13 +56,12 @@ Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
 
 void InterpolateQuaternions(std::vector<double> t_old,
                             std::vector<double> t_new,
-                            const QuatVector &input_q,
-                            QuatVector &interpolated_q);
+                            const quat_vector &input_q,
+                            quat_vector &interpolated_q);
 
-void InterpolateVector3d(std::vector<double> t_old,
-                         std::vector<double> t_new,
-                         const Vec3Vector &input_vec,
-                         Vec3Vector &interpolated_vec);
+void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
+                         const vec3_vector &input_vec,
+                         vec3_vector &interpolated_vec);
 
 } // namespace utils
-} // namespace OpenCamCalib
+} // namespace OpenICC

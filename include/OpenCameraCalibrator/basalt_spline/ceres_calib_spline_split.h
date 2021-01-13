@@ -4,7 +4,6 @@
 #include "calib_helpers.h"
 #include "ceres_local_param.h"
 #include "common_types.h"
-#include "eigen_utils.h"
 #include <thread>
 
 #include "ceres_calib_split_residuals.h"
@@ -189,13 +188,13 @@ public:
       const std::unordered_map<TimeCamId, CalibInitPoseData> &init_spline_poses,
       const int num_knots_so3, const int num_knots_r3) {
 
-    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3);
-    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3);
+    so3_knots = OpenICC::so3_vector(num_knots_so3);
+    trans_knots = OpenICC::vec3_vector(num_knots_r3);
 
     // first interpolate spline poses for imu update rate
     // create zero-based maps
-    OpenCamCalib::QuatMap quat_vis_map;
-    OpenCamCalib::Vec3Map translations_map;
+    OpenICC::quat_map quat_vis_map;
+    OpenICC::vec3_map translations_map;
 
     // get sorted poses
     for (auto const &data : init_spline_poses) {
@@ -204,8 +203,8 @@ public:
       translations_map[t_s] = data.second.T_a_c.translation();
     }
 
-    OpenCamCalib::QuatVector quat_vis;
-    OpenCamCalib::Vec3Vector translations;
+    OpenICC::quat_vector quat_vis;
+    OpenICC::vec3_vector translations;
     std::vector<double> t_vis;
     for (auto const &q : quat_vis_map) {
       quat_vis.push_back(q.second);
@@ -228,11 +227,12 @@ public:
       t_r3_spline.push_back(t);
     }
 
-    OpenCamCalib::QuatVector interp_spline_quats;
-    OpenCamCalib::Vec3Vector interpo_spline_trans;
-    OpenCamCalib::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis,
-                                                interp_spline_quats);
-    OpenCamCalib::utils::InterpolateVector3d(t_vis, t_r3_spline, translations,interpo_spline_trans);
+    OpenICC::quat_vector interp_spline_quats;
+    OpenICC::vec3_vector interpo_spline_trans;
+    OpenICC::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis,
+                                           interp_spline_quats);
+    OpenICC::utils::InterpolateVector3d(t_vis, t_r3_spline, translations,
+                                        interpo_spline_trans);
 
     for (int i = 0; i < num_knots_so3; ++i) {
       so3_knots[i] = Sophus::SO3d(interp_spline_quats[i]);
@@ -260,9 +260,8 @@ public:
   void init(const Sophus::SE3d &init, const int num_knots_so3,
             const int num_knots_r3) {
 
-    so3_knots = Eigen::aligned_vector<Sophus::SO3d>(num_knots_so3, init.so3());
-    trans_knots = Eigen::aligned_vector<Eigen::Vector3d>(num_knots_r3,
-                                                         init.translation());
+    so3_knots = OpenICC::so3_vector(num_knots_so3, init.so3());
+    trans_knots = OpenICC::vec3_vector(num_knots_r3, init.translation());
 
     // Add local parametrization for SO(3) rotation
     for (int i = 0; i < num_knots_so3; i++) {
@@ -627,17 +626,17 @@ public:
   Sophus::SE3<double> getT_i_c() { return T_i_c; }
 
   void Clear() {
-      so3_knots.clear();
-      trans_knots.clear();
-      track_ids.clear();
+    so3_knots.clear();
+    trans_knots.clear();
+    track_ids.clear();
   }
 
 private:
   int64_t dt_so3_ns, dt_r3_ns, start_t_ns;
   double inv_so3_dt, inv_r3_dt;
 
-  Eigen::aligned_vector<Sophus::SO3d> so3_knots;
-  Eigen::aligned_vector<Eigen::Vector3d> trans_knots;
+  OpenICC::so3_vector so3_knots;
+  OpenICC::vec3_vector trans_knots;
   Eigen::Vector3d g, accel_bias, gyro_bias;
   theia::Reconstruction calib;
   std::vector<theia::TrackId> track_ids;

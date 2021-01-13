@@ -41,9 +41,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tbb/tbb.h>
 
 #include <theia/sfm/track.h>
+#include "OpenCameraCalibrator/utils/types.h"
 
 struct CalibCornerData {
-  Eigen::aligned_vector<Eigen::Vector2d> corners;
+  OpenICC::vec2_vector corners;
   std::vector<theia::TrackId> track_ids;
   std::vector<double> radii;  //!< threshold used for maximum displacement
                               //! during sub-pix refinement; Search region is
@@ -52,7 +53,7 @@ struct CalibCornerData {
 };
 
 struct ProjectedCornerData {
-  Eigen::aligned_vector<Eigen::Vector2d> corners_proj;
+  OpenICC::vec2_vector corners_proj;
   std::vector<bool> corners_proj_success;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -62,7 +63,7 @@ struct CalibInitPoseData {
   Sophus::SE3d T_a_c;
   size_t num_inliers;
 
-  Eigen::aligned_vector<Eigen::Vector2d> reprojected_corners;
+  OpenICC::vec2_vector reprojected_corners;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

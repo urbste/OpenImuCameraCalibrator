@@ -1,3 +1,17 @@
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "OpenCameraCalibrator/core/board_extractor.h"
 
@@ -19,7 +33,7 @@
 
 using namespace cv;
 
-namespace OpenCamCalib {
+namespace OpenICC {
 namespace core {
 
 BoardExtractor::BoardExtractor() {}
@@ -31,7 +45,7 @@ bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
   // load images from folder
   detector_params_ = aruco::DetectorParameters::create();
 
-  if (!OpenCamCalib::utils::ReadDetectorParameters(path_to_detector_params,
+  if (!OpenICC::utils::ReadDetectorParameters(path_to_detector_params,
                                                    detector_params_)) {
     LOG(ERROR) << "Invalid detector parameters file\n";
     return 0;
@@ -167,8 +181,8 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
   } else if (board_type_ == BoardType::RADON) {
     std::vector<int> board_ids = GetRadonBoardIDs();
     for (size_t i = 0; i < board_ids.size(); ++i) {
-      output_json["scene_pts"][board_ids[i]] = {
-          board_pts[i].x, board_pts[i].y, board_pts[i].z};
+      output_json["scene_pts"][board_ids[i]] = {board_pts[i].x, board_pts[i].y,
+                                                board_pts[i].z};
     }
   }
 
@@ -235,4 +249,4 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
 }
 
 } // namespace core
-} // namespace OpenCamCalib
+} // namespace OpenICC

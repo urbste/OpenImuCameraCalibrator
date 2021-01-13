@@ -1,3 +1,17 @@
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "OpenCameraCalibrator/utils/utils.h"
 
@@ -14,7 +28,7 @@
 
 using namespace cv;
 
-namespace OpenCamCalib {
+namespace OpenICC {
 namespace utils {
 
 bool DoesFileExist(const std::string &path) {
@@ -192,8 +206,8 @@ Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
 
 void InterpolateQuaternions(std::vector<double> t_old,
                             std::vector<double> t_new,
-                            const QuatVector &input_q,
-                            QuatVector &interpolated_q) {
+                            const quat_vector &input_q,
+                            quat_vector &interpolated_q) {
   for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
     int nearest_old_idx =
@@ -211,8 +225,8 @@ void InterpolateQuaternions(std::vector<double> t_old,
 }
 
 void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
-                         const Vec3Vector &input_vec,
-                         Vec3Vector &interpolated_vec) {
+                         const vec3_vector &input_vec,
+                         vec3_vector &interpolated_vec) {
 
   for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
@@ -232,4 +246,4 @@ void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
 }
 
 } // namespace utils
-} // namespace OpenCamCalib
+} // namespace OpenICC

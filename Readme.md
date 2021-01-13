@@ -70,6 +70,8 @@ ters, 1(1):137–144, Jan 2016.
 
 
 ## Working on / ToDo / Contributions Welcome
+* [ ] Code cleanup, add license header
+* [x] use different initialization for linear mode
 * [ ] Beautify logs
 * [ ] Add more camera models -> Scaramuzza omni model, ...
 * [ ] Use more generic JSON meta data interface, so that others cameras can be calibrated that come with different telemetry formats

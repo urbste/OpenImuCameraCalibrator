@@ -46,6 +46,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "sophus_utils.h"
 
+#include "OpenCameraCalibrator/utils/types.h"
+
 /// ids for 2D features detected in images
 using FeatureId = int;
 
@@ -100,7 +102,7 @@ struct KeypointsData {
   /// FeatureId)
   std::vector<std::bitset<256>> corner_descriptors;
 
-  Eigen::aligned_vector<Eigen::Vector4d> corners_3d;
+  OpenICC::vec4_vector corners_3d;
 
   std::vector<FeatureHash> hashes;
   HashBowVector bow_vector;

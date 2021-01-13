@@ -12,20 +12,26 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 #pragma once
 
-#include <fstream>
-#include <ios>
-#include <iostream>
+#include <Eigen/Geometry>
+#include <string>
 
-#include "theia/sfm/camera/camera.h"
+#include "OpenCameraCalibrator/utils/types.h"
 
 namespace OpenICC {
-namespace io {
 
-bool read_camera_calibration(const std::string &input_json,
-                             theia::Camera &camera, double &fps);
+bool ReadGoProTelemetry(const std::string &path_to_telemetry_file,
+                        CameraTelemetryData &telemetry);
 
-} // namespace io
+bool ReadSplineErrorWeighting(
+    const std::string &path_to_spline_error_weighting_json,
+    SplineWeightingData &spline_weighting);
+
+bool ReadIMUBias(const std::string &path_to_imu_bias,
+                 Eigen::Vector3d &gyro_bias, Eigen::Vector3d &accl_bias);
+
+bool ReadIMU2CamInit(const std::string &path_to_file,
+                     Eigen::Quaterniond &imu_to_cam_rotation,
+                     double &time_offset_imu_to_cam);
 } // namespace OpenICC

@@ -1,16 +1,23 @@
-#include <algorithm>
-#include <chrono> // NOLINT
-#include <dirent.h>
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <fstream>
 #include <gflags/gflags.h>
-#include <iostream>
-#include <ostream>
-#include <string>
-#include <time.h>
-#include <vector>
 
 #include "OpenCameraCalibrator/core/imu_to_camera_rotation_estimator.h"
-#include "OpenCameraCalibrator/imu/read_gopro_imu_json.h"
+#include "OpenCameraCalibrator/io/read_gopro_imu_json.h"
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 
@@ -21,9 +28,9 @@
 
 using json = nlohmann::json;
 
-using namespace OpenCamCalib;
-using namespace OpenCamCalib::utils;
-using namespace OpenCamCalib::core;
+using namespace OpenICC;
+using namespace OpenICC::utils;
+using namespace OpenICC::core;
 
 // Input/output files.
 DEFINE_string(input_pose_calibration_dataset, "",
@@ -53,21 +60,21 @@ int main(int argc, char *argv[]) {
   if (FLAGS_imu_bias_estimate != "") {
     // IMU Bias
     LOG(INFO) << "Load IMU bias file: " << FLAGS_imu_bias_estimate << std::endl;
-    OpenCamCalib::ReadIMUBias(FLAGS_imu_bias_estimate, gyro_bias, accl_bias);
+    OpenICC::ReadIMUBias(FLAGS_imu_bias_estimate, gyro_bias, accl_bias);
   } else {
     // if no bias is given we can also estimate it here
     rotation_estimator.EnableGyroBiasEstimation();
   }
 
   // read gopro telemetry
-  OpenCamCalib::CameraTelemetryData telemetry_data;
-  if (!OpenCamCalib::ReadGoProTelemetry(FLAGS_gopro_telemetry_json,
+  OpenICC::CameraTelemetryData telemetry_data;
+  if (!OpenICC::ReadGoProTelemetry(FLAGS_gopro_telemetry_json,
                                         telemetry_data)) {
     std::cout << "Could not read: " << FLAGS_gopro_telemetry_json << std::endl;
   }
 
   // fill measurementes
-  Vec3Map angular_velocities, acclerations;
+  vec3_map angular_velocities, acclerations;
   for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size();
        ++i) {
     angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
@@ -86,7 +93,7 @@ int main(int argc, char *argv[]) {
       static_cast<double>(telemetry_data.gyroscope.timestamp_ms.size() - 1);
   imu_dt_s *= 1e-3;
 
-  QuatMap visual_rotations;
+  quat_map visual_rotations;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {
     const theia::View *view = pose_dataset.View(pose_dataset.ViewIds()[i]);
     const double timestamp_s = view->GetTimestamp();
@@ -106,24 +113,24 @@ int main(int argc, char *argv[]) {
     cams_dt_s.push_back(timestamps_images[i] - timestamps_images[i - 1]);
   }
   // we take the median as some images might not have been estimated
-  const double cam_dt_s = OpenCamCalib::utils::MedianOfDoubleVec(cams_dt_s);
+  const double cam_dt_s = OpenICC::utils::MedianOfDoubleVec(cams_dt_s);
 
   std::vector<double> tVis_all_frames, tVis_missing_frames;
   for (double t = visual_rotations.begin()->first;
        t < visual_rotations.rbegin()->first; t += cam_dt_s) {
     tVis_all_frames.push_back(t);
   }
-  QuatVector visual_rotations_missing_frames;
+  quat_vector visual_rotations_missing_frames;
   for (auto const &vis : visual_rotations) {
     tVis_missing_frames.push_back(vis.first);
     visual_rotations_missing_frames.push_back(vis.second);
   }
   // interpolate visual rotations as some views might be missing
-  QuatVector visual_rotations_interpolated_vec;
-  OpenCamCalib::utils::InterpolateQuaternions(
+  quat_vector visual_rotations_interpolated_vec;
+  OpenICC::utils::InterpolateQuaternions(
       tVis_missing_frames, tVis_all_frames, visual_rotations_missing_frames,
       visual_rotations_interpolated_vec);
-  QuatMap visual_rotations_interpolated;
+  quat_map visual_rotations_interpolated;
   for (int i = 0; i < visual_rotations_interpolated_vec.size(); ++i) {
     visual_rotations_interpolated[tVis_all_frames[i]] =
         visual_rotations_interpolated_vec[i];
@@ -131,7 +138,7 @@ int main(int argc, char *argv[]) {
 
   Eigen::Matrix3d R_gyro_to_camera;
   double time_offset_gyro_to_camera;
-  Vec3Vector ang_vel, imu_vel;
+  vec3_vector ang_vel, imu_vel;
 
   rotation_estimator.SetAngularVelocities(angular_velocities);
   rotation_estimator.SetVisualRotations(visual_rotations_interpolated);

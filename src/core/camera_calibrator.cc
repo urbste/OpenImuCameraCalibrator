@@ -1,3 +1,18 @@
+/* Copyright (C) 2021 Steffen Urban
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "OpenCameraCalibrator/core/camera_calibrator.h"
 
 #include <opencv2/aruco/charuco.hpp>
@@ -6,15 +21,19 @@
 #include <theia/io/reconstruction_writer.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjuster.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjustment.h>
-#include <theia/sfm/camera/division_undistortion_camera_model.h>
-#include <theia/sfm/camera/extended_unified_camera_model.h>
-#include <theia/sfm/camera/fisheye_camera_model.h>
-#include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/solvers/ransac.h>
 #include <theia/io/write_ply_file.h>
+// camera types
+#include <theia/sfm/camera/division_undistortion_camera_model.h>
+#include <theia/sfm/camera/extended_unified_camera_model.h>
+#include <theia/sfm/camera/fisheye_camera_model.h>
+#include <theia/sfm/camera/pinhole_camera_model.h>
+#include <theia/sfm/camera/double_sphere_camera_model.h>
+
+
 
 #include "OpenCameraCalibrator/io/read_scene.h"
 #include "OpenCameraCalibrator/io/write_camera_calibration.h"
@@ -23,7 +42,7 @@
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 
-namespace OpenCamCalib {
+namespace OpenICC {
 namespace core {
 
 CameraCalibrator::CameraCalibrator(const std::string &camera_model,
@@ -32,7 +51,7 @@ CameraCalibrator::CameraCalibrator(const std::string &camera_model,
   ransac_params_.failure_probability = 0.001;
   ransac_params_.use_mle = true;
   ransac_params_.max_iterations = 1000;
-  ransac_params_.min_iterations = 10;
+  ransac_params_.min_iterations = 5;
   ransac_params_.error_thresh = 0.5;
 }
 
@@ -83,7 +102,7 @@ theia::ViewId CameraCalibrator::AddView(
   cam->SetCameraIntrinsicsModelType(
       theia::StringToCameraIntrinsicsModelType(camera_model_));
 
-  if (camera_model_ == "LINEAR_PINHOLE") {
+  if (camera_model_ == "PINHOLE") {
   } else if (camera_model_ == "DIVISION_UNDISTORTION") {
     cam->CameraIntrinsics()->SetParameter(
         theia::DivisionUndistortionCameraModel::RADIAL_DISTORTION_1,
@@ -92,12 +111,12 @@ theia::ViewId CameraCalibrator::AddView(
     cam->CameraIntrinsics()->SetParameter(
           theia::DoubleSphereCameraModel::XI, -0.25);
     cam->CameraIntrinsics()->SetParameter(
-        theia::DoubleSphereCameraModel::ALPHA, 0.6);
+        theia::DoubleSphereCameraModel::ALPHA, 0.5);
   } else if (camera_model_ == "EXTENDED_UNIFIED") {
       cam->CameraIntrinsics()->SetParameter(
-          theia::ExtendedUnifiedCameraModel::ALPHA, 0.1);
+          theia::ExtendedUnifiedCameraModel::ALPHA, 0.5);
       cam->CameraIntrinsics()->SetParameter(
-          theia::ExtendedUnifiedCameraModel::BETA, 1.2);
+          theia::ExtendedUnifiedCameraModel::BETA, 1.0);
   } else if (camera_model_ == "FISHEYE") {
   }
 
@@ -125,7 +144,7 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
-  if (camera_model_ != "LINEAR_PINHOLE") {
+  if (camera_model_ != "PINHOLE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
@@ -134,7 +153,6 @@ bool CameraCalibrator::RunCalibration() {
   theia::BundleAdjustmentSummary summary = BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
-  PrintResult();
   RemoveViewsReprojError(5.0);
 
   /////////////////////////////////////////////////
@@ -162,7 +180,7 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS |
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
-  if (camera_model_ == "LINEAR_PINHOLE") {
+  if (camera_model_ == "PINHOLE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
@@ -200,9 +218,11 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
   const double px = static_cast<double>(image_width) / 2.0;
   const double py = static_cast<double>(image_height) / 2.0;
 
-  aligned_vector<Eigen::Vector3d> saved_poses;
+  vec3_vector saved_poses;
   // iterate views and estimate poses
   const auto views = scene_json["views"];
+  const size_t total_nr_views = views.size();
+  int views_initialized = 0;
   for (const auto &view : views.items()) {
     const double timestamp_us = std::stod(view.key()); // to seconds
     const double timestamp_s = timestamp_us * 1e-6;    // to seconds
@@ -236,15 +256,20 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
     double focal_length = 0.0, radial_distortion = 0.0;
     LOG(INFO) << "Initializing " << camera_model_ << " camera model.\n";
 
-    if (camera_model_ == "LINEAR_PINHOLE") {
-      success_init = initialize_pinhole_camera(
+    if (camera_model_ == "PINHOLE") {
+      success_init = utils::initialize_pinhole_camera(
           correspondences, ransac_params_, ransac_summary, rotation, position,
           focal_length, verbose_);
     } else {
-        success_init = initialize_radial_undistortion_camera(
+        success_init = utils::initialize_radial_undistortion_camera(
                 correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
                 rotation, position, focal_length, radial_distortion, verbose_);
     }
+    if (views_initialized % 100 == 0) {
+        std::cout<<"View: "<<views_initialized<< "/"<<total_nr_views<<" initialized for calibration.\n";
+    }
+    ++views_initialized;
+
     // check if a very close by pose is already present
     bool take_image = true;
     for (int i = 0; i < saved_poses.size(); ++i) {
@@ -304,23 +329,22 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
         recon_calib_dataset_.NumViews(), total_repro_error))
         << "Could not write calibration file.\n";
   }
-  PrintResult();
 }
 
 void CameraCalibrator::PrintResult() {
   const theia::Camera cam =
       recon_calib_dataset_.View(recon_calib_dataset_.ViewIds()[0])->Camera();
-  LOG(INFO) << "Focal Length:" << cam.FocalLength()
+  std::cout << "Focal Length:" << cam.FocalLength()
             << "px Principal Point: " << cam.PrincipalPointX() << "/"
-            << cam.PrincipalPointY() << "px.";
+            << cam.PrincipalPointY() << "px.\n";
   if (camera_model_ == "DIVISION_UNDISTORTION") {
-    LOG(INFO)
+    std::cout <<"DIVISION_UNDISTORTION model: "
         << "Distortion: "
         << cam.intrinsics()[theia::DivisionUndistortionCameraModel::
                                 InternalParametersIndex::RADIAL_DISTORTION_1]
         << "\n";
   } else if (camera_model_ == "DOUBLE_SPHERE") {
-    LOG(INFO)
+    std::cout <<"DOUBLE_SPHERE model: "
         << "XI: "
         << cam.intrinsics()
                [theia::DoubleSphereCameraModel::InternalParametersIndex::XI]
@@ -329,7 +353,7 @@ void CameraCalibrator::PrintResult() {
                [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA]
         << "\n";
   } else if (camera_model_ == "EXTENDED_UNIFIED") {
-    LOG(INFO) << "ALPHA: "
+    std::cout <<"EXTENDED_UNIFIED model: "
               << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::
                                       InternalParametersIndex::ALPHA]
               << " BETA: "
@@ -337,7 +361,7 @@ void CameraCalibrator::PrintResult() {
                                       InternalParametersIndex::BETA]
               << "\n";
   } else if (camera_model_ == "FISHEYE") {
-    LOG(INFO)
+    std::cout <<"FISHEYE model: "
         << "Radial distortion 1: "
         << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
                                 RADIAL_DISTORTION_1]
@@ -354,4 +378,4 @@ void CameraCalibrator::PrintResult() {
   }
 }
 } // namespace core
-} // namespace OpenCamCalib
+} // namespace OpenICC
