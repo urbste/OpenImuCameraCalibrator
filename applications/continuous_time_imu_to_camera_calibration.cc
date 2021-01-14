@@ -27,8 +27,10 @@
 #include "OpenCameraCalibrator/basalt_spline/calib_helpers.h"
 #include "OpenCameraCalibrator/basalt_spline/ceres_calib_spline_split.h"
 #include "OpenCameraCalibrator/core/imu_camera_calibrator.h"
-#include "OpenCameraCalibrator/io/read_gopro_imu_json.h"
 #include "OpenCameraCalibrator/io/read_camera_calibration.h"
+#include "OpenCameraCalibrator/io/read_misc.h"
+#include "OpenCameraCalibrator/io/read_telemetry.h"
+
 #include "OpenCameraCalibrator/io/read_scene.h"
 #include "OpenCameraCalibrator/utils/json.h"
 #include "OpenCameraCalibrator/utils/types.h"
@@ -41,7 +43,7 @@
 
 // Input/output files.
 DEFINE_string(
-    gopro_telemetry_json, "",
+    telemetry_json, "",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
 DEFINE_string(input_pose_dataset, "", "Path to pose dataset.");
 DEFINE_string(input_corners, "",
@@ -69,13 +71,14 @@ using namespace theia;
 using namespace OpenICC;
 using namespace OpenICC::core;
 using namespace OpenICC::utils;
+using namespace OpenICC::io;
 
 int main(int argc, char *argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
   // IMU Bias
   Eigen::Vector3d accl_bias, gyro_bias;
-  CHECK(OpenICC::ReadIMUBias(FLAGS_imu_bias_file, gyro_bias, accl_bias))
+  CHECK(ReadIMUBias(FLAGS_imu_bias_file, gyro_bias, accl_bias))
       << "Could not open " << FLAGS_imu_bias_file;
 
   // Get pose dataset
@@ -91,18 +94,18 @@ int main(int argc, char *argv[]) {
   CHECK(io::read_camera_calibration(FLAGS_camera_calibration_json, camera, fps))
       << "Could not read camera calibration: " << FLAGS_camera_calibration_json;
 
-  // fill tracks. we use the ones from pose estimation because they might have been
-  // optimized (to account for non planarity of the target)
+  // fill tracks. we use the ones from pose estimation because they might have
+  // been optimized (to account for non planarity of the target)
   theia::Reconstruction recon_calib_dataset;
-  //io::scene_points_to_calib_dataset(scene_json, recon_calib_dataset);
-  for (const auto& old_track_id : pose_dataset.TrackIds()) {
-      recon_calib_dataset.AddTrack(old_track_id);
-      theia::Track* new_track = recon_calib_dataset.MutableTrack(old_track_id);
-      const theia::Track* old_track = pose_dataset.Track(old_track_id);
-      Eigen::Vector4d* new_point = new_track->MutablePoint();
-      for (int j=0; j < 4; ++j) {
-          (*new_point)[j] = old_track->Point()[j];
-      }
+  // io::scene_points_to_calib_dataset(scene_json, recon_calib_dataset);
+  for (const auto &old_track_id : pose_dataset.TrackIds()) {
+    recon_calib_dataset.AddTrack(old_track_id);
+    theia::Track *new_track = recon_calib_dataset.MutableTrack(old_track_id);
+    const theia::Track *old_track = pose_dataset.Track(old_track_id);
+    Eigen::Vector4d *new_point = new_track->MutablePoint();
+    for (int j = 0; j < 4; ++j) {
+      (*new_point)[j] = old_track->Point()[j];
+    }
   }
   for (const auto &view : scene_json["views"].items()) {
     const double timestamp_us = std::stod(view.key());
@@ -135,26 +138,25 @@ int main(int argc, char *argv[]) {
   }
 
   // read gopro telemetry
-  OpenICC::CameraTelemetryData telemetry_data;
-  CHECK(OpenICC::ReadGoProTelemetry(FLAGS_gopro_telemetry_json,
-                                         telemetry_data))
-      << "Could not read: " << FLAGS_gopro_telemetry_json;
+  CameraTelemetryData telemetry_data;
+  CHECK(ReadTelemetryJSON(FLAGS_telemetry_json, telemetry_data))
+      << "Could not read: " << FLAGS_telemetry_json;
 
   // read a gyro to cam calibration json to initialize rotation between imu and
   // camera
   Eigen::Quaterniond imu2cam;
   double time_offset_imu_to_cam;
-  CHECK(OpenICC::ReadIMU2CamInit(FLAGS_gyro_to_cam_initial_calibration,
-                                      imu2cam, time_offset_imu_to_cam))
+  CHECK(ReadIMU2CamInit(FLAGS_gyro_to_cam_initial_calibration, imu2cam,
+                        time_offset_imu_to_cam))
       << "Could not read: " << FLAGS_gyro_to_cam_initial_calibration;
   Sophus::SE3<double> T_i_c_init(imu2cam.conjugate(), Eigen::Vector3d(0, 0, 0));
 
   CHECK(FLAGS_spline_error_weighting_json != "")
       << "You need to provide spline error weighting factors. Create with "
          "get_sew_for_dataset.py.";
-  OpenICC::SplineWeightingData weight_data;
-  CHECK(OpenICC::ReadSplineErrorWeighting(
-      FLAGS_spline_error_weighting_json, weight_data))
+  SplineWeightingData weight_data;
+  CHECK(
+      ReadSplineErrorWeighting(FLAGS_spline_error_weighting_json, weight_data))
       << "Could not open " << FLAGS_spline_error_weighting_json;
 
   LOG(INFO) << "Optimizing Spline...Will run trough multiple r3_dt...";
@@ -232,27 +234,27 @@ int main(int argc, char *argv[]) {
   for (auto &g : gyro_meas) {
     const int64_t t_ns = g.first * 1e9;
     const std::string t_ns_s = std::to_string(t_ns);
-    json_calibspline_results_out[t_ns_s]["gyro_imu"]["x"] = g.second[0];
-    json_calibspline_results_out[t_ns_s]["gyro_imu"]["y"] = g.second[1];
-    json_calibspline_results_out[t_ns_s]["gyro_imu"]["z"] = g.second[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["x"] = g.second[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["y"] = g.second[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["z"] = g.second[2];
     // write out spline estimates
     Eigen::Vector3d gyro_spline = imu_cam_calibrator.trajectory_.getGyro(t_ns);
-    json_calibspline_results_out[t_ns_s]["gyro_spline"]["x"] = gyro_spline[0];
-    json_calibspline_results_out[t_ns_s]["gyro_spline"]["y"] = gyro_spline[1];
-    json_calibspline_results_out[t_ns_s]["gyro_spline"]["z"] = gyro_spline[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["x"] = gyro_spline[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["y"] = gyro_spline[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["z"] = gyro_spline[2];
   }
   for (auto &a : accl_meas) {
     const int64_t t_ns = a.first * 1e9;
     const std::string t_ns_s = std::to_string(t_ns);
     // accelerometer
-    json_calibspline_results_out[t_ns_s]["accl_imu"]["x"] = a.second[0];
-    json_calibspline_results_out[t_ns_s]["accl_imu"]["y"] = a.second[1];
-    json_calibspline_results_out[t_ns_s]["accl_imu"]["z"] = a.second[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["x"] = a.second[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["y"] = a.second[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["z"] = a.second[2];
     // write out spline estimates
     Eigen::Vector3d accl_spline = imu_cam_calibrator.trajectory_.getAccel(t_ns);
-    json_calibspline_results_out[t_ns_s]["accl_spline"]["x"] = accl_spline[0];
-    json_calibspline_results_out[t_ns_s]["accl_spline"]["y"] = accl_spline[1];
-    json_calibspline_results_out[t_ns_s]["accl_spline"]["z"] = accl_spline[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["x"] = accl_spline[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["y"] = accl_spline[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["z"] = accl_spline[2];
   }
 
   std::ofstream calibspline_output_json_file(FLAGS_result_output_json);

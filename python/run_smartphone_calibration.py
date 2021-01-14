@@ -14,7 +14,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_60_linear/dataset1', 
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/OnePlus/dataset1', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -46,38 +46,38 @@ def main():
     parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=2.0, type=float)
-    parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=0, type=int)
+    parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=1, type=int)
     parser.add_argument("--optimize_board_points", help="if board points should be optimized during camera calibration and after pose estimation.", default=1, type=int)
     parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
 
     args = parser.parse_args()
 
 
-    # # 
-    # # 0. Check inputs 
-    # #
+    # 
+    # 0. Check inputs 
+    #
     bin_path = pjoin(args.path_to_build)
     cam_calib_path = pjoin(args.path_calib_dataset,'cam')
-    cam_calib_video = glob.glob(pjoin(cam_calib_path,"*.MP4"))
+    cam_calib_video = glob.glob(pjoin(cam_calib_path,"*.mp4"))
     if len(cam_calib_video) == 0:
-        print("Error! Could not find cam calibration video file with MP4 ending in path "+cam_calib_path)
+        print("Error! Could not find cam calibration video file with mp4 ending in path "+cam_calib_path)
         exit(-1)
     print(cam_calib_video)
     imu_bias_path = pjoin(args.path_calib_dataset,'imu_bias')
-    imu_bias_video = glob.glob(pjoin(imu_bias_path,"*.MP4"))
+    imu_bias_video = glob.glob(pjoin(imu_bias_path,"*.mp4"))
     if len(imu_bias_video) == 0:
-        print("Error! Could not find imu bias calibration video file with MP4 ending in path "+imu_bias_path)
+        print("Error! Could not find imu bias calibration video file with mp4 ending in path "+imu_bias_path)
         exit(-1)
     cam_imu_path = pjoin(args.path_calib_dataset,'cam_imu')
-    cam_imu_video = glob.glob(pjoin(cam_imu_path,"*.MP4"))
+    cam_imu_video = glob.glob(pjoin(cam_imu_path,"*.mp4"))
     
     if len(cam_imu_video) == 0:
-        print("Error! Could not find imu camera calibration video file with MP4 ending in path "+cam_imu_path)
+        print("Error! Could not find imu camera calibration video file with mp4 ending in path "+cam_imu_path)
         exit(-1)
 
 
     # globals
-    cam_imu_video_fn = os.path.basename(cam_imu_video[0])[:-4] # strip .MP4
+    cam_imu_video_fn = os.path.basename(cam_imu_video[0])[:-4] # strip .mp4
     bias_video_fn = os.path.basename(imu_bias_video[0])[:-4]
     cam_video_fn = os.path.basename(cam_calib_video[0])[:-4]
 
@@ -85,7 +85,6 @@ def main():
     cam_calib = "cam_calib_"+cam_video_fn+"_" + \
                          get_abbr_from_cam_model(args.camera_model) + "_" + \
                          str(args.image_downsample_factor)
-    calib_dataset_name = cam_calib+".calibdata"
     cam_calib_file_path = pjoin(cam_calib_path, cam_calib)
     calib_dataset_json = cam_calib_file_path+".json"
 
@@ -99,102 +98,88 @@ def main():
     cam_imu_corners_json = pjoin(cam_imu_path, "cam_imu_corners_"+cam_imu_video_fn+".uson")
     cam_corners_json = pjoin(cam_calib_path, "cam_corners_"+cam_video_fn+".uson")
 
-    gopro_telemetry = glob.glob(pjoin(cam_imu_path,"G*.MP4"))[0][:-4]+".json"
-    imu_bias_telemetry_json_in = glob.glob(pjoin(imu_bias_path,"G*.MP4"))[0][:-4]+".json"
-    gopro_telemetry_gen = gopro_telemetry[:-5] + "_gen.json"
-    imu_bias_telemetry_json_in_gen = imu_bias_telemetry_json_in[:-5] + "_gen.json"
+    cam_accl_telemetry = pjoin(cam_imu_path,"accelerations.json")
+    cam_gyro_telemetry = pjoin(cam_imu_path,"rotations.json")
+    cam_cam_telemetry = pjoin(cam_imu_path,"frames.json")
+    cam_telemetry_gen = pjoin(cam_imu_path, "telemetry_gen.json")
 
-    #
-    # 0. Extract corners for camera calibration and camera imu calibration
-    #
-    print("==================================================================")
-    print("Running corner extraction.")
-    print("==================================================================")   
-    start = time.time()
-    print("Extracing corners for camera calibration.")
-    cam_calib = Popen([pjoin(bin_path,'extract_board_to_json'),
-                    "--input_video=" + cam_calib_video[0],
-                    "--aruco_detector_params=" + aruco_detector_params,
-                    "--board_type=" + args.board_type,
-                    "--save_corners_json_path=" + cam_corners_json,
-                    "--downsample_factor=" + str(args.image_downsample_factor),
-                    "--checker_square_length_m=" + checker_size_m,
-                    "--verbose=" + str(args.verbose),
-                    "--recompute_corners=" + str(args.recompute_corners),
-                    "--num_squares_x="+str(args.num_squares_x),
-                    "--num_squares_y="+str(args.num_squares_y),
-                    "--logtostderr=1"])
-    error_cam_calib = cam_calib.wait()
-    print("Extracing corners for imu camera calibration.")
-    cam_imu_calib_corners = Popen([pjoin(bin_path,'extract_board_to_json'),
-                    "--input_video=" + cam_imu_video[0],
-                    "--aruco_detector_params=" + aruco_detector_params,
-                    "--board_type=" + args.board_type,
-                    "--save_corners_json_path=" + cam_imu_corners_json,
-                    "--downsample_factor=" + str(args.image_downsample_factor),
-                    "--checker_square_length_m=" + checker_size_m,
-                    "--verbose=" + str(args.verbose),
-                    "--recompute_corners=" + str(args.recompute_corners),
-                    "--num_squares_x="+str(args.num_squares_x),
-                    "--num_squares_y="+str(args.num_squares_y),
-                    "--logtostderr=1"])
-    error_cam_calib = cam_imu_calib_corners.wait()
-    print("Finished corner extraction.")
-    print("==================================================================")
-    print("Corner extraction took {:.2f}s.".format(time.time()-start))
-    print("==================================================================")
+    bias_accl_telemetry = pjoin(imu_bias_path,"accelerations.json")
+    bias_gyro_telemetry = pjoin(imu_bias_path,"rotations.json")
+    bias_cam_telemetry = pjoin(imu_bias_path,"frames.json")
+    bias_telemetry_gen = pjoin(imu_bias_path, "telemetry_gen.json")
 
-    #
-    # 1. Calibrate camera
-    #
-    print("==================================================================")
-    print("Running camera calibration.")
-    print("==================================================================")
-    start = time.time()
-    print("Calibrating camera.")
-    cam_calib = Popen([pjoin(bin_path,'calibrate_camera'),
-                    "--input_corners=" + cam_corners_json,
-                    "--save_path_calib_dataset=" + cam_calib_file_path,
-                    "--camera_model_to_calibrate=" + args.camera_model,
-                    "--grid_size=" + str(args.voxel_grid_size),
-                    "--optimize_board_points="+str(args.optimize_board_points),
-                    "--verbose=" + str(args.verbose),
-                    "--logtostderr=0"])
-    error_cam_calib = cam_calib.wait()
-    print("Finished camera calibration.")
-    print("==================================================================")
-    print("Camera calibration took {:.2f}s.".format(time.time()-start))
-    print("==================================================================")
 
-    #
-    # 2. Extracting GoPro telemetry
-    #   
-    js_extract_file = pjoin(args.path_to_src,"javascript","extract_metadata.js")
-    print("==================================================================")
-    print("Extracting GoPro telemetry for imu bias and camera imu calibration.")
-    print("==================================================================")
-    start = time.time()
-    telemetry_extract = Popen(["node",js_extract_file,
-                       imu_bias_path,
-                       bias_video_fn+".MP4",
-                       imu_bias_path])
-    # error_telemetry_extract = telemetry_extract.wait()
-    telemetry_extract = Popen(["node",js_extract_file,
-                       cam_imu_path,
-                       cam_imu_video_fn+".MP4",
-                       cam_imu_path])
-    error_telemetry_extract = telemetry_extract.wait()
-    print("==================================================================")
-    print("Telemetry extraction took {:.2f}s.".format(time.time()-start))
-    print("==================================================================")
+    # #
+    # # 0. Extract corners for camera calibration and camera imu calibration
+    # #
+    # print("==================================================================")
+    # print("Running corner extraction.")
+    # print("==================================================================")   
+    # start = time.time()
+    # print("Extracing corners for camera calibration.")
+    # cam_calib = Popen([pjoin(bin_path,'extract_board_to_json'),
+    #                 "--input_video=" + cam_calib_video[0],
+    #                 "--aruco_detector_params=" + aruco_detector_params,
+    #                 "--board_type=" + args.board_type,
+    #                 "--save_corners_json_path=" + cam_corners_json,
+    #                 "--downsample_factor=" + str(args.image_downsample_factor),
+    #                 "--checker_square_length_m=" + checker_size_m,
+    #                 "--verbose=" + str(args.verbose),
+    #                 "--recompute_corners=" + str(args.recompute_corners),
+    #                 "--num_squares_x="+str(args.num_squares_x),
+    #                 "--num_squares_y="+str(args.num_squares_y),
+    #                 "--logtostderr=1"])
+    # error_cam_calib = cam_calib.wait()
+    # print("Extracing corners for imu camera calibration.")
+    # cam_imu_calib_corners = Popen([pjoin(bin_path,'extract_board_to_json'),
+    #                 "--input_video=" + cam_imu_video[0],
+    #                 "--aruco_detector_params=" + aruco_detector_params,
+    #                 "--board_type=" + args.board_type,
+    #                 "--save_corners_json_path=" + cam_imu_corners_json,
+    #                 "--downsample_factor=" + str(args.image_downsample_factor),
+    #                 "--checker_square_length_m=" + checker_size_m,
+    #                 "--verbose=" + str(args.verbose),
+    #                 "--recompute_corners=" + str(args.recompute_corners),
+    #                 "--num_squares_x="+str(args.num_squares_x),
+    #                 "--num_squares_y="+str(args.num_squares_y),
+    #                 "--logtostderr=1"])
+    # error_cam_calib = cam_imu_calib_corners.wait()
+    # print("Finished corner extraction.")
+    # print("==================================================================")
+    # print("Corner extraction took {:.2f}s.".format(time.time()-start))
+    # print("==================================================================")
+
+    # #
+    # # 1. Calibrate camera
+    # #
+    # print("==================================================================")
+    # print("Running camera calibration.")
+    # print("==================================================================")
+    # start = time.time()
+    # print("Calibrating camera.")
+    # cam_calib = Popen([pjoin(bin_path,'calibrate_camera'),
+    #                 "--input_corners=" + cam_corners_json,
+    #                 "--save_path_calib_dataset=" + cam_calib_file_path,
+    #                 "--camera_model_to_calibrate=" + args.camera_model,
+    #                 "--grid_size=" + str(args.voxel_grid_size),
+    #                 "--optimize_board_points="+str(args.optimize_board_points),
+    #                 "--verbose=" + str(args.verbose),
+    #                 "--logtostderr=0"])
+    # error_cam_calib = cam_calib.wait()
+    # print("Finished camera calibration.")
+    # print("==================================================================")
+    # print("Camera calibration took {:.2f}s.".format(time.time()-start))
+    # print("==================================================================")
     
 
     #
     # 3. Convert gopro json telemetry to common format
     #
     telemetry_conv = TelemetryConverter()
-    telemetry_conv.convert_gopro_telemetry_file(gopro_telemetry, gopro_telemetry_gen)
-    telemetry_conv.convert_gopro_telemetry_file(imu_bias_telemetry_json_in, imu_bias_telemetry_json_in_gen)
+    telemetry_conv.convert_pilotguru_telemetry_file(
+        cam_accl_telemetry, cam_gyro_telemetry, cam_cam_telemetry, cam_telemetry_gen)
+    telemetry_conv.convert_pilotguru_telemetry_file(
+        bias_accl_telemetry, bias_gyro_telemetry, bias_cam_telemetry, bias_telemetry_gen)
 
     #
     # 4. Estimating IMU biases
@@ -205,7 +190,7 @@ def main():
     print("==================================================================")
     start = time.time()
     bias_estimation = Popen(["python", py_imu_file,
-                       "--input_json_path=" + imu_bias_telemetry_json_in_gen,
+                       "--input_json_path=" + bias_telemetry_gen,
                        "--output_path=" + imu_bias_json,
                        "--gravity_const=" + str(args.gravity_const),
                        "--remove_sec=" + str(args.bias_calib_remove_s)])
@@ -240,7 +225,7 @@ def main():
     print("==================================================================")
     start = time.time()
     spline_init = Popen(["python", py_spline_file,
-                       "--path_to_json=" + gopro_telemetry_gen,
+                       "--path_to_json=" + cam_telemetry_gen,
                        "--output_path=" + spline_weighting_json,
                        "--q_so3=" + str(0.98),
                        "--q_r3=" + str(0.98)])
@@ -257,7 +242,7 @@ def main():
     print("==================================================================")
     start = time.time()
     spline_init = Popen([pjoin(bin_path,"estimate_imu_to_camera_rotation"),
-                       "--telemetry_json=" + gopro_telemetry_gen,
+                       "--telemetry_json=" + cam_telemetry_gen,
                        "--input_pose_calibration_dataset=" + pose_calib_dataset,
                        "--imu_bias_estimate=" + imu_bias_json,
                        "--imu_rotation_init_output=" + imu_cam_calibration_json,
@@ -276,7 +261,7 @@ def main():
     start = time.time()
     spline_init = Popen([pjoin(bin_path,"continuous_time_imu_to_camera_calibration"),
                        "--gyro_to_cam_initial_calibration=" + imu_cam_calibration_json,
-                       "--telemetry_json=" + gopro_telemetry_gen,
+                       "--telemetry_json=" + cam_telemetry_gen,
                        "--input_pose_dataset=" + pose_calib_dataset,
                        "--input_corners=" + cam_imu_corners_json,
                        "--camera_calibration_json=" + calib_dataset_json,

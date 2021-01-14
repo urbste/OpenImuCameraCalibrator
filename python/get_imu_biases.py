@@ -6,7 +6,7 @@ from sew import knot_spacing_and_variance
 import matplotlib.pyplot as plt 
 import glob
 from utils import read_imu_data
-
+from telemetry_converter import TelemetryImporter
 
 ms_to_sec = 1.0/1000.
 
@@ -22,13 +22,15 @@ def main():
                         help="gravity constant", 
                         default=9.81, type=float)
     parser.add_argument("--remove_sec", 
-                        help="How many seconds to remove from start and end (due to press of button)", 
-                        default=2.0, type=float)
-
+                        help="How many seconds to remove from start and end of sequence", 
+                        default=0.0, type=float)
     args = parser.parse_args()
 
-    _, accl_np, gyro_np, _ = read_imu_data(args.input_json_path, args.remove_sec)
+    json_importer = TelemetryImporter()
+    json_importer.read_generic_json(args.input_json_path, args.remove_sec)
 
+    accl_np = np.asarray(json_importer.telemetry["accelerometer"])
+    gyro_np = np.asarray(json_importer.telemetry["gyroscope"])
 
     # find z direction of accelerometer, search for maximum acceleration (aroung g)
     mean_accl = np.mean(accl_np,0)
@@ -54,15 +56,15 @@ def main():
     with open(args.output_path, 'w') as json_dump:
         json.dump(biases, json_dump)
 
-    # plt.plot(gyro_np[:,0])
-    # plt.plot(gyro_np[:,1])
-    # plt.plot(gyro_np[:,2])
-    # plt.show()
+    plt.plot(gyro_np[:,0],label='x')
+    plt.plot(gyro_np[:,1],label='y')
+    plt.plot(gyro_np[:,2],label='z')
+    plt.show()
 
-    # plt.plot(accl_np[:,0],'r',label='x')
-    # plt.plot(accl_np[:,1],'g',label='y')
-    # plt.plot(accl_np[:,2],'b',label='z')
-    # plt.show()
+    plt.plot(accl_np[:,0],'r',label='x')
+    plt.plot(accl_np[:,1],'g',label='y')
+    plt.plot(accl_np[:,2],'b',label='z')
+    plt.show()
 
 
 if __name__ == "__main__":

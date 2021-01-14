@@ -112,7 +112,7 @@ void ImuCameraCalibrator::InitSpline(
   }
 
   // Add Accelerometer
-  for (size_t i = 0; i < telemetry_data.accelerometer.acc_measurement.size();
+  for (size_t i = 0; i < telemetry_data.accelerometer.measurement.size();
        ++i) {
     const double t = telemetry_data.accelerometer.timestamp_ms[i] * 1e-3 +
                      time_offset_imu_to_cam;
@@ -120,14 +120,14 @@ void ImuCameraCalibrator::InitSpline(
       continue;
 
     const Eigen::Vector3d accl_unbiased =
-        telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
+        telemetry_data.accelerometer.measurement[i] + accl_bias;
     trajectory_.addAccelMeasurement(accl_unbiased, t * 1e9,
                                     1. / spline_weight_data_.var_r3, reestimate_biases_);
     accl_measurements[t] = accl_unbiased;
   }
 
   // Add Gyroscope
-  for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size();
+  for (size_t i = 0; i < telemetry_data.gyroscope.measurement.size();
        ++i) {
     const double t = telemetry_data.gyroscope.timestamp_ms[i] * 1e-3 +
                      time_offset_imu_to_cam;
@@ -135,7 +135,7 @@ void ImuCameraCalibrator::InitSpline(
       continue;
 
     const Eigen::Vector3d gyro_unbiased =
-        telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias;
+        telemetry_data.gyroscope.measurement[i] + gyro_bias;
     trajectory_.addGyroMeasurement(gyro_unbiased, t * 1e9,
                                    1. / spline_weight_data_.var_so3, reestimate_biases_);
     gyro_measurements[t] = gyro_unbiased;
@@ -156,11 +156,11 @@ void ImuCameraCalibrator::InitializeGravity(
 
       if (!gravity_initialized_) {
         for (size_t i = 0;
-             i < telemetry_data.accelerometer.acc_measurement.size() &&
+             i < telemetry_data.accelerometer.measurement.size() &&
              !gravity_initialized_;
              i++) {
           const Eigen::Vector3d ad =
-              telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
+              telemetry_data.accelerometer.measurement[i] + accl_bias;
           const int64_t accl_t =
               telemetry_data.accelerometer.timestamp_ms[i] * 1e-3;
           if (std::abs(accl_t - cam_timestamps_[j]) < 1e-2) {

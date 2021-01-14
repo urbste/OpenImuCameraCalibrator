@@ -70,11 +70,13 @@ ters, 1(1):137–144, Jan 2016.
 
 
 ## Working on / ToDo / Contributions Welcome
-* [ ] Code cleanup, add license header
+v0.1
+* [x] Code cleanup, add license header
 * [x] use different initialization for linear mode
-* [ ] Beautify logs
-* [ ] Add more camera models -> Scaramuzza omni model, ...
 * [ ] Use more generic JSON meta data interface, so that others cameras can be calibrated that come with different telemetry formats
+* [ ] Beautify logs
+* [ ] Write example for calibration of Smartphone
+v0.2
 * [ ] Rolling shutter calibration -> first resolve problems with templated spline functions
 * [ ] Model bias over time with a R3 spline
 * [ ] Pose estimation with UPNP or MLPnP to support arbitraty camera types. Right now: undistortion and then using vanilla PnP --> will lead to problems for Ultra Wide Angle fisheye lenses (e.g. GoPro Max or potentially Max lens mod)
@@ -84,3 +86,4 @@ ters, 1(1):137–144, Jan 2016.
 * [ ] Extend to multi-camera systems
 * [ ] Docker?
 * [ ] Put together a little paper on how this all works
+* [ ] Add more camera models -> Scaramuzza omni model, ...

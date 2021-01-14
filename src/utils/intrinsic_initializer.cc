@@ -17,16 +17,18 @@
 
 #include "OpenCameraCalibrator/utils/intrinsic_initializer.h"
 #include "OpenCameraCalibrator/utils/utils.h"
-#include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
 #include "theia/sfm/camera/division_undistortion_camera_model.h"
 #include "theia/sfm/camera/double_sphere_camera_model.h"
 #include "theia/sfm/camera/pinhole_camera_model.h"
+#include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
 
 #include <theia/sfm/estimators/estimate_calibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
 
 #include <opencv2/core/eigen.hpp>
+
+const size_t MIN_NUM_POINTS = 10;
 
 namespace OpenICC {
 namespace utils {
@@ -36,6 +38,10 @@ bool initialize_pinhole_camera(
     const theia::RansacParameters &ransac_params,
     theia::RansacSummary &ransac_summary, Eigen::Matrix3d &rotation,
     Eigen::Vector3d &position, double &focal_length, const bool verbose) {
+
+  if (correspondences.size() <= MIN_NUM_POINTS) {
+    return false;
+  }
 
   theia::UncalibratedAbsolutePose pose_linear;
   // use -> cv::initCameraMatrix2D()
@@ -51,7 +57,7 @@ bool initialize_pinhole_camera(
   rotation = pose_linear.rotation;
   position = pose_linear.position;
   focal_length = pose_linear.focal_length;
-  if (ransac_summary.inliers.size() < 10)
+  if (ransac_summary.inliers.size() < MIN_NUM_POINTS)
     return false;
   return success;
 }
@@ -63,7 +69,7 @@ bool initialize_radial_undistortion_camera(
     Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
     double &radial_distortion, const bool verbose) {
 
-  if (correspondences.size() <= 4) {
+  if (correspondences.size() <= MIN_NUM_POINTS) {
     return false;
   }
   theia::RadialDistUncalibratedAbsolutePoseMetaData meta_data;
@@ -85,10 +91,11 @@ bool initialize_radial_undistortion_camera(
   }
 
   rotation = pose_division_undist.rotation;
-  position = -pose_division_undist.rotation.transpose() * pose_division_undist.translation;
+  position = -pose_division_undist.rotation.transpose() *
+             pose_division_undist.translation;
   radial_distortion = pose_division_undist.radial_distortion;
   focal_length = pose_division_undist.focal_length;
-  if (ransac_summary.inliers.size() < 8)
+  if (ransac_summary.inliers.size() < MIN_NUM_POINTS)
     return false;
   return success;
 }

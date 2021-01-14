@@ -17,7 +17,8 @@
 #include <gflags/gflags.h>
 
 #include "OpenCameraCalibrator/core/imu_to_camera_rotation_estimator.h"
-#include "OpenCameraCalibrator/io/read_gopro_imu_json.h"
+#include "OpenCameraCalibrator/io/read_misc.h"
+#include "OpenCameraCalibrator/io/read_telemetry.h"
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 
@@ -31,12 +32,13 @@ using json = nlohmann::json;
 using namespace OpenICC;
 using namespace OpenICC::utils;
 using namespace OpenICC::core;
+using namespace OpenICC::io;
 
 // Input/output files.
 DEFINE_string(input_pose_calibration_dataset, "",
               "Path to input calibration dataset.");
 DEFINE_string(
-    gopro_telemetry_json, "",
+    telemetry_json, "",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
 DEFINE_string(imu_bias_estimate, "",
               "Estimate to imu bias values. If empty, we will estimate this.");
@@ -60,7 +62,7 @@ int main(int argc, char *argv[]) {
   if (FLAGS_imu_bias_estimate != "") {
     // IMU Bias
     LOG(INFO) << "Load IMU bias file: " << FLAGS_imu_bias_estimate << std::endl;
-    OpenICC::ReadIMUBias(FLAGS_imu_bias_estimate, gyro_bias, accl_bias);
+    ReadIMUBias(FLAGS_imu_bias_estimate, gyro_bias, accl_bias);
   } else {
     // if no bias is given we can also estimate it here
     rotation_estimator.EnableGyroBiasEstimation();
@@ -68,19 +70,19 @@ int main(int argc, char *argv[]) {
 
   // read gopro telemetry
   OpenICC::CameraTelemetryData telemetry_data;
-  if (!OpenICC::ReadGoProTelemetry(FLAGS_gopro_telemetry_json,
+  if (!OpenICC::io::ReadTelemetryJSON(FLAGS_telemetry_json,
                                         telemetry_data)) {
-    std::cout << "Could not read: " << FLAGS_gopro_telemetry_json << std::endl;
+    std::cout << "Could not read: " << FLAGS_telemetry_json << std::endl;
   }
 
   // fill measurementes
   vec3_map angular_velocities, acclerations;
-  for (size_t i = 0; i < telemetry_data.gyroscope.gyro_measurement.size();
+  for (size_t i = 0; i < telemetry_data.gyroscope.measurement.size();
        ++i) {
     angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
-        telemetry_data.gyroscope.gyro_measurement[i] + gyro_bias;
+        telemetry_data.gyroscope.measurement[i] + gyro_bias;
     acclerations[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
-        telemetry_data.accelerometer.acc_measurement[i] + accl_bias;
+        telemetry_data.accelerometer.measurement[i] + accl_bias;
   }
 
   // get mean hz imu

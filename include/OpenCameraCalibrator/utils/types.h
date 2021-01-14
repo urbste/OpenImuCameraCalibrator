@@ -63,7 +63,7 @@ public:
 };
 
 struct CameraGyroData {
-  vec3_vector gyro_measurement;
+  vec3_vector measurement;
   std::vector<double> timestamp_ms;
 
 public:
@@ -71,7 +71,7 @@ public:
 };
 
 struct CameraAccData {
-  vec3_vector acc_measurement;
+  vec3_vector measurement;
   std::vector<double> timestamp_ms;
 
 public:

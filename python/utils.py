@@ -4,6 +4,22 @@ import numpy as np
 
 ms_to_sec = 1./1000.
 
+def get_abbr_from_cam_model(model_name):
+    if model_name == "DIVISION_UNDISTORTION":
+        return "di"
+    elif model_name == "DOUBLE_SPHERE":
+        return "ds"
+    elif model_name == "PINHOLE":
+        return "ph"
+    elif model_name == "EXTENDED_UNIFIED":
+        return "ex"
+    elif model_name == "FISHEYE":
+        return "fi"
+    else:
+        print("Model name ", model_name, " does not exist.")
+        exit(-1)
+
+
 def read_imu_data(path_to_json, skip_seconds=0):
     accl = []
     gyro  = []
