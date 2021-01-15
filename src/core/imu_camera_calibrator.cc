@@ -74,46 +74,43 @@ void ImuCameraCalibrator::InitSpline(
         view.Camera().GetPosition());
     calib_init_poses_[t_c_id] = pose_data;
 
-
     Sophus::SE3d T_w_i_init =
         calib_init_poses_.at(t_c_id).T_a_c * T_i_c_init.inverse();
     CalibInitPoseData spline_pose_data;
     spline_pose_data.T_a_c = T_w_i_init;
     spline_init_poses_[t_c_id] = spline_pose_data;
-  } 
+  }
 
   nr_knots_so3_ = (end_t_ns - start_t_ns) / dt_so3_ns + SPLINE_N;
   nr_knots_r3_ = (end_t_ns - start_t_ns) / dt_r3_ns + SPLINE_N;
 
-//  TimeCamId tcid_init(
-//      cam_timestamps_[result.first - cam_timestamps_.begin()] * 1e9, 0);
-//  Sophus::SE3d T_w_i_init =
-//      calib_init_poses_.at(tcid_init).T_a_c * T_i_c_init.inverse();
+  //  TimeCamId tcid_init(
+  //      cam_timestamps_[result.first - cam_timestamps_.begin()] * 1e9, 0);
+  //  Sophus::SE3d T_w_i_init =
+  //      calib_init_poses_.at(tcid_init).T_a_c * T_i_c_init.inverse();
   std::cout << "Initializing " << nr_knots_so3_ << " SO3 knots.\n";
   std::cout << "Initializing " << nr_knots_r3_ << " R3 knots.\n";
 
-  //trajectory_.init(T_w_i_init, nr_knots_so3_, nr_knots_r3_);
+  // trajectory_.init(T_w_i_init, nr_knots_so3_, nr_knots_r3_);
   trajectory_.initAll(spline_init_poses_, nr_knots_so3_, nr_knots_r3_);
+  double cam_readout_s_ = 1. / spline_weight_data.cam_fps;
   // add corners
   for (const auto &kv : calib_corners_) {
     if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {
-      //      if (cam_readout > 0.0) {
-
-      //        calib_spline.addRSCornersMeasurement(
-      //            &kv.second, &calib_dataset,
-      //            &calib_dataset.View(0)->Camera(), cam_readout,
-      //            kv.first.cam_id, kv.first.frame_id);
-      //      } else {
-      trajectory_.addCornersMeasurement(&kv.second, &calib_dataset,
-                                        &calib_dataset.View(0)->Camera(),
-                                        kv.first.cam_id, kv.first.frame_id);
-      //}
+      if (cam_readout_s_ > 0.0) {
+        trajectory_.addRSCornersMeasurement(
+            &kv.second, &calib_dataset, &calib_dataset.View(0)->Camera(),
+            cam_readout_s_, kv.first.cam_id, kv.first.frame_id);
+      } else {
+        trajectory_.addCornersMeasurement(&kv.second, &calib_dataset,
+                                          &calib_dataset.View(0)->Camera(),
+                                          kv.first.cam_id, kv.first.frame_id);
+      }
     }
   }
 
   // Add Accelerometer
-  for (size_t i = 0; i < telemetry_data.accelerometer.measurement.size();
-       ++i) {
+  for (size_t i = 0; i < telemetry_data.accelerometer.measurement.size(); ++i) {
     const double t = telemetry_data.accelerometer.timestamp_ms[i] * 1e-3 +
                      time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_)
@@ -122,13 +119,13 @@ void ImuCameraCalibrator::InitSpline(
     const Eigen::Vector3d accl_unbiased =
         telemetry_data.accelerometer.measurement[i] + accl_bias;
     trajectory_.addAccelMeasurement(accl_unbiased, t * 1e9,
-                                    1. / spline_weight_data_.var_r3, reestimate_biases_);
+                                    1. / spline_weight_data_.var_r3,
+                                    reestimate_biases_);
     accl_measurements[t] = accl_unbiased;
   }
 
   // Add Gyroscope
-  for (size_t i = 0; i < telemetry_data.gyroscope.measurement.size();
-       ++i) {
+  for (size_t i = 0; i < telemetry_data.gyroscope.measurement.size(); ++i) {
     const double t = telemetry_data.gyroscope.timestamp_ms[i] * 1e-3 +
                      time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_)
@@ -137,7 +134,8 @@ void ImuCameraCalibrator::InitSpline(
     const Eigen::Vector3d gyro_unbiased =
         telemetry_data.gyroscope.measurement[i] + gyro_bias;
     trajectory_.addGyroMeasurement(gyro_unbiased, t * 1e9,
-                                   1. / spline_weight_data_.var_so3, reestimate_biases_);
+                                   1. / spline_weight_data_.var_so3,
+                                   reestimate_biases_);
     gyro_measurements[t] = gyro_unbiased;
   }
 }
@@ -179,7 +177,7 @@ void ImuCameraCalibrator::InitializeGravity(
 double ImuCameraCalibrator::Optimize(const int iterations) {
   ceres::Solver::Summary summary = trajectory_.optimize(iterations);
 
-  return trajectory_.meanReprojection(calib_corners_);
+  return trajectory_.meanReprojection(calib_corners_, cam_readout_s_);
 }
 
 void ImuCameraCalibrator::ToTheiaReconDataset(Reconstruction &output_recon) {
@@ -199,13 +197,13 @@ void ImuCameraCalibrator::ToTheiaReconDataset(Reconstruction &output_recon) {
 }
 
 void ImuCameraCalibrator::ClearSpline() {
-    cam_timestamps_.clear();
-    gyro_measurements.clear();
-    accl_measurements.clear();
-    calib_corners_.clear();
-    calib_init_poses_.clear();
-    spline_init_poses_.clear();
-    trajectory_.Clear();
+  cam_timestamps_.clear();
+  gyro_measurements.clear();
+  accl_measurements.clear();
+  calib_corners_.clear();
+  calib_init_poses_.clear();
+  spline_init_poses_.clear();
+  trajectory_.Clear();
 }
 
 } // namespace core

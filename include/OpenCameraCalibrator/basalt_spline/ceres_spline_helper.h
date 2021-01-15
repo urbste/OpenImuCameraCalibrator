@@ -41,15 +41,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "spline_common.h"
 #include <Eigen/Dense>
 
+#include "ceres/ceres.h"
+
 /// @brief Helper for implementing Lie group and Euclidean b-splines in ceres of
 /// order N
-template <int _N>
+template <class T, int _N>
 struct CeresSplineHelper {
   static constexpr int N = _N;        // Order of the spline.
   static constexpr int DEG = _N - 1;  // Degree of the spline.
 
-  using MatN = Eigen::Matrix<double, _N, _N>;
-  using VecN = Eigen::Matrix<double, _N, 1>;
+  using MatN = Eigen::Matrix<T, _N, _N>;
+  using VecN = Eigen::Matrix<T, _N, 1>;
 
   static const MatN blending_matrix_;
   static const MatN cumulative_blending_matrix_;
@@ -66,7 +68,7 @@ struct CeresSplineHelper {
   /// @param[in] t
   template <int Derivative, class Derived>
   static inline void baseCoeffsWithTime(
-      const Eigen::MatrixBase<Derived>& res_const, double t) {
+      const Eigen::MatrixBase<Derived>& res_const, T t) {
     EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, N);
     Eigen::MatrixBase<Derived>& res =
         const_cast<Eigen::MatrixBase<Derived>&>(res_const);
@@ -76,7 +78,7 @@ struct CeresSplineHelper {
     if (Derivative < N) {
       res[Derivative] = base_coefficients_(Derivative, Derivative);
 
-      double _t = t;
+      T _t = t;
       for (int j = Derivative + 1; j < N; j++) {
         res[j] = base_coefficients_(Derivative, j) * _t;
         _t = _t * t;
@@ -96,9 +98,9 @@ struct CeresSplineHelper {
   /// body frame
   /// @param[out] accel_out if not nullptr acceleration (second time derivative)
   /// in the body frame
-  template <class T, template <class> class GroupT>
+  template <template <class> class GroupT>
   static inline void evaluate_lie(
-      T const* const* sKnots, const double u, const double inv_dt,
+      T const* const* sKnots, const T u, const T inv_dt,
       GroupT<T>* transform_out = nullptr,
       typename GroupT<T>::Tangent* vel_out = nullptr,
       typename GroupT<T>::Tangent* accel_out = nullptr,
@@ -109,22 +111,22 @@ struct CeresSplineHelper {
 
     VecN p, coeff, dcoeff, ddcoeff, dddcoeff;
 
-    CeresSplineHelper<N>::template baseCoeffsWithTime<0>(p, u);
-    coeff = CeresSplineHelper<N>::cumulative_blending_matrix_ * p;
+    CeresSplineHelper<T,N>::template baseCoeffsWithTime<0>(p, u);
+    coeff = CeresSplineHelper<T,N>::cumulative_blending_matrix_ * p;
 
     if (vel_out || accel_out || jerk_out) {
-      CeresSplineHelper<N>::template baseCoeffsWithTime<1>(p, u);
-      dcoeff = inv_dt * CeresSplineHelper<N>::cumulative_blending_matrix_ * p;
+      CeresSplineHelper<T,N>::template baseCoeffsWithTime<1>(p, u);
+      dcoeff = inv_dt * CeresSplineHelper<T,N>::cumulative_blending_matrix_ * p;
 
       if (accel_out || jerk_out) {
-        CeresSplineHelper<N>::template baseCoeffsWithTime<2>(p, u);
+        CeresSplineHelper<T,N>::template baseCoeffsWithTime<2>(p, u);
         ddcoeff = inv_dt * inv_dt *
-                  CeresSplineHelper<N>::cumulative_blending_matrix_ * p;
+                  CeresSplineHelper<T,N>::cumulative_blending_matrix_ * p;
 
         if (jerk_out) {
-          CeresSplineHelper<N>::template baseCoeffsWithTime<3>(p, u);
+          CeresSplineHelper<T,N>::template baseCoeffsWithTime<3>(p, u);
           dddcoeff = inv_dt * inv_dt * inv_dt *
-                     CeresSplineHelper<N>::cumulative_blending_matrix_ * p;
+                     CeresSplineHelper<T,N>::cumulative_blending_matrix_ * p;
         }
       }
     }
@@ -168,7 +170,7 @@ struct CeresSplineHelper {
             rot_jerk = A * rot_jerk;
             rot_jerk += dddcoeff[i + 1] * delta +
                         Group::lieBracket(ddcoeff[i + 1] * rot_vel +
-                                              2 * dcoeff[i + 1] * rot_accel -
+                                              T(2) * dcoeff[i + 1] * rot_accel -
                                               dcoeff[i + 1] * accel_lie_bracket,
                                           delta);
           }
@@ -190,9 +192,9 @@ struct CeresSplineHelper {
   /// knots
   /// @param[out] vec_out if DERIV=0 returns value of the spline, otherwise
   /// corresponding derivative.
-  template <class T, int DIM, int DERIV>
-  static inline void evaluate(T const* const* sKnots, const double u,
-                              const double inv_dt,
+  template <int DIM, int DERIV>
+  static inline void evaluate(T const* const* sKnots, const T u,
+                              const T inv_dt,
                               Eigen::Matrix<T, DIM, 1>* vec_out) {
     if (!vec_out) return;
 
@@ -200,9 +202,9 @@ struct CeresSplineHelper {
 
     VecN p, coeff;
 
-    CeresSplineHelper<N>::template baseCoeffsWithTime<DERIV>(p, u);
+    CeresSplineHelper<T,N>::template baseCoeffsWithTime<DERIV>(p, u);
     coeff =
-        std::pow(inv_dt, DERIV) * CeresSplineHelper<N>::blending_matrix_ * p;
+        ceres::pow(inv_dt, DERIV) * CeresSplineHelper<T,N>::blending_matrix_ * p;
 
     vec_out->setZero();
 
@@ -214,18 +216,18 @@ struct CeresSplineHelper {
   }
 };
 
-template <int _N>
-const typename CeresSplineHelper<_N>::MatN
-    CeresSplineHelper<_N>::base_coefficients_ =
-        computeBaseCoefficients<_N, double>();
+template <class T,int _N>
+const typename CeresSplineHelper<T,_N>::MatN
+    CeresSplineHelper<T,_N>::base_coefficients_ =
+        computeBaseCoefficients<_N, T>();
 
-template <int _N>
-const typename CeresSplineHelper<_N>::MatN
-    CeresSplineHelper<_N>::blending_matrix_ =
-        computeBlendingMatrix<_N, double, false>();
+template <class T,int _N>
+const typename CeresSplineHelper<T,_N>::MatN
+    CeresSplineHelper<T,_N>::blending_matrix_ =
+        computeBlendingMatrix<_N, T, false>();
 
-template <int _N>
-const typename CeresSplineHelper<_N>::MatN
-    CeresSplineHelper<_N>::cumulative_blending_matrix_ =
-        computeBlendingMatrix<_N, double, true>();
+template <class T,int _N>
+const typename CeresSplineHelper<T,_N>::MatN
+    CeresSplineHelper<T,_N>::cumulative_blending_matrix_ =
+        computeBlendingMatrix<_N, T, true>();
 

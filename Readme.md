@@ -77,7 +77,8 @@ v0.1
 * [ ] Beautify logs
 * [ ] Write example for calibration of Smartphone
 v0.2
-* [ ] Rolling shutter calibration -> first resolve problems with templated spline functions
+* [x] Rolling shutter calibration -> first resolve problems with templated spline functions
+* [ ] Add readout time as a optimizable parameter
 * [ ] Model bias over time with a R3 spline
 * [ ] Pose estimation with UPNP or MLPnP to support arbitraty camera types. Right now: undistortion and then using vanilla PnP --> will lead to problems for Ultra Wide Angle fisheye lenses (e.g. GoPro Max or potentially Max lens mod)
 * [ ] use only bearings in spline reproj error -> local tangent reprojection error

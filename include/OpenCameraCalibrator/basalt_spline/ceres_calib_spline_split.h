@@ -81,25 +81,25 @@ public:
     Sophus::SO3d rot;
     Eigen::Vector3d trans;
 
-    {
-      std::vector<const double *> vec;
-      for (int i = 0; i < N; i++) {
-        vec.emplace_back(so3_knots[s_so3 + i].data());
-      }
+//    {
+//      std::vector<const double *> vec;
+//      for (int i = 0; i < N; i++) {
+//        vec.emplace_back(so3_knots[s_so3 + i].data());
+//      }
 
-      CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(
-          &vec[0], u_so3, inv_so3_dt, &rot);
-    }
+//      CeresSplineHelper<double, N>::template evaluate_lie<double, Sophus::SO3>(
+//          &vec[0], u_so3, inv_so3_dt, &rot);
+//    }
 
-    {
-      std::vector<const double *> vec;
-      for (int i = 0; i < N; i++) {
-        vec.emplace_back(trans_knots[s_r3 + i].data());
-      }
+//    {
+//      std::vector<const double *> vec;
+//      for (int i = 0; i < N; i++) {
+//        vec.emplace_back(trans_knots[s_r3 + i].data());
+//      }
 
-      CeresSplineHelper<N>::template evaluate<double, 3, 0>(&vec[0], u_r3,
-                                                            inv_r3_dt, &trans);
-    }
+//      CeresSplineHelper<double, N>::template evaluate<double, 3, 0>(&vec[0], u_r3,
+//                                                            inv_r3_dt, &trans);
+//    }
 
     res = Sophus::SE3d(rot, trans);
 
@@ -127,7 +127,7 @@ public:
       vec.emplace_back(so3_knots[s_so3 + i].data());
     }
 
-    CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(
+    CeresSplineHelper<double,N>::template evaluate_lie<Sophus::SO3>(
         &vec[0], u_so3, inv_so3_dt, nullptr, &gyro);
 
     return gyro;
@@ -165,7 +165,7 @@ public:
         vec.emplace_back(so3_knots[s_so3 + i].data());
       }
 
-      CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(
+      CeresSplineHelper<double,N>::template evaluate_lie<Sophus::SO3>(
           &vec[0], u_so3, inv_so3_dt, &rot);
     }
 
@@ -175,7 +175,7 @@ public:
         vec.emplace_back(trans_knots[s_r3 + i].data());
       }
 
-      CeresSplineHelper<N>::template evaluate<double, 3, 2>(
+      CeresSplineHelper<double,N>::template evaluate<3, 2>(
           &vec[0], u_r3, inv_r3_dt, &trans_accel_world);
     }
 
@@ -363,7 +363,9 @@ public:
     if (calib_bias) {
       cost_function->AddParameterBlock(3);
     }
+
     cost_function->SetNumResiduals(3);
+
 
     std::vector<double *> vec;
     for (int i = 0; i < N; i++) {
@@ -463,8 +465,7 @@ public:
                          "s " << s_r3 << " N " << N << " knots.size() "
                               << trans_knots.size());
 
-    using FunctorT = CalibRSReprojectionCostFunctorSplit<
-        N, theia::DivisionUndistortionCameraModel>;
+    using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
     FunctorT *functor = new FunctorT(corners, calib, cam, cam_readout_s, u_so3,
                                      u_r3, inv_so3_dt, inv_r3_dt);
 
@@ -480,6 +481,9 @@ public:
     // T_i_c
     cost_function->AddParameterBlock(7);
 
+    // cam readout time
+    cost_function->AddParameterBlock(1);
+
     cost_function->SetNumResiduals(corners->track_ids.size() * 2);
 
     std::vector<double *> vec;
@@ -490,6 +494,7 @@ public:
       vec.emplace_back(trans_knots[s_r3 + i].data());
     }
     vec.emplace_back(T_i_c.data());
+    vec.emplace_back(&cam_readout_time_s_);
 
     ceres::LossFunction *loss_function =
         new ceres::HuberLoss(robust_loss_width);
@@ -503,7 +508,7 @@ public:
   int64_t minTimeNs() const { return start_t_ns; }
 
   double meanReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
-                              &calib_corners) const {
+                              &calib_corners, const double cam_readout_s) const {
     double sum_error = 0;
     int num_points = 0;
 
@@ -534,10 +539,10 @@ public:
                            "s " << s_r3 << " N " << N << " knots.size() "
                                 << trans_knots.size());
 
-      using FunctorT = CalibReprojectionCostFunctorSplit<N>;
+      using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
 
       FunctorT *functor =
-          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(), u_so3,
+          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(), cam_readout_s, u_so3,
                        u_r3, inv_so3_dt, inv_r3_dt);
 
       ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
@@ -634,6 +639,7 @@ public:
 private:
   int64_t dt_so3_ns, dt_r3_ns, start_t_ns;
   double inv_so3_dt, inv_r3_dt;
+  double cam_readout_time_s_;
 
   OpenICC::so3_vector so3_knots;
   OpenICC::vec3_vector trans_knots;
