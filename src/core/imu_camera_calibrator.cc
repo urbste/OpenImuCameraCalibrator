@@ -30,6 +30,9 @@ void ImuCameraCalibrator::InitSpline(
 
   spline_weight_data_ = spline_weight_data;
 
+  double cam_readout_s_ = 1. / spline_weight_data.cam_fps;
+  trajectory_.SetInitialCamReadoutTime(cam_readout_s_);
+
   T_i_c_init_ = T_i_c_init;
   const auto &view_ids = calib_dataset.ViewIds();
   // get all timestamps and find smallest one
@@ -42,7 +45,7 @@ void ImuCameraCalibrator::InitSpline(
   auto result =
       std::minmax_element(cam_timestamps_.begin(), cam_timestamps_.end());
   t0_s_ = cam_timestamps_[result.first - cam_timestamps_.begin()];
-  tend_s_ = cam_timestamps_[result.second - cam_timestamps_.begin()];
+  tend_s_ = cam_timestamps_[result.second - cam_timestamps_.begin()] + 2*cam_readout_s_;
   const int64_t start_t_ns = t0_s_ * 1e9;
   const int64_t end_t_ns = tend_s_ * 1e9;
   const int64_t dt_so3_ns = spline_weight_data_.dt_so3 * 1e9;
@@ -93,11 +96,11 @@ void ImuCameraCalibrator::InitSpline(
 
   // trajectory_.init(T_w_i_init, nr_knots_so3_, nr_knots_r3_);
   trajectory_.initAll(spline_init_poses_, nr_knots_so3_, nr_knots_r3_);
-  double cam_readout_s_ = 1. / spline_weight_data.cam_fps;
-  // add corners
+
+    // add corners
   for (const auto &kv : calib_corners_) {
     if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {
-      if (cam_readout_s_ > 0.0) {
+      if (calibrate_cam_readout_) {
         trajectory_.addRSCornersMeasurement(
             &kv.second, &calib_dataset, &calib_dataset.View(0)->Camera(),
             cam_readout_s_, kv.first.cam_id, kv.first.frame_id);
@@ -176,8 +179,10 @@ void ImuCameraCalibrator::InitializeGravity(
 
 double ImuCameraCalibrator::Optimize(const int iterations) {
   ceres::Solver::Summary summary = trajectory_.optimize(iterations);
-
-  return trajectory_.meanReprojection(calib_corners_, cam_readout_s_);
+  if (calibrate_cam_readout_) {
+      return trajectory_.meanRSReprojection(calib_corners_);
+  }
+  return trajectory_.meanReprojection(calib_corners_);
 }
 
 void ImuCameraCalibrator::ToTheiaReconDataset(Reconstruction &output_recon) {

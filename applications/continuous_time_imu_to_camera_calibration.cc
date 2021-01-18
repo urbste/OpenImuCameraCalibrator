@@ -56,6 +56,8 @@ DEFINE_string(imu_bias_file, "", "IMU bias json");
 DEFINE_string(spline_error_weighting_json, "",
               "Path to spline error weighting data");
 DEFINE_string(output_path, "", "");
+DEFINE_bool(calibrate_cam_readout, true,
+            "If camera rolling shutter readout should be calibrated.");
 DEFINE_string(result_output_json, "", "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 DEFINE_bool(reestimate_biases, false,
@@ -160,13 +162,15 @@ int main(int argc, char *argv[]) {
       << "Could not open " << FLAGS_spline_error_weighting_json;
 
   LOG(INFO) << "Optimizing Spline...Will run trough multiple r3_dt...";
-  std::vector<double> r3_dts_ = {0.01,  0.025, 0.05,  0.075, 0.1,
-                                 0.125, 0.15,  0.175, 0.2};
+  std::vector<double> r3_dts_ = {0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25};
   double min_error = std::numeric_limits<double>::max();
   double final_r3_dt = 0.0;
   for (int i = 0; i < r3_dts_.size(); ++i) {
     weight_data.dt_r3 = r3_dts_[i];
     ImuCameraCalibrator imu_cam_calibrator_tmp(FLAGS_reestimate_biases);
+    if (FLAGS_calibrate_cam_readout) {
+        imu_cam_calibrator_tmp.SetCalibrateCamReadoutTime();
+    }
     imu_cam_calibrator_tmp.InitSpline(recon_calib_dataset, T_i_c_init,
                                       weight_data, time_offset_imu_to_cam,
                                       gyro_bias, accl_bias, telemetry_data);
@@ -175,12 +179,18 @@ int main(int argc, char *argv[]) {
     std::cout << "T_i_c tmp "
               << imu_cam_calibrator_tmp.trajectory_.getT_i_c().matrix()
               << std::endl;
+    std::cout << "Optimized sensor readout: "
+              << imu_cam_calibrator_tmp.trajectory_.GetOptimizedReadoutTime()
+              << "\n";
     if (mean_reproj_err < min_error) {
       final_r3_dt = r3_dts_[i];
       min_error = mean_reproj_err;
     }
   }
   ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
+  if (FLAGS_calibrate_cam_readout) {
+      imu_cam_calibrator.SetCalibrateCamReadoutTime();
+  }
   // final optimization with "optimal" spacing, however weighting is actually
   // not "correct" -> sew.py
   std::cout << "FINAL OPTIMIZATION. Best r3_dt: " << final_r3_dt << "\n";
@@ -204,10 +214,12 @@ int main(int argc, char *argv[]) {
       imu_cam_calibrator.trajectory_.getT_i_c().so3().unit_quaternion();
   const Eigen::Vector3d t_i_c =
       imu_cam_calibrator.trajectory_.getT_i_c().translation();
-
+  const double readout_s =
+      imu_cam_calibrator.trajectory_.GetOptimizedReadoutTime();
   std::cout << "T_i_c qw,qx,qy,qz: " << q_i_c.w() << " " << q_i_c.x() << " "
             << q_i_c.y() << " " << q_i_c.z() << std::endl;
   std::cout << "T_i_c t: " << t_i_c.transpose() << std::endl;
+  std::cout << "Final calibrated readout time: " << readout_s << "\n";
   std::cout << "mean_reproj: " << mean_reproj_err << std::endl;
   nlohmann::json json_calibspline_results_out;
 
@@ -221,7 +233,7 @@ int main(int argc, char *argv[]) {
   json_calibspline_results_out["final_reproj_error"] = mean_reproj_err;
   json_calibspline_results_out["r3_dt"] = weight_data.dt_r3;
   json_calibspline_results_out["so3_dt"] = weight_data.dt_so3;
-
+  json_calibspline_results_out["readout_s"] = readout_s;
   std::vector<double> cam_timestamps_s = imu_cam_calibrator.GetCamTimestamps();
   std::sort(cam_timestamps_s.begin(), cam_timestamps_s.end(), std::less<>());
 
@@ -234,27 +246,39 @@ int main(int argc, char *argv[]) {
   for (auto &g : gyro_meas) {
     const int64_t t_ns = g.first * 1e9;
     const std::string t_ns_s = std::to_string(t_ns);
-    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["x"] = g.second[0];
-    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["y"] = g.second[1];
-    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["z"] = g.second[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["x"] =
+        g.second[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["y"] =
+        g.second[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["z"] =
+        g.second[2];
     // write out spline estimates
     Eigen::Vector3d gyro_spline = imu_cam_calibrator.trajectory_.getGyro(t_ns);
-    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["x"] = gyro_spline[0];
-    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["y"] = gyro_spline[1];
-    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["z"] = gyro_spline[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["x"] =
+        gyro_spline[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["y"] =
+        gyro_spline[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["z"] =
+        gyro_spline[2];
   }
   for (auto &a : accl_meas) {
     const int64_t t_ns = a.first * 1e9;
     const std::string t_ns_s = std::to_string(t_ns);
     // accelerometer
-    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["x"] = a.second[0];
-    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["y"] = a.second[1];
-    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["z"] = a.second[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["x"] =
+        a.second[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["y"] =
+        a.second[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["z"] =
+        a.second[2];
     // write out spline estimates
     Eigen::Vector3d accl_spline = imu_cam_calibrator.trajectory_.getAccel(t_ns);
-    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["x"] = accl_spline[0];
-    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["y"] = accl_spline[1];
-    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["z"] = accl_spline[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["x"] =
+        accl_spline[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["y"] =
+        accl_spline[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["z"] =
+        accl_spline[2];
   }
 
   std::ofstream calibspline_output_json_file(FLAGS_result_output_json);

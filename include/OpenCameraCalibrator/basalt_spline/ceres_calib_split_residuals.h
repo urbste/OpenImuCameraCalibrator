@@ -242,14 +242,15 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
     using Vector2 = Eigen::Matrix<T, 2, 1>;
     using Vector3 = Eigen::Matrix<T, 3, 1>;
     using Vector4 = Eigen::Matrix<T, 4, 1>;
+    using Vector1 = Eigen::Matrix<T, 1, 1>;
 
     using Matrix4 = Eigen::Matrix<T, 4, 4>;
 
     for (size_t i = 0; i < corners->track_ids.size(); i++) {
 
-      const T row_delta = T(*sKnots[2 * N + 6]) / T(cam->ImageHeight());
-      std::cout<<"row_delta: "<<row_delta<<std::endl;
+      Eigen::Map<Vector1 const> const readout(sKnots[2 * N + 1]);
 
+      const T row_delta = readout[0] / T(cam->ImageHeight());
 
       const T y_coord = T(corners->corners[i][1]);
       const T t_so3_row = T(u_so3) + T(row_delta) * y_coord;
@@ -305,8 +306,8 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
           sResiduals[2 * i + 0] = T(1e10);
           sResiduals[2 * i + 1] = T(1e10);
         } else {
-          sResiduals[2 * i + 0] = (reprojection[0] - T(corners->corners[i][0]));
-          sResiduals[2 * i + 1] = (reprojection[1] - T(corners->corners[i][1]));
+          sResiduals[2 * i + 0] = T(1000.)*(reprojection[0] - T(corners->corners[i][0]));
+          sResiduals[2 * i + 1] = T(1000.)*(reprojection[1] - T(corners->corners[i][1]));
         }
       }
       return true;

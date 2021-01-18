@@ -65,6 +65,8 @@ public:
     return accl_measurements;
   }
 
+  void SetCalibrateCamReadoutTime() { calibrate_cam_readout_ = true; }
+  bool GetCalibrateCamReadoutTime() { return calibrate_cam_readout_; }
 private:
   //! camera timestamps
   std::vector<double> cam_timestamps_;
@@ -89,8 +91,9 @@ private:
   uint64_t nr_knots_so3_;
   uint64_t nr_knots_r3_;
 
-  //! camera readout time
-  double cam_readout_s_;
+  //! camera readout time, init global shutter = 0.0
+  double cam_readout_s_ = 0.0;
+  bool calibrate_cam_readout_ = false;
 
   //! is gravity direction in sensor frame is initialized
   bool gravity_initialized_ = false;

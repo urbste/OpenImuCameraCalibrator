@@ -81,25 +81,28 @@ public:
     Sophus::SO3d rot;
     Eigen::Vector3d trans;
 
-//    {
-//      std::vector<const double *> vec;
-//      for (int i = 0; i < N; i++) {
-//        vec.emplace_back(so3_knots[s_so3 + i].data());
-//      }
+    //    {
+    //      std::vector<const double *> vec;
+    //      for (int i = 0; i < N; i++) {
+    //        vec.emplace_back(so3_knots[s_so3 + i].data());
+    //      }
 
-//      CeresSplineHelper<double, N>::template evaluate_lie<double, Sophus::SO3>(
-//          &vec[0], u_so3, inv_so3_dt, &rot);
-//    }
+    //      CeresSplineHelper<double, N>::template evaluate_lie<double,
+    //      Sophus::SO3>(
+    //          &vec[0], u_so3, inv_so3_dt, &rot);
+    //    }
 
-//    {
-//      std::vector<const double *> vec;
-//      for (int i = 0; i < N; i++) {
-//        vec.emplace_back(trans_knots[s_r3 + i].data());
-//      }
+    //    {
+    //      std::vector<const double *> vec;
+    //      for (int i = 0; i < N; i++) {
+    //        vec.emplace_back(trans_knots[s_r3 + i].data());
+    //      }
 
-//      CeresSplineHelper<double, N>::template evaluate<double, 3, 0>(&vec[0], u_r3,
-//                                                            inv_r3_dt, &trans);
-//    }
+    //      CeresSplineHelper<double, N>::template evaluate<double, 3,
+    //      0>(&vec[0], u_r3,
+    //                                                            inv_r3_dt,
+    //                                                            &trans);
+    //    }
 
     res = Sophus::SE3d(rot, trans);
 
@@ -127,7 +130,7 @@ public:
       vec.emplace_back(so3_knots[s_so3 + i].data());
     }
 
-    CeresSplineHelper<double,N>::template evaluate_lie<Sophus::SO3>(
+    CeresSplineHelper<double, N>::template evaluate_lie<Sophus::SO3>(
         &vec[0], u_so3, inv_so3_dt, nullptr, &gyro);
 
     return gyro;
@@ -165,7 +168,7 @@ public:
         vec.emplace_back(so3_knots[s_so3 + i].data());
       }
 
-      CeresSplineHelper<double,N>::template evaluate_lie<Sophus::SO3>(
+      CeresSplineHelper<double, N>::template evaluate_lie<Sophus::SO3>(
           &vec[0], u_so3, inv_so3_dt, &rot);
     }
 
@@ -175,7 +178,7 @@ public:
         vec.emplace_back(trans_knots[s_r3 + i].data());
       }
 
-      CeresSplineHelper<double,N>::template evaluate<3, 2>(
+      CeresSplineHelper<double, N>::template evaluate<3, 2>(
           &vec[0], u_r3, inv_r3_dt, &trans_accel_world);
     }
 
@@ -366,7 +369,6 @@ public:
 
     cost_function->SetNumResiduals(3);
 
-
     std::vector<double *> vec;
     for (int i = 0; i < N; i++) {
       vec.emplace_back(so3_knots[s_so3 + i].data());
@@ -499,6 +501,9 @@ public:
     ceres::LossFunction *loss_function =
         new ceres::HuberLoss(robust_loss_width);
     problem.AddResidualBlock(cost_function, loss_function, vec);
+
+    problem.SetParameterLowerBound(&cam_readout_time_s_, 0, 0.001);
+    problem.SetParameterUpperBound(&cam_readout_time_s_, 0, 0.2);
   }
 
   int64_t maxTimeNs() const {
@@ -507,8 +512,8 @@ public:
 
   int64_t minTimeNs() const { return start_t_ns; }
 
-  double meanReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
-                              &calib_corners, const double cam_readout_s) const {
+  double meanRSReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
+                              &calib_corners) const {
     double sum_error = 0;
     int num_points = 0;
 
@@ -542,7 +547,94 @@ public:
       using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
 
       FunctorT *functor =
-          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(), cam_readout_s, u_so3,
+          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(),
+                       cam_readout_time_s_, u_so3, u_r3, inv_so3_dt, inv_r3_dt);
+
+      ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
+          new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
+
+      for (int i = 0; i < N; i++) {
+        cost_function->AddParameterBlock(4);
+      }
+      for (int i = 0; i < N; i++) {
+        cost_function->AddParameterBlock(3);
+      }
+      // T_i_c
+      cost_function->AddParameterBlock(7);
+      cost_function->AddParameterBlock(1);
+
+      cost_function->SetNumResiduals(kv.second.track_ids.size() * 2);
+
+      std::vector<const double *> vec;
+      for (int i = 0; i < N; i++) {
+        vec.emplace_back(so3_knots[s_so3 + i].data());
+      }
+      for (int i = 0; i < N; i++) {
+        vec.emplace_back(trans_knots[s_r3 + i].data());
+      }
+      // vec.emplace_back(calib.T_i_c[kv.first.cam_id].data());
+      vec.emplace_back(T_i_c.data());
+      vec.emplace_back(&cam_readout_time_s_);
+
+      {
+        Eigen::VectorXd residual;
+        residual.setZero(kv.second.track_ids.size() * 2);
+
+        cost_function->Evaluate(&vec[0], residual.data(), NULL);
+
+        for (size_t i = 0; i < kv.second.track_ids.size(); i++) {
+          Eigen::Vector2d res_point = residual.segment<2>(2 * i);
+          res_point /= 1000.0;
+          if (res_point[0] != 0.0 && res_point[1] != 0.0) {
+            sum_error += res_point.norm();
+            num_points += 1;
+          }
+        }
+      }
+    }
+
+    std::cout << "mean rolling shutter reproj error " << sum_error / num_points
+              << " num_points " << num_points << std::endl;
+
+    return sum_error / num_points;
+  }
+
+  double meanReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
+                                &calib_corners) const {
+    double sum_error = 0;
+    int num_points = 0;
+
+    for (const auto &kv : calib_corners) {
+      const int64_t time_ns = kv.first.frame_id;
+
+      if (time_ns < minTimeNs() || time_ns >= maxTimeNs())
+        continue;
+
+      const int64_t st_ns = (time_ns - start_t_ns);
+
+      BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns "
+                                                << time_ns << " start_t_ns "
+                                                << start_t_ns);
+
+      const int64_t s_so3 = st_ns / dt_so3_ns;
+      const double u_so3 = double(st_ns % dt_so3_ns) / double(dt_so3_ns);
+      int64_t s_r3 = st_ns / dt_r3_ns;
+      const double u_r3 = double(st_ns % dt_r3_ns) / double(dt_r3_ns);
+
+      BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
+      BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
+
+      BASALT_ASSERT_STREAM(size_t(s_so3 + N) <= so3_knots.size(),
+                           "s " << s_so3 << " N " << N << " knots.size() "
+                                << so3_knots.size());
+      BASALT_ASSERT_STREAM(size_t(s_r3 + N) <= trans_knots.size(),
+                           "s " << s_r3 << " N " << N << " knots.size() "
+                                << trans_knots.size());
+
+      using FunctorT = CalibReprojectionCostFunctorSplit<N>;
+
+      FunctorT *functor =
+          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(), u_so3,
                        u_r3, inv_so3_dt, inv_r3_dt);
 
       ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
@@ -585,8 +677,8 @@ public:
       }
     }
 
-    std::cout << "mean error " << sum_error / num_points << " num_points "
-              << num_points << std::endl;
+    std::cout << "mean global shutter error " << sum_error / num_points
+              << " num_points " << num_points << std::endl;
 
     return sum_error / num_points;
   }
@@ -635,6 +727,12 @@ public:
     trans_knots.clear();
     track_ids.clear();
   }
+
+  void SetInitialCamReadoutTime(const double readout_s) {
+    cam_readout_time_s_ = readout_s;
+  }
+
+  double GetOptimizedReadoutTime() { return cam_readout_time_s_; }
 
 private:
   int64_t dt_so3_ns, dt_r3_ns, start_t_ns;
