@@ -162,39 +162,49 @@ int main(int argc, char *argv[]) {
       << "Could not open " << FLAGS_spline_error_weighting_json;
 
   LOG(INFO) << "Optimizing Spline...Will run trough multiple r3_dt...";
-  std::vector<double> r3_dts_ = {0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25};
-  double min_error = std::numeric_limits<double>::max();
-  double final_r3_dt = 0.0;
-  for (int i = 0; i < r3_dts_.size(); ++i) {
-    weight_data.dt_r3 = r3_dts_[i];
-    ImuCameraCalibrator imu_cam_calibrator_tmp(FLAGS_reestimate_biases);
-    if (FLAGS_calibrate_cam_readout) {
-        imu_cam_calibrator_tmp.SetCalibrateCamReadoutTime();
-    }
-    imu_cam_calibrator_tmp.InitSpline(recon_calib_dataset, T_i_c_init,
-                                      weight_data, time_offset_imu_to_cam,
-                                      gyro_bias, accl_bias, telemetry_data);
-    imu_cam_calibrator_tmp.InitializeGravity(telemetry_data, accl_bias);
-    const double mean_reproj_err = imu_cam_calibrator_tmp.Optimize(30);
-    std::cout << "T_i_c tmp "
-              << imu_cam_calibrator_tmp.trajectory_.getT_i_c().matrix()
-              << std::endl;
-    std::cout << "Optimized sensor readout: "
-              << imu_cam_calibrator_tmp.trajectory_.GetOptimizedReadoutTime()
-              << "\n";
-    if (mean_reproj_err < min_error) {
-      final_r3_dt = r3_dts_[i];
-      min_error = mean_reproj_err;
-    }
-  }
+//  std::vector<double> r3_dts_ = {0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2};
+//  double min_error = std::numeric_limits<double>::max();
+//  double final_r3_dt = 0.0;
+//  for (int i = 0; i < r3_dts_.size(); ++i) {
+//    weight_data.dt_r3 = r3_dts_[i];
+//    ImuCameraCalibrator imu_cam_calibrator_tmp(FLAGS_reestimate_biases);
+//    imu_cam_calibrator_tmp.InitSpline(recon_calib_dataset, T_i_c_init,
+//                                      weight_data, time_offset_imu_to_cam,
+//                                      gyro_bias, accl_bias, telemetry_data);
+//    imu_cam_calibrator_tmp.InitializeGravity(telemetry_data, accl_bias);
+//    double mean_reproj_err = imu_cam_calibrator_tmp.Optimize(30);
+//    std::cout << "T_i_c tmp "
+//              << imu_cam_calibrator_tmp.trajectory_.getT_i_c().matrix()
+//              << std::endl;
+//    std::cout << "Reprojection error after global shutter optimization" << mean_reproj_err<<"\n";
+//    if (FLAGS_calibrate_cam_readout) {
+
+//        ImuCameraCalibrator imu_cam_calibrator_tmp_rs(FLAGS_reestimate_biases);
+//        imu_cam_calibrator_tmp_rs.SetCalibrateRSLineDelay();
+//        imu_cam_calibrator_tmp_rs.InitSplinePosesFromSpline(recon_calib_dataset,
+//                                                            weight_data, time_offset_imu_to_cam,
+//                                                            gyro_bias, accl_bias, telemetry_data,
+//                                                            imu_cam_calibrator_tmp.trajectory_);
+
+//        mean_reproj_err = imu_cam_calibrator_tmp_rs.Optimize(30);
+//        std::cout << "Reprojection error after rolling shutter optimization" << mean_reproj_err<<"\n";
+//        std::cout << "Optimized sensor line delay: "
+//                  << imu_cam_calibrator_tmp_rs.trajectory_.GetOptimizedRSLineDelay() * 1e6
+//                  << "ns\n";
+//    }
+//    if (mean_reproj_err < min_error) {
+//      final_r3_dt = r3_dts_[i];
+//      min_error = mean_reproj_err;
+//    }
+//  }
   ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
   if (FLAGS_calibrate_cam_readout) {
-      imu_cam_calibrator.SetCalibrateCamReadoutTime();
+      imu_cam_calibrator.SetCalibrateRSLineDelay();
   }
   // final optimization with "optimal" spacing, however weighting is actually
   // not "correct" -> sew.py
-  std::cout << "FINAL OPTIMIZATION. Best r3_dt: " << final_r3_dt << "\n";
-  weight_data.dt_r3 = final_r3_dt;
+  //std::cout << "FINAL OPTIMIZATION. Best r3_dt: " << final_r3_dt << "\n";
+  //weight_data.dt_r3 = final_r3_dt;
   imu_cam_calibrator.InitSpline(recon_calib_dataset, T_i_c_init, weight_data,
                                 time_offset_imu_to_cam, gyro_bias, accl_bias,
                                 telemetry_data);
@@ -214,12 +224,12 @@ int main(int argc, char *argv[]) {
       imu_cam_calibrator.trajectory_.getT_i_c().so3().unit_quaternion();
   const Eigen::Vector3d t_i_c =
       imu_cam_calibrator.trajectory_.getT_i_c().translation();
-  const double readout_s =
-      imu_cam_calibrator.trajectory_.GetOptimizedReadoutTime();
+  const double line_delay_us =
+      imu_cam_calibrator.trajectory_.GetOptimizedRSLineDelay() * 1e6;
   std::cout << "T_i_c qw,qx,qy,qz: " << q_i_c.w() << " " << q_i_c.x() << " "
             << q_i_c.y() << " " << q_i_c.z() << std::endl;
   std::cout << "T_i_c t: " << t_i_c.transpose() << std::endl;
-  std::cout << "Final calibrated readout time: " << readout_s << "\n";
+  std::cout << "Final calibrated readout time: " << line_delay_us << "\n";
   std::cout << "mean_reproj: " << mean_reproj_err << std::endl;
   nlohmann::json json_calibspline_results_out;
 
@@ -233,7 +243,7 @@ int main(int argc, char *argv[]) {
   json_calibspline_results_out["final_reproj_error"] = mean_reproj_err;
   json_calibspline_results_out["r3_dt"] = weight_data.dt_r3;
   json_calibspline_results_out["so3_dt"] = weight_data.dt_so3;
-  json_calibspline_results_out["readout_s"] = readout_s;
+  json_calibspline_results_out["line_delay_us"] = line_delay_us;
   std::vector<double> cam_timestamps_s = imu_cam_calibrator.GetCamTimestamps();
   std::sort(cam_timestamps_s.begin(), cam_timestamps_s.end(), std::less<>());
 
@@ -390,7 +400,7 @@ int main(int argc, char *argv[]) {
                   cv::Point(20, 20), cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0,
                   cv::Scalar(255, 0, 0));
       cv::imshow("spline reprojection", image);
-      cv::waitKey(1);
+      cv::waitKey(0);
       ++nr_frames;
     }
   }

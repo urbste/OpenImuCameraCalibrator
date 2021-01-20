@@ -14,7 +14,7 @@ class TelemetryImporter:
         self.telemetry = {}
 
     def _remove_seconds(self, accl, gyro, timestamps_ns, skip_seconds):
-        skip_ns = skip_seconds * self.ns_to_sec
+        skip_ns = skip_seconds / self.ns_to_sec
 
         ds = timestamps_ns[1] - timestamps_ns[0]
         nr_remove = round(skip_ns / ds)

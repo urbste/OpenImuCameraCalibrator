@@ -14,7 +14,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_60_linear/dataset1', 
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_60/dataset2', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -28,21 +28,23 @@ def main():
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="PINHOLE", type=str)
+                        default="EXTENDED_UNIFIED", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 
                         type=float)
     parser.add_argument("--num_squares_x",
                         help="number of squares in x direction.",
-                        default=10)
+                        default=10) # 10 for charuco board, 14 radon board
     parser.add_argument("--num_squares_y",
                         help="number of squares in x direction.",
-                        default=8)
+                        default=8) # 8 for charuco board, 9 radon board
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
                         default=0.04)
-    parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
+    parser.add_argument("--use_rolling_shutter",
+                        help="If rolling shutter should be enabled", default=1)
+    parser.add_argument("--board_type", help="Board type (radon or charuco)", default="radon", type=str)
     parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=2.0, type=float)
@@ -104,9 +106,9 @@ def main():
     gopro_telemetry_gen = gopro_telemetry[:-5] + "_gen.json"
     imu_bias_telemetry_json_in_gen = imu_bias_telemetry_json_in[:-5] + "_gen.json"
 
-    # #
-    # # 0. Extract corners for camera calibration and camera imu calibration
-    # #
+    #
+    # 0. Extract corners for camera calibration and camera imu calibration
+    #
     # print("==================================================================")
     # print("Running corner extraction.")
     # print("==================================================================")   
@@ -189,83 +191,83 @@ def main():
     # print("==================================================================")
     
 
-    # #
-    # # 3. Convert gopro json telemetry to common format
-    # #
-    # telemetry_conv = TelemetryConverter()
-    # telemetry_conv.convert_gopro_telemetry_file(gopro_telemetry, gopro_telemetry_gen)
-    # telemetry_conv.convert_gopro_telemetry_file(imu_bias_telemetry_json_in, imu_bias_telemetry_json_in_gen)
+    #
+    # 3. Convert gopro json telemetry to common format
+    #
+    telemetry_conv = TelemetryConverter()
+    telemetry_conv.convert_gopro_telemetry_file(gopro_telemetry, gopro_telemetry_gen)
+    telemetry_conv.convert_gopro_telemetry_file(imu_bias_telemetry_json_in, imu_bias_telemetry_json_in_gen)
 
-    # #
-    # # 4. Estimating IMU biases
-    # #   
-    # py_imu_file = pjoin(args.path_to_src,"python","get_imu_biases.py")
-    # print("==================================================================")
-    # print("Estimating IMU biases.")
-    # print("==================================================================")
-    # start = time.time()
-    # bias_estimation = Popen(["python", py_imu_file,
-    #                    "--input_json_path=" + imu_bias_telemetry_json_in_gen,
-    #                    "--output_path=" + imu_bias_json,
-    #                    "--gravity_const=" + str(args.gravity_const),
-    #                    "--remove_sec=" + str(args.bias_calib_remove_s)])
-    # error_bias_estimation = bias_estimation.wait()
-    # print("==================================================================")
-    # print("IMU bias estimation took {:.2f}s.".format(time.time()-start))
-    # print("==================================================================")
+    #
+    # 4. Estimating IMU biases
+    #  
+    py_imu_file = pjoin(args.path_to_src,"python","get_imu_biases.py")
+    print("==================================================================")
+    print("Estimating IMU biases.")
+    print("==================================================================")
+    start = time.time()
+    bias_estimation = Popen(["python", py_imu_file,
+                       "--input_json_path=" + imu_bias_telemetry_json_in_gen,
+                       "--output_path=" + imu_bias_json,
+                       "--gravity_const=" + str(args.gravity_const),
+                       "--remove_sec=" + str(args.bias_calib_remove_s)])
+    error_bias_estimation = bias_estimation.wait()
+    print("==================================================================")
+    print("IMU bias estimation took {:.2f}s.".format(time.time()-start))
+    print("==================================================================")
 
-    # #
-    # # 5. Creating pose dataset for IMU - CAM calibration
-    # #   
-    # print("==================================================================")
-    # print("Estimating camera poses for IMU - CAM calibration.")
-    # print("==================================================================")
-    # start = time.time()
-    # pose_estimation = Popen([pjoin(bin_path,"estimate_camera_poses_from_checkerboard"),
-    #                    "--input_corners=" + cam_imu_corners_json,
-    #                    "--camera_calibration_json=" + calib_dataset_json,
-    #                    "--output_pose_dataset=" + pose_calib_dataset,
-    #                    "--optimize_board_points="+str(args.optimize_board_points)])
-    # error_pose_estimation = pose_estimation.wait()  
-    # print("==================================================================")
-    # print("Pose estimation estimation took {:.2f}s.".format(time.time()-start))
-    # print("==================================================================")
+    #
+    # 5. Creating pose dataset for IMU - CAM calibration
+    #   
+    print("==================================================================")
+    print("Estimating camera poses for IMU - CAM calibration.")
+    print("==================================================================")
+    start = time.time()
+    pose_estimation = Popen([pjoin(bin_path,"estimate_camera_poses_from_checkerboard"),
+                       "--input_corners=" + cam_imu_corners_json,
+                       "--camera_calibration_json=" + calib_dataset_json,
+                       "--output_pose_dataset=" + pose_calib_dataset,
+                       "--optimize_board_points="+str(args.optimize_board_points)])
+    error_pose_estimation = pose_estimation.wait()  
+    print("==================================================================")
+    print("Pose estimation estimation took {:.2f}s.".format(time.time()-start))
+    print("==================================================================")
 
-    # #
-    # # 6. Estimate spline error weighting parameters
-    # #   
-    # py_spline_file = pjoin(args.path_to_src,"python","get_sew_for_dataset.py")
-    # print("==================================================================")
-    # print("Estimating Spline error weighting and knot spacing.")
-    # print("==================================================================")
-    # start = time.time()
-    # spline_init = Popen(["python", py_spline_file,
-    #                    "--path_to_json=" + gopro_telemetry_gen,
-    #                    "--output_path=" + spline_weighting_json,
-    #                    "--q_so3=" + str(0.98),
-    #                    "--q_r3=" + str(0.98)])
-    # error_spline_init = spline_init.wait()  
-    # print("==================================================================")
-    # print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
-    # print("==================================================================")
+    #
+    # 6. Estimate spline error weighting parameters
+    #   
+    py_spline_file = pjoin(args.path_to_src,"python","get_sew_for_dataset.py")
+    print("==================================================================")
+    print("Estimating Spline error weighting and knot spacing.")
+    print("==================================================================")
+    start = time.time()
+    spline_init = Popen(["python", py_spline_file,
+                       "--path_to_json=" + gopro_telemetry_gen,
+                       "--output_path=" + spline_weighting_json,
+                       "--q_so3=" + str(0.99),
+                       "--q_r3=" + str(0.97)])
+    error_spline_init = spline_init.wait()  
+    print("==================================================================")
+    print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
+    print("==================================================================")
 
-    # #
-    # # 7. Estimate IMU to cam rotation
-    # #   
-    # print("==================================================================")
-    # print("Initializing IMU to camera rotation.")
-    # print("==================================================================")
-    # start = time.time()
-    # spline_init = Popen([pjoin(bin_path,"estimate_imu_to_camera_rotation"),
-    #                    "--telemetry_json=" + gopro_telemetry_gen,
-    #                    "--input_pose_calibration_dataset=" + pose_calib_dataset,
-    #                    "--imu_bias_estimate=" + imu_bias_json,
-    #                    "--imu_rotation_init_output=" + imu_cam_calibration_json,
-    #                    "--logtostderr=1"])
-    # error_spline_init = spline_init.wait()  
-    # print("==================================================================")
-    # print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
-    # print("==================================================================")
+    #
+    # 7. Estimate IMU to cam rotation
+    #   
+    print("==================================================================")
+    print("Initializing IMU to camera rotation.")
+    print("==================================================================")
+    start = time.time()
+    spline_init = Popen([pjoin(bin_path,"estimate_imu_to_camera_rotation"),
+                       "--telemetry_json=" + gopro_telemetry_gen,
+                       "--input_pose_calibration_dataset=" + pose_calib_dataset,
+                       "--imu_bias_estimate=" + imu_bias_json,
+                       "--imu_rotation_init_output=" + imu_cam_calibration_json,
+                       "--logtostderr=1"])
+    error_spline_init = spline_init.wait()  
+    print("==================================================================")
+    print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
+    print("==================================================================")
 
     #
     # 8. Run IMU to Camera calibration using Spline Fusion
@@ -286,6 +288,7 @@ def main():
                        "--result_output_json=" + cam_imu_result_json,
                        "--reestimate_biases="+str(args.reestimate_bias_spline_opt),
                        "--logtostderr=1",
+                       "--calibrate_cam_readout="+str(args.use_rolling_shutter),
                        "--debug_video_path="+cam_imu_video[0]])
     error_spline_init = spline_init.wait()  
     print("==================================================================")

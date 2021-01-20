@@ -197,8 +197,8 @@ struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> 
         sResiduals[2 * i + 0] = T(1e10);
         sResiduals[2 * i + 1] = T(1e10);
       } else {
-        sResiduals[2 * i + 0] = (reprojection[0] - T(corners->corners[i][0]));
-        sResiduals[2 * i + 1] = (reprojection[1] - T(corners->corners[i][1]));
+        sResiduals[2 * i + 0] = reprojection[0] - T(corners->corners[i][0]);
+        sResiduals[2 * i + 1] = reprojection[1] - T(corners->corners[i][1]);
       }
     }
 
@@ -230,12 +230,12 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
   CalibRSReprojectionCostFunctorSplit(const CalibCornerData *corner_data,
                                       const theia::Reconstruction *calib,
                                       const theia::Camera *cam,
-                                      double cam_readout_s, double u_so3,
+                                      double u_so3,
                                       double u_r3, double inv_so3_dt,
-                                      double inv_r3_dt)
+                                      double inv_r3_dt,
+                                      double weight = 1.0)
       : corners(corner_data), calib(calib), cam(cam), u_so3(u_so3), u_r3(u_r3),
-        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt),
-        row_delta(cam_readout_s / cam->ImageHeight()) {}
+        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt),  weight(weight) {}
 
   template <class T>
   bool operator()(T const *const *sKnots, T *sResiduals) const {
@@ -248,14 +248,11 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
 
     for (size_t i = 0; i < corners->track_ids.size(); i++) {
 
-      Eigen::Map<Vector1 const> const readout(sKnots[2 * N + 1]);
-
-      const T row_delta = readout[0] / T(cam->ImageHeight());
-
-      const T y_coord = T(corners->corners[i][1]);
-      const T t_so3_row = T(u_so3) + T(row_delta) * y_coord;
-      const T t_r3_row = T(u_r3) + T(row_delta) * y_coord;
-
+      Eigen::Map<Vector1 const> const line_delay(sKnots[2 * N + 1]);
+      //std::cout<<"line delay: "<<line_delay[0]<<"\n";
+      const T y_coord = T(corners->corners[i][1]) * line_delay[0];
+      const T t_so3_row = T(u_so3) + y_coord;
+      const T t_r3_row = T(u_r3) + y_coord;
       Sophus::SO3<T> R_w_i;
       CeresSplineHelper<T, N>::template evaluate_lie<Sophus::SO3>(
           sKnots, t_so3_row, T(inv_so3_dt), &R_w_i);
@@ -265,7 +262,6 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
                                                        T(inv_r3_dt), &t_w_i);
 
       Eigen::Map<Sophus::SE3<T> const> const T_i_c(sKnots[2 * N]);
-
 
       Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
       Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();
@@ -306,8 +302,8 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
           sResiduals[2 * i + 0] = T(1e10);
           sResiduals[2 * i + 1] = T(1e10);
         } else {
-          sResiduals[2 * i + 0] = T(1000.)*(reprojection[0] - T(corners->corners[i][0]));
-          sResiduals[2 * i + 1] = T(1000.)*(reprojection[1] - T(corners->corners[i][1]));
+          sResiduals[2 * i + 0] = T(weight) * reprojection[0] - T(corners->corners[i][0]);
+          sResiduals[2 * i + 1] = T(weight) * reprojection[1] - T(corners->corners[i][1]);
         }
       }
       return true;
@@ -316,10 +312,9 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
   const CalibCornerData *corners;
   const theia::Camera *cam;
   const theia::Reconstruction *calib;
-  double cam_readout_s;
   double u_so3;
   double u_r3;
   double inv_so3_dt;
   double inv_r3_dt;
-  double row_delta;
+  double weight;
 };

@@ -18,23 +18,36 @@ This is where the OpenGoProCalibrator comes in. With this toolbox you can:
 For this example I am using a GoPro 9. To calibrate the camera and the IMU to camera transformation we will use the following script: **python/run_gopro_calibration.
 The py**
 ```Python
-python python/run_gopro_calibration.py --path_calib_dataset=/your/path --checker_size_m=0.022 --image_downsample_factor=1 --camera_model=DIVISION_UNDISTORTION
+python python/run_gopro_calibration.py --path_calib_dataset=/your/path --checker_size_m=0.021 --image_downsample_factor=1 --camera_model=DIVISION_UNDISTORTION
 ```
 
 ## Results
 This section provides some results on my cameras. You can use this to verify your own results or use them as initial values for your application.
-Dataset | Camera | Setting | Camera model | Intrinsics (f, cx, cy) | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy,qz) (tx,ty,tz)_m | Final mean reproj error |
-|--|--|--|--|--|--|--|--|--|
-| Dataset 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Division Undistortion | (869.96, 975.68, 543.73) Dist: -3.586e-07 | -0.0813s | 0.01/0.0573 | (0.005904,-0.006493,-0.7094,0.70472), (-0.0016,-0.0185,-0.0054) | 1.86 pixel |
-| Dataset 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified | (872.00, 975.18, 543.479) Alpha: 0.4589 Beta: 1.2047  | -0.0813s | 0.01/0.0573 | (0.00573,-0.00617,-0.7097,0.7044),(-0.0015, -0.0185,-0.0053) | 1.86 pixel |
-| Dataset 3 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified | (871.94, 960.91, 551.49) Alpha: 0.60101 Beta: 0.8661  | -0.0815s | 0.01/0.0599 | (0.0016,-0.0004,-0.7119,0.7022),(-0.0005,-0.0188,-0.0061) | 1.94 pixel |
-| Dataset 1 | GoPro 9 | 960x540 / 120fps / Wide | Extended Unified | (438.51, 482.44, 276.41) Alpha: 0.5042 Beta: 1.1104  | -0.0564s | 0.01/0.0667 | (0.0027,-0.0005,-0.7107,0.703428),(-0.0006, -0.0212,  -0.0046) | 0.7411 pixel |
-| Dataset 1 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (438.18, 274.54, 276.41) Dist: -1.4747e-06  | -0.0129s | 0.025/0.089| (0.011,-0.0070,0.7065,-0.7075),(0.0012, -0.0167, 0.009) | 1.22 pixel |
-| Dataset 2 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (437.35, 474.16, 274.48) Dist: -1.4558e-06  | -0.0129s | 0.01/0.062| (0.009,-0.009,0.705,-0.7085),(0.006,-0.0156, 0.006) | 0.80 pixel |
+### Camera calibration
+Dataset | Camera | Setting | Camera model | Intrinsics (f, cx, cy) | Reproj error | 
+|--|--|--|--|--|--|--|--|--|--|
+| 1 | GoPro 9 | 1920x1080 / 60fps / Wide | Division Undistortion | (871.81, 980.123, 544.36) Dist: -3.588e-07 | 0.62 |
+| 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Double Sphere | (790.152, 978.640, 545.584) XI: -0.09694 Alpha: 0.52873  | 0.41 |
+| 3 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified | (871.94, 960.91, 551.49) Alpha: 0.6010 Beta: 0.8661  | 0.41 |
+<!-- | 4 | GoPro 9 | 960x540 / 120fps / Wide | Extended Unified | (438.51, 482.44, 276.41) Alpha: 0.5042 Beta: 1.1104  | 0.62 |
+| 5 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (438.18, 274.54, 276.41) Dist: -1.4747e-06  | 0.62 |
+| 6 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (437.35, 474.16, 274.48) Dist: -1.4558e-06  | 0.62 | -->
 
+### Imu to camera calibration
+Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy,qz) (tx,ty,tz)_m | Final mean reproj error |
+|--|--|--|--|--|
+1 | -0.0813s | 0.01/0.0573 | (0.005904,-0.006493,-0.7094,0.70472), (-0.0016,-0.0185,-0.0054) | 1.86 pixel |
+2 | -0.0813s | 0.01/0.0573 | (0.00573,-0.00617,-0.7097,0.7044),(-0.0015, -0.0185,-0.0053) | 1.86 pixel |
+3 | -0.0815s | 0.01/0.0599 | (0.0016,-0.0004,-0.7119,0.7022),(-0.0005,-0.0188,-0.0061) | 1.94 pixel |
+<!-- 4 | -0.0564s | 0.01/0.0667 | (0.0027,-0.0005,-0.7107,0.703428),(-0.0006, -0.0212,  -0.0046) | 0.7411 pixel |
+5 | -0.0129s | 0.025/0.089| (0.011,-0.0070,0.7065,-0.7075),(0.0012, -0.0167, 0.009) | 1.22 pixel |
+6 | -0.0129s | 0.01/0.062| (0.009,-0.009,0.705,-0.7085),(0.006,-0.0156, 0.006) | 0.80 pixel | -->
 
 ## Installation instructions
-ToDo
+
+1. Clone and build OpenCV
+
+2. Clone and build the TheiaSfM fork
 
 
 
@@ -73,16 +86,17 @@ ters, 1(1):137–144, Jan 2016.
 v0.1
 * [x] Code cleanup, add license header
 * [x] use different initialization for linear mode
-* [ ] Use more generic JSON meta data interface, so that others cameras can be calibrated that come with different telemetry formats
+* [x] Use more generic JSON meta data interface, so that others cameras can be calibrated that come with different telemetry formats
 * [ ] Beautify logs
 * [ ] Write example for calibration of Smartphone
 v0.2
 * [x] Rolling shutter calibration -> first resolve problems with templated spline functions
-* [ ] Add readout time as a optimizable parameter
+* [x] Add readout time as a optimizable parameter -> not working well, probably residual weighting needs to be improved
 * [ ] Model bias over time with a R3 spline
 * [ ] Pose estimation with UPNP or MLPnP to support arbitraty camera types. Right now: undistortion and then using vanilla PnP --> will lead to problems for Ultra Wide Angle fisheye lenses (e.g. GoPro Max or potentially Max lens mod)
+* [ ] Pose estimation with RSPnP
 * [ ] use only bearings in spline reproj error -> local tangent reprojection error
-* [ ] More accurate checkerboard (OpenCV has findCheckerboardSB. I integrated a first version but results were weird. Re-check...)
+* [ ] Accurate checkerboard detector (OpenCV has findCheckerboardSB. I integrated a first version but results were weird. Re-check...)
 * [ ] Model IMU - camera time difference continously (or at least optimize for different time windows)
 * [ ] Extend to multi-camera systems
 * [ ] Docker?

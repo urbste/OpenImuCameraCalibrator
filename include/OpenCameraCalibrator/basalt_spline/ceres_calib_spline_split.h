@@ -81,28 +81,25 @@ public:
     Sophus::SO3d rot;
     Eigen::Vector3d trans;
 
-    //    {
-    //      std::vector<const double *> vec;
-    //      for (int i = 0; i < N; i++) {
-    //        vec.emplace_back(so3_knots[s_so3 + i].data());
-    //      }
+    {
+      std::vector<const double *> vec;
+      for (int i = 0; i < N; i++) {
+        vec.emplace_back(so3_knots[s_so3 + i].data());
+      }
 
-    //      CeresSplineHelper<double, N>::template evaluate_lie<double,
-    //      Sophus::SO3>(
-    //          &vec[0], u_so3, inv_so3_dt, &rot);
-    //    }
+      CeresSplineHelper<double, N>::template evaluate_lie<Sophus::SO3>(
+          &vec[0], u_so3, inv_so3_dt, &rot);
+    }
 
-    //    {
-    //      std::vector<const double *> vec;
-    //      for (int i = 0; i < N; i++) {
-    //        vec.emplace_back(trans_knots[s_r3 + i].data());
-    //      }
+    {
+      std::vector<const double *> vec;
+      for (int i = 0; i < N; i++) {
+        vec.emplace_back(trans_knots[s_r3 + i].data());
+      }
 
-    //      CeresSplineHelper<double, N>::template evaluate<double, 3,
-    //      0>(&vec[0], u_r3,
-    //                                                            inv_r3_dt,
-    //                                                            &trans);
-    //    }
+      CeresSplineHelper<double, N>::template evaluate<3, 0>(
+          &vec[0], u_r3, inv_r3_dt, &trans);
+    }
 
     res = Sophus::SE3d(rot, trans);
 
@@ -185,6 +182,17 @@ public:
     accel = rot.inverse() * (trans_accel_world + g);
 
     return accel;
+  }
+
+  void initFromSpline(const OpenICC::so3_vector &so3_knots_old,
+                      const OpenICC::vec3_vector &trans_knots_old,
+                      const Eigen::Vector3d &g_old,
+                      const Sophus::SE3<double> &T_i_c_calib) {
+
+    so3_knots = so3_knots_old;
+    trans_knots = trans_knots_old;
+    g = g_old;
+    T_i_c = T_i_c_calib;
   }
 
   void initAll(
@@ -386,9 +394,9 @@ public:
 
   void addCornersMeasurement(const CalibCornerData *corners,
                              const theia::Reconstruction *calib,
-                             const theia::Camera *cam, int cam_id,
+                             const theia::Camera *cam,
                              int64_t time_ns,
-                             const double robust_loss_width = 1.345) {
+                             const double robust_loss_width = 3.0) {
     const int64_t st_ns = (time_ns - start_t_ns);
 
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
@@ -438,15 +446,13 @@ public:
 
     ceres::LossFunction *loss_function =
         new ceres::HuberLoss(robust_loss_width);
-    // ceres::LossFunctionWrapper* loss_function(, ceres::TAKE_OWNERSHIP);
     problem.AddResidualBlock(cost_function, loss_function, vec);
   }
 
   void addRSCornersMeasurement(const CalibCornerData *corners,
                                const theia::Reconstruction *calib,
-                               const theia::Camera *cam, double cam_readout_s,
-                               int cam_id, int64_t time_ns,
-                               const double robust_loss_width = 1.345) {
+                               const theia::Camera *cam, int64_t time_ns,
+                               const double robust_loss_width = 3.0) {
     const int64_t st_ns = (time_ns - start_t_ns);
 
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
@@ -468,8 +474,8 @@ public:
                               << trans_knots.size());
 
     using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
-    FunctorT *functor = new FunctorT(corners, calib, cam, cam_readout_s, u_so3,
-                                     u_r3, inv_so3_dt, inv_r3_dt);
+    FunctorT *functor =
+        new FunctorT(corners, calib, cam, u_so3, u_r3, inv_so3_dt, inv_r3_dt);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -483,7 +489,7 @@ public:
     // T_i_c
     cost_function->AddParameterBlock(7);
 
-    // cam readout time
+    // cam line delay time
     cost_function->AddParameterBlock(1);
 
     cost_function->SetNumResiduals(corners->track_ids.size() * 2);
@@ -495,15 +501,25 @@ public:
     for (int i = 0; i < N; i++) {
       vec.emplace_back(trans_knots[s_r3 + i].data());
     }
+    // camera to imu transformation
     vec.emplace_back(T_i_c.data());
-    vec.emplace_back(&cam_readout_time_s_);
+
+
+    // line delay for rolling shutter cameras
+    vec.emplace_back(&cam_line_delay_s_);
 
     ceres::LossFunction *loss_function =
         new ceres::HuberLoss(robust_loss_width);
     problem.AddResidualBlock(cost_function, loss_function, vec);
 
-    problem.SetParameterLowerBound(&cam_readout_time_s_, 0, 0.001);
-    problem.SetParameterUpperBound(&cam_readout_time_s_, 0, 0.2);
+//    problem.SetParameterLowerBound(&cam_line_delay_s_, 0, 0.0);
+//    problem.SetParameterUpperBound(&cam_line_delay_s_, 0, 1e-4);
+    problem.SetParameterBlockConstant(&cam_line_delay_s_);
+//    problem.SetParameterBlockConstant(T_i_c.data());
+//    for (int i = 0; i < N; i++) {
+//        problem.SetParameterBlockConstant(so3_knots[s_so3 + i].data());
+//        problem.SetParameterBlockConstant(trans_knots[s_r3 + i].data());
+//    }
   }
 
   int64_t maxTimeNs() const {
@@ -513,7 +529,7 @@ public:
   int64_t minTimeNs() const { return start_t_ns; }
 
   double meanRSReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
-                              &calib_corners) const {
+                                &calib_corners) const {
     double sum_error = 0;
     int num_points = 0;
 
@@ -547,8 +563,8 @@ public:
       using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
 
       FunctorT *functor =
-          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(),
-                       cam_readout_time_s_, u_so3, u_r3, inv_so3_dt, inv_r3_dt);
+          new FunctorT(&kv.second, &calib, &calib.View(0)->Camera(), u_so3,
+                       u_r3, inv_so3_dt, inv_r3_dt);
 
       ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
           new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -574,7 +590,7 @@ public:
       }
       // vec.emplace_back(calib.T_i_c[kv.first.cam_id].data());
       vec.emplace_back(T_i_c.data());
-      vec.emplace_back(&cam_readout_time_s_);
+      vec.emplace_back(&cam_line_delay_s_);
 
       {
         Eigen::VectorXd residual;
@@ -584,7 +600,7 @@ public:
 
         for (size_t i = 0; i < kv.second.track_ids.size(); i++) {
           Eigen::Vector2d res_point = residual.segment<2>(2 * i);
-          res_point /= 1000.0;
+          // res_point /= 1000.0;
           if (res_point[0] != 0.0 && res_point[1] != 0.0) {
             sum_error += res_point.norm();
             num_points += 1;
@@ -600,7 +616,7 @@ public:
   }
 
   double meanReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
-                                &calib_corners) const {
+                              &calib_corners) const {
     double sum_error = 0;
     int num_points = 0;
 
@@ -728,16 +744,19 @@ public:
     track_ids.clear();
   }
 
-  void SetInitialCamReadoutTime(const double readout_s) {
-    cam_readout_time_s_ = readout_s;
+  void SetInitialRSLineDelay(const double cam_line_delay) {
+    cam_line_delay_s_ = cam_line_delay;
   }
 
-  double GetOptimizedReadoutTime() { return cam_readout_time_s_; }
+  double GetOptimizedRSLineDelay() { return cam_line_delay_s_; }
+
+  void GetSO3Knots(OpenICC::so3_vector& so3_knots_out) { so3_knots_out = so3_knots; }
+  void GetR3Knots(OpenICC::vec3_vector& r3_knots_out) { r3_knots_out = trans_knots; }
 
 private:
   int64_t dt_so3_ns, dt_r3_ns, start_t_ns;
   double inv_so3_dt, inv_r3_dt;
-  double cam_readout_time_s_;
+  double cam_line_delay_s_;
 
   OpenICC::so3_vector so3_knots;
   OpenICC::vec3_vector trans_knots;
