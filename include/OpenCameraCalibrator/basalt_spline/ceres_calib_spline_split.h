@@ -396,7 +396,7 @@ public:
                              const theia::Reconstruction *calib,
                              const theia::Camera *cam,
                              int64_t time_ns,
-                             const double robust_loss_width = 3.0) {
+                             const double robust_loss_width = 5.0) {
     const int64_t st_ns = (time_ns - start_t_ns);
 
     BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
@@ -475,7 +475,7 @@ public:
 
     using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
     FunctorT *functor =
-        new FunctorT(corners, calib, cam, u_so3, u_r3, inv_so3_dt, inv_r3_dt);
+        new FunctorT(corners, calib, cam, u_so3, u_r3, inv_so3_dt, inv_r3_dt, 1.0);
 
     ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -512,10 +512,13 @@ public:
         new ceres::HuberLoss(robust_loss_width);
     problem.AddResidualBlock(cost_function, loss_function, vec);
 
-//    problem.SetParameterLowerBound(&cam_line_delay_s_, 0, 0.0);
-//    problem.SetParameterUpperBound(&cam_line_delay_s_, 0, 1e-4);
-    problem.SetParameterBlockConstant(&cam_line_delay_s_);
-//    problem.SetParameterBlockConstant(T_i_c.data());
+    problem.SetParameterLowerBound(&cam_line_delay_s_, 0, 1e-6);
+    problem.SetParameterUpperBound(&cam_line_delay_s_, 0, 1e-3);
+    if (cam_line_delay_s_ == 0.0) {
+        problem.SetParameterBlockConstant(&cam_line_delay_s_);
+    }
+    //problem.SetParameterBlockConstant(T_i_c.data());
+
 //    for (int i = 0; i < N; i++) {
 //        problem.SetParameterBlockConstant(so3_knots[s_so3 + i].data());
 //        problem.SetParameterBlockConstant(trans_knots[s_r3 + i].data());

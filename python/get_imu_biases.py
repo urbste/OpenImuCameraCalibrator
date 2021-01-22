@@ -56,15 +56,15 @@ def main():
     with open(args.output_path, 'w') as json_dump:
         json.dump(biases, json_dump)
 
-    plt.plot(gyro_np[:,0],label='x')
-    plt.plot(gyro_np[:,1],label='y')
-    plt.plot(gyro_np[:,2],label='z')
-    plt.show()
+    # plt.plot(gyro_np[:,0],label='x')
+    # plt.plot(gyro_np[:,1],label='y')
+    # plt.plot(gyro_np[:,2],label='z')
+    # plt.show()
 
-    plt.plot(accl_np[:,0],'r',label='x')
-    plt.plot(accl_np[:,1],'g',label='y')
-    plt.plot(accl_np[:,2],'b',label='z')
-    plt.show()
+    # plt.plot(accl_np[:,0],'r',label='x')
+    # plt.plot(accl_np[:,1],'g',label='y')
+    # plt.plot(accl_np[:,2],'b',label='z')
+    # plt.show()
 
 
 if __name__ == "__main__":

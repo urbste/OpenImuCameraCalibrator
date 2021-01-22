@@ -25,6 +25,7 @@
 #include "OpenCameraCalibrator/utils/utils.h"
 
 #include <theia/io/reconstruction_writer.h>
+#include <theia/io/write_ply_file.h>
 
 using namespace OpenICC::core;
 using namespace OpenICC::io;
@@ -57,6 +58,7 @@ int main(int argc, char *argv[]) {
   LOG(INFO) << "Finished pose estimation.\n";
   pose_estimator.OptimizeAllPoses();
   if (FLAGS_optimize_board_points) {
+      LOG(INFO) << "Optimizing board points.\n";
       pose_estimator.OptimizeBoardPoints();
       pose_estimator.OptimizeAllPoses();
   }
@@ -64,6 +66,7 @@ int main(int argc, char *argv[]) {
   theia::Reconstruction pose_dataset;
   pose_estimator.GetPoseDataset(pose_dataset);
   theia::WriteReconstruction(pose_dataset, FLAGS_output_pose_dataset);
+  theia::WritePlyFile(FLAGS_output_pose_dataset+".ply", pose_dataset, Eigen::Vector3i(255,0,0), 2);
 
   return 0;
 }

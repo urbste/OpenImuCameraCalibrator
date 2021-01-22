@@ -51,12 +51,11 @@ public:
   void InitializeGravity(const OpenICC::CameraTelemetryData &telemetry_data,
                          const Eigen::Vector3d &accl_bias);
 
-  double Optimize(const int iterations);
+  std::vector<double> Optimize(const int iterations);
 
   void ToTheiaReconDataset(theia::Reconstruction &output_recon);
 
   void ClearSpline();
-
 
   CeresCalibrationSplineSplit<SPLINE_N, USE_OLD_TIME_DERIV> trajectory_;
 
@@ -75,8 +74,8 @@ public:
 
   void SetCalibrateRSLineDelay() { calibrate_cam_line_delay_ = true; }
   bool GetCalibrateRSLineDelay() { return calibrate_cam_line_delay_; }
-  double GetRSLineDelay() { return cam_line_delay_s_; }
-
+  double GetCalibratedRSLineDelay() { return trajectory_.GetOptimizedRSLineDelay(); }
+  double GetInitialRSLineDelay() { return inital_cam_line_delay_s_; }
 private:
   //! camera timestamps
   std::vector<double> cam_timestamps_;
@@ -102,7 +101,7 @@ private:
   uint64_t nr_knots_r3_;
 
   //! camera readout time, init global shutter = 0.0
-  double cam_line_delay_s_ = 0.0;
+  double inital_cam_line_delay_s_ = 0.0;
   bool calibrate_cam_line_delay_ = false;
 
   //! is gravity direction in sensor frame is initialized

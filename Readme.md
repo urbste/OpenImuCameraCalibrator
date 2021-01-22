@@ -25,29 +25,39 @@ python python/run_gopro_calibration.py --path_calib_dataset=/your/path --checker
 This section provides some results on my cameras. You can use this to verify your own results or use them as initial values for your application.
 ### Camera calibration
 Dataset | Camera | Setting | Camera model | Intrinsics (f, cx, cy) | Reproj error | 
-|--|--|--|--|--|--|--|--|--|--|
-| 1 | GoPro 9 | 1920x1080 / 60fps / Wide | Division Undistortion | (871.81, 980.123, 544.36) Dist: -3.588e-07 | 0.62 |
-| 2 | GoPro 9 | 1920x1080 / 60fps / Wide | Double Sphere | (790.152, 978.640, 545.584) XI: -0.09694 Alpha: 0.52873  | 0.41 |
-| 3 | GoPro 9 | 1920x1080 / 60fps / Wide | Extended Unified | (871.94, 960.91, 551.49) Alpha: 0.6010 Beta: 0.8661  | 0.41 |
-<!-- | 4 | GoPro 9 | 960x540 / 120fps / Wide | Extended Unified | (438.51, 482.44, 276.41) Alpha: 0.5042 Beta: 1.1104  | 0.62 |
-| 5 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (438.18, 274.54, 276.41) Dist: -1.4747e-06  | 0.62 |
-| 6 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (437.35, 474.16, 274.48) Dist: -1.4558e-06  | 0.62 | -->
+|--|--|--|--|--|--|
+| 1 | GoPro 9 | 960x540 / 60fps / Wide | Division Undistortion | (871.81, 980.123, 544.36) Dist: -3.588e-07 | 0.62 |
+| 2 | GoPro 9 | 960x540 / 60fps / Wide | Double Sphere | (790.152, 978.640, 545.584) XI: -0.09694 Alpha: 0.52873  | 0.41 |
+| 3 | GoPro 9 | 960x540 / 60fps / Wide | Extended Unified | (871.94, 960.91, 551.49) Alpha: 0.6010 Beta: 0.8661  | 0.41 |
+| 4 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (438.59, 480.80, 274.80) Dist: -1.47079-06  | 0.09 |
+| 5 | GoPro 6 | 960x540 / 60fps / Wide | Double Sphere | (342.43, 472.60, 273.88) XI: -0.215 Alpha 0.5129 | 0.16 | 
+| 5 | GoPro 6 | 960x540 / 60fps / Wide | Fisheye | (439.13, 479.66, 273.19) d1: 0.046, d2: 0.064, d3:-0.10, d4: 0.052 | 0.17 | 
 
 ### Imu to camera calibration
-Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy,qz) (tx,ty,tz)_m | Final mean reproj error |
+
+#### Without Rolling Shutter
+
+
+#### With Rolling Shutter
+Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy,qz) (tx,ty,tz)_m | RS Line delay init / calib | Final mean reproj error |
 |--|--|--|--|--|
-1 | -0.0813s | 0.01/0.0573 | (0.005904,-0.006493,-0.7094,0.70472), (-0.0016,-0.0185,-0.0054) | 1.86 pixel |
-2 | -0.0813s | 0.01/0.0573 | (0.00573,-0.00617,-0.7097,0.7044),(-0.0015, -0.0185,-0.0053) | 1.86 pixel |
-3 | -0.0815s | 0.01/0.0599 | (0.0016,-0.0004,-0.7119,0.7022),(-0.0005,-0.0188,-0.0061) | 1.94 pixel |
-<!-- 4 | -0.0564s | 0.01/0.0667 | (0.0027,-0.0005,-0.7107,0.703428),(-0.0006, -0.0212,  -0.0046) | 0.7411 pixel |
-5 | -0.0129s | 0.025/0.089| (0.011,-0.0070,0.7065,-0.7075),(0.0012, -0.0167, 0.009) | 1.22 pixel |
-6 | -0.0129s | 0.01/0.062| (0.009,-0.009,0.705,-0.7085),(0.006,-0.0156, 0.006) | 0.80 pixel | -->
+1 | -0.0813s | 0.1/0.056 | (0.0052,-0.0066,-0.7077,0.7064), (0.0065,-0.0182,-0.0035) | 30.895 / 90.84 | 0.87 pixel |
+2 | -0.0813s | 0.1/0.048 | (0.0051,-0.0068,-0.7083,0.7057),(0.0033, -0.017,-0.0021)| 30.895 / 99.34| 0.88 pixel |
+3 | -0.0815s | 0.1/0.050 | (0.0001,-0.0002,0.7102,-0.7039),(0.0105,-0.0165,-0.002)| 30.895 / 82.235 | 0.88 pixel |
+4 | -0.0129s | 0.15/0.062| (-0.005,0.003,-0.706,0.7080),(0.007, -0.015, 0.009) | 30.895 / 1.0 | 0.80 pixel |
+5 | -0.0129s | 0.15/0.051| (0.003,-0.009,0.705,-0.7085),(0.003,-0.028, 0.012) | 30.895 / 1.0 | 0.61 pixel | 
+5 | -0.0129s | 0.15/0.054| (0.006,-0.006,0.706,-0.7072),(0.004,-0.026, 0.007) | 30.895 / 1.0| 0.65 pixel | 
 
 ## Installation instructions
 
-1. Clone and build OpenCV
+1. Clone and build OpenCV > 4.5
 
 2. Clone and build the TheiaSfM fork
+```
+git clone https://github.com/urbste/TheiaSfM
+```
+
+3. Build this project
 
 
 
@@ -90,6 +100,7 @@ v0.1
 * [ ] Beautify logs
 * [ ] Write example for calibration of Smartphone
 v0.2
+* [ ] Model time delay for optimization
 * [x] Rolling shutter calibration -> first resolve problems with templated spline functions
 * [x] Add readout time as a optimizable parameter -> not working well, probably residual weighting needs to be improved
 * [ ] Model bias over time with a R3 spline
