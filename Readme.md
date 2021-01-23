@@ -1,4 +1,6 @@
 # OpenICC: OpenImuCameraCalibrator
+WORK IN PROGRESS
+
 I developed this repository to experiment with the accurate calibration of action cameras (e.g. GoPro cameras) to use them for geometric vision tasks like Structure-from-Motion, Photogrammetry and SLAM. Modern action cameras are equipped with various sensors like IMUs (accelerometer, gyroscope and magnetometer) and GPS. However the calibration data (e.g. camera projection and IMU to camera transformations) is not available.
 
 This is where the OpenImuCameraCalibrator comes in. With this toolbox you can:
