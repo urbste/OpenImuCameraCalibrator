@@ -199,7 +199,7 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
     }
 
     const double timstamp_s = input_video.get(cv::CAP_PROP_POS_MSEC) * 1e-3;
-    const std::string view_us = std::to_string(timstamp_s * 1e6);
+    const std::string view_us = std::to_string(timstamp_s * S_TO_US);
     ++frame_cnt;
 
     const double fxfy = 1. / img_downsample_factor;

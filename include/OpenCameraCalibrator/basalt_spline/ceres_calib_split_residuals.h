@@ -165,7 +165,7 @@ struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> 
     for (int i = 0; i < cam->CameraIntrinsics()->NumParameters(); ++i) {
       intr[i] = T(cam->intrinsics()[i]);
     }
-    for (size_t i = 0; i < corners->track_ids.size(); i++) {
+    for (size_t i = 0; i < corners->track_ids.size(); ++i) {
       Vector3 p3d =
           (T_c_w_matrix * calib->Track(corners->track_ids[i])->Point())
               .hnormalized();
@@ -246,7 +246,7 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
 
     using Matrix4 = Eigen::Matrix<T, 4, 4>;
 
-    for (size_t i = 0; i < corners->track_ids.size(); i++) {
+    for (size_t i = 0; i < corners->track_ids.size(); ++i) {
 
       Eigen::Map<Vector1 const> const line_delay(sKnots[2 * N + 1]);
       //std::cout<<"line delay: "<<line_delay[0]<<"\n";
@@ -270,7 +270,7 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
       for (int i = 0; i < cam->CameraIntrinsics()->NumParameters(); ++i) {
         intr[i] = T(cam->intrinsics()[i]);
       }
-      for (size_t i = 0; i < corners->track_ids.size(); i++) {
+      for (size_t i = 0; i < corners->track_ids.size(); ++i) {
         Vector3 p3d =
             (T_c_w_matrix * calib->Track(corners->track_ids[i])->Point())
                 .hnormalized();

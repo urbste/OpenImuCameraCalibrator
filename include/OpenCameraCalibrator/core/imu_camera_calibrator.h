@@ -39,19 +39,17 @@ public:
                   const double time_offset_imu_to_cam,
                   const Eigen::Vector3d &gyro_bias,
                   const Eigen::Vector3d &accl_bias,
-                  const OpenICC::CameraTelemetryData &telemetry_data);
-
-  void InitSplinePosesFromSpline(const theia::Reconstruction &calib_dataset,
-          const SplineWeightingData &spline_weight_data,
-          const double time_offset_imu_to_cam, const Eigen::Vector3d &gyro_bias,
-          const Eigen::Vector3d &accl_bias,
-          const OpenICC::CameraTelemetryData &telemetry_data,
-          CeresCalibrationSplineSplit<SPLINE_N, USE_OLD_TIME_DERIV> &trajectory);
+                  const OpenICC::CameraTelemetryData &telemetry_data,
+                  const double initial_line_delay);
 
   void InitializeGravity(const OpenICC::CameraTelemetryData &telemetry_data,
                          const Eigen::Vector3d &accl_bias);
 
-  std::vector<double> Optimize(const int iterations);
+  double Optimize(const int iterations,
+                  const bool fix_so3_spline,
+                  const bool fix_r3_spline,
+                  const bool fix_T_i_c,
+                  const bool fix_line_delay);
 
   void ToTheiaReconDataset(theia::Reconstruction &output_recon);
 
@@ -64,27 +62,33 @@ public:
 
   //! get gyroscope measurements
   aligned_map<double, Eigen::Vector3d> GetGyroMeasurements() {
-    return gyro_measurements;
+    return gyro_measurements_;
   }
 
   //! get accelerometer measurements
   aligned_map<double, Eigen::Vector3d> GetAcclMeasurements() {
-    return accl_measurements;
+    return accl_measurements_;
   }
 
   void SetCalibrateRSLineDelay() { calibrate_cam_line_delay_ = true; }
   bool GetCalibrateRSLineDelay() { return calibrate_cam_line_delay_; }
-  double GetCalibratedRSLineDelay() { return trajectory_.GetOptimizedRSLineDelay(); }
+  void SetRSLineDelay(const double line_delay) {
+    inital_cam_line_delay_s_ = line_delay;
+  }
+  double GetCalibratedRSLineDelay() {
+    return trajectory_.GetOptimizedRSLineDelay();
+  }
   double GetInitialRSLineDelay() { return inital_cam_line_delay_s_; }
+
 private:
   //! camera timestamps
   std::vector<double> cam_timestamps_;
 
   //! accl measurements
-  aligned_map<double, Eigen::Vector3d> gyro_measurements;
+  aligned_map<double, Eigen::Vector3d> gyro_measurements_;
 
   //! gyro measurements
-  aligned_map<double, Eigen::Vector3d> accl_measurements;
+  aligned_map<double, Eigen::Vector3d> accl_measurements_;
 
   //! imu update rate in hz
   double imu_update_rate_hz_;
@@ -100,7 +104,7 @@ private:
   uint64_t nr_knots_so3_;
   uint64_t nr_knots_r3_;
 
-  //! camera readout time, init global shutter = 0.0
+  //! camera line delay, init global shutter = 0.0
   double inital_cam_line_delay_s_ = 0.0;
   bool calibrate_cam_line_delay_ = false;
 

@@ -14,7 +14,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro6/1080_60/dataset2', 
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro6/1080_60/dataset1', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="DOUBLE_SPHERE", type=str)
+                        default="FISHEYE", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 
@@ -42,15 +42,15 @@ def main():
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
                         default=0.04)
-    parser.add_argument("--use_rolling_shutter",
-                        help="If rolling shutter should be enabled", default=0)
+    parser.add_argument("--calib_cam_line_delay",
+                        help="If camera line delay should be calibrated", default=1)
     parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
     parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
     parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=0, type=int)
     parser.add_argument("--optimize_board_points", help="if board points should be optimized during camera calibration and after pose estimation.", default=1, type=int)
-    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
+    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=1, type=int)
 
     args = parser.parse_args()
 
@@ -234,23 +234,23 @@ def main():
     # print("Pose estimation estimation took {:.2f}s.".format(time.time()-start))
     # print("==================================================================")
 
-    # # 
-    # # 6. Estimate spline error weighting parameters
-    # #  
-    # py_spline_file = pjoin(args.path_to_src,"python","get_sew_for_dataset.py")
-    # print("==================================================================")
-    # print("Estimating Spline error weighting and knot spacing.")
-    # print("==================================================================")
-    # start = time.time()
-    # spline_init = Popen(["python", py_spline_file,
-    #                    "--path_to_json=" + gopro_telemetry_gen,
-    #                    "--output_path=" + spline_weighting_json,
-    #                    "--q_so3=" + str(0.99),
-    #                    "--q_r3=" + str(0.97)])
-    # error_spline_init = spline_init.wait()  
-    # print("==================================================================")
-    # print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
-    # print("==================================================================")
+    # 
+    # 6. Estimate spline error weighting parameters
+    #  
+    py_spline_file = pjoin(args.path_to_src,"python","get_sew_for_dataset.py")
+    print("==================================================================")
+    print("Estimating Spline error weighting and knot spacing.")
+    print("==================================================================")
+    start = time.time()
+    spline_init = Popen(["python", py_spline_file,
+                       "--path_to_json=" + gopro_telemetry_gen,
+                       "--output_path=" + spline_weighting_json,
+                       "--q_so3=" + str(0.99),
+                       "--q_r3=" + str(0.99)])
+    error_spline_init = spline_init.wait()  
+    print("==================================================================")
+    print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))
+    print("==================================================================")
 
     #
     # 7. Estimate IMU to cam rotation
@@ -289,7 +289,7 @@ def main():
                        "--result_output_json=" + cam_imu_result_json,
                        "--reestimate_biases="+str(args.reestimate_bias_spline_opt),
                        "--logtostderr=1",
-                       "--calibrate_cam_readout="+str(args.use_rolling_shutter),
+                       "--calibrate_cam_line_delay="+str(args.calib_cam_line_delay),
                        "--debug_video_path="+cam_imu_video[0]])
     error_spline_init = spline_init.wait()  
     print("==================================================================")

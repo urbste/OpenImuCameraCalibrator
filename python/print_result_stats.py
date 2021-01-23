@@ -42,13 +42,13 @@ def main():
     gyro_spline_np = np.asarray(gyro_spline)
     gyro_imu_np = np.asarray(gyro_imu)
     t_np = np.asarray(t)
-    skip = 1
+    skip = 4
 
     labels = ['spline x', 'imu y', 
             'spline y', 'imu y', 
             'spline z', 'imu z'] 
 
-    fig, ax = plt.subplots(1,2)
+    fig, ax = plt.subplots(2,1)
     ax[0].set_title("Accelerometer - Spline value vs Measurements")
     ax[0].plot(accl_spline_np[0:-1:skip,0], 'r')
     ax[0].plot(accl_imu_np[0:-1:skip,0], 'r--')

@@ -17,9 +17,6 @@ class CeresRSCalibrationSplineSplit {
   static constexpr int N = _N;        // Order of the spline.
   static constexpr int DEG = _N - 1;  // Degree of the spline.
 
-  static constexpr double ns_to_s = 1e-9;  ///< Nanosecond to second conversion
-  static constexpr double s_to_ns = 1e9;   ///< Second to nanosecond conversion
-
   CeresRSCalibrationSplineSplit(int64_t time_interval_ns,
                                 int64_t start_time_ns = 0)
       : dt_ns(time_interval_ns), start_t_ns(start_time_ns) {

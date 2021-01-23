@@ -86,7 +86,7 @@ theia::ViewId CameraCalibrator::AddView(
     const int &image_height, const double &timestamp_s,
     const theia::CameraIntrinsicsGroupId group_id) {
   // fill charucoCorners to theia reconstruction
-  std::string view_name = std::to_string((uint64_t)(timestamp_s * 1e6));
+  std::string view_name = std::to_string((uint64_t)(timestamp_s * S_TO_US));
   theia::ViewId view_id =
       recon_calib_dataset_.AddView(view_name, group_id, timestamp_s);
   theia::View *theia_view = recon_calib_dataset_.MutableView(view_id);

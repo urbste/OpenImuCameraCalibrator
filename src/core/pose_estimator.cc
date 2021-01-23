@@ -131,7 +131,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
                 << "s. Not enough points found.";
       continue;
     }
-    std::string view_name = std::to_string((uint64_t)(timestamp_s * 1e6));
+    std::string view_name = std::to_string((uint64_t)(timestamp_s * S_TO_US));
     theia::ViewId view_id = pose_dataset_.AddView(view_name, 0, timestamp_s);
 
     theia::Camera* cam = pose_dataset_.MutableView(view_id)->MutableCamera();

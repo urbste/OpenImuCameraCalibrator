@@ -47,8 +47,8 @@ bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
   }
 
   for (const auto& t : timestamps_ns) {
-      telemetry.accelerometer.timestamp_ms.emplace_back((double)t * 1e-6);
-      telemetry.gyroscope.timestamp_ms.emplace_back((double)t * 1e-6);
+      telemetry.accelerometer.timestamp_ms.emplace_back((double)t * US_TO_S);
+      telemetry.gyroscope.timestamp_ms.emplace_back((double)t * US_TO_S);
   }
   for (const auto& a : accl) {
       Eigen::Vector3d v;

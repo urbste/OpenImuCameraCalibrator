@@ -26,6 +26,15 @@
 
 namespace OpenICC {
 
+const double NS_TO_S = 1e-9; ///< Nanosecond to second conversion
+const double S_TO_NS = 1e9;  ///< Second to nanosecond conversion
+
+const double US_TO_S = 1e-6; ///< Museconds to second conversion
+const double S_TO_US = 1e6;  ///< Second to museconds conversion
+
+const double MS_TO_S = 1e-3; ///< Milliseconds to second conversion
+const double S_TO_MS = 1e3;  ///< Second to milliseconds conversion
+
 // alignment stuff
 template <typename T>
 using aligned_vector = std::vector<T, Eigen::aligned_allocator<T>>;

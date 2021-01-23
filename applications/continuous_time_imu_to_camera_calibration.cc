@@ -56,8 +56,8 @@ DEFINE_string(imu_bias_file, "", "IMU bias json");
 DEFINE_string(spline_error_weighting_json, "",
               "Path to spline error weighting data");
 DEFINE_string(output_path, "", "");
-DEFINE_bool(calibrate_cam_readout, false,
-            "If camera rolling shutter readout should be calibrated.");
+DEFINE_bool(calibrate_cam_line_delay, false,
+            "If camera rolling shutter line delay should be calibrated.");
 DEFINE_string(result_output_json, "", "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 DEFINE_bool(reestimate_biases, false,
@@ -111,8 +111,8 @@ int main(int argc, char *argv[]) {
   }
   for (const auto &view : scene_json["views"].items()) {
     const double timestamp_us = std::stod(view.key());
-    const double timestamp_s = timestamp_us * 1e-6; // to seconds
-    std::string view_name = std::to_string((uint64_t)(timestamp_s * 1e6));
+    const double timestamp_s = timestamp_us * US_TO_S; // to seconds
+    std::string view_name = std::to_string((uint64_t)timestamp_us);
     theia::ViewId view_id =
         recon_calib_dataset.AddView(view_name, 0, timestamp_s);
 
@@ -161,19 +161,22 @@ int main(int argc, char *argv[]) {
       ReadSplineErrorWeighting(FLAGS_spline_error_weighting_json, weight_data))
       << "Could not open " << FLAGS_spline_error_weighting_json;
 
-  ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
-  if (FLAGS_calibrate_cam_readout) {
-    imu_cam_calibrator.SetCalibrateRSLineDelay();
-  }
+  const double init_line_delay_us = 1./ fps / camera.ImageHeight();
 
+  ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
   imu_cam_calibrator.InitSpline(recon_calib_dataset, T_i_c_init, weight_data,
                                 time_offset_imu_to_cam, gyro_bias, accl_bias,
-                                telemetry_data);
+                                telemetry_data, init_line_delay_us);
   imu_cam_calibrator.InitializeGravity(telemetry_data, accl_bias);
-  std::vector<double> reproj_errors = imu_cam_calibrator.Optimize(15);
+  double reproj_error = imu_cam_calibrator.Optimize(20, false, false, false, true);
+  double reproj_error_after_ld = reproj_error;
+  if (FLAGS_calibrate_cam_line_delay) {
+     reproj_error_after_ld = imu_cam_calibrator.Optimize(5, true, true, true, false);
+  }
 
-  LOG(INFO) << "Mean reprojection error (global shutter, rolling shutter) "
-            << reproj_errors[0] << "/" << reproj_errors[1] << "px\n";
+  LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";
+  LOG(INFO) << "Mean reprojection error after line delay optim " << reproj_error_after_ld << "px\n";
+
   std::cout << "g: " << imu_cam_calibrator.trajectory_.getG().transpose()
             << std::endl;
   std::cout << "accel_bias: "
@@ -187,12 +190,11 @@ int main(int argc, char *argv[]) {
   const Eigen::Vector3d t_i_c =
       imu_cam_calibrator.trajectory_.getT_i_c().translation();
   const double calib_line_delay_us =
-      imu_cam_calibrator.GetCalibratedRSLineDelay() * 1e6;
-  const double init_line_delay_us = imu_cam_calibrator.GetInitialRSLineDelay() * 1e6;
+      imu_cam_calibrator.GetCalibratedRSLineDelay() * S_TO_US;
   std::cout << "T_i_c qw,qx,qy,qz: " << q_i_c.w() << " " << q_i_c.x() << " "
             << q_i_c.y() << " " << q_i_c.z() << std::endl;
   std::cout << "T_i_c t: " << t_i_c.transpose() << std::endl;
-  std::cout << "Initialized line delay [us]: " << init_line_delay_us << "\n";
+  std::cout << "Initialized line delay [us]: " << imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US << "\n";
   std::cout << "Calibrated line delay [us]: " << calib_line_delay_us << "\n";
   nlohmann::json json_calibspline_results_out;
 
@@ -203,11 +205,10 @@ int main(int argc, char *argv[]) {
   json_calibspline_results_out["t_i_c"]["x"] = t_i_c[0];
   json_calibspline_results_out["t_i_c"]["y"] = t_i_c[1];
   json_calibspline_results_out["t_i_c"]["z"] = t_i_c[2];
-  json_calibspline_results_out["final_gl_shut_reproj_error"] = reproj_errors[0];
-  json_calibspline_results_out["final_rl_shut_reproj_error"] = reproj_errors[1];
+  json_calibspline_results_out["final_reproj_error"] = reproj_error;
   json_calibspline_results_out["r3_dt"] = weight_data.dt_r3;
   json_calibspline_results_out["so3_dt"] = weight_data.dt_so3;
-  json_calibspline_results_out["init_line_delay_us"] = init_line_delay_us;
+  json_calibspline_results_out["init_line_delay_us"] = imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US;
   json_calibspline_results_out["calib_line_delay_us"] = calib_line_delay_us;
   std::vector<double> cam_timestamps_s = imu_cam_calibrator.GetCamTimestamps();
   std::sort(cam_timestamps_s.begin(), cam_timestamps_s.end(), std::less<>());
@@ -219,7 +220,7 @@ int main(int argc, char *argv[]) {
 
   // Evaluate spline for all accelerometer and gyro and output them
   for (auto &g : gyro_meas) {
-    const int64_t t_ns = g.first * 1e9;
+    const int64_t t_ns = g.first * S_TO_NS;
     const std::string t_ns_s = std::to_string(t_ns);
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["x"] =
         g.second[0];
@@ -237,7 +238,7 @@ int main(int argc, char *argv[]) {
         gyro_spline[2];
   }
   for (auto &a : accl_meas) {
-    const int64_t t_ns = a.first * 1e9;
+    const int64_t t_ns = a.first * S_TO_NS;
     const std::string t_ns_s = std::to_string(t_ns);
     // accelerometer
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["x"] =
@@ -264,7 +265,7 @@ int main(int argc, char *argv[]) {
   // read camera calibration
   theia::Reconstruction output_spline_recon;
   for (size_t i = 0; i < cam_timestamps_s.size(); ++i) {
-    const int64_t t_ns = cam_timestamps_s[i] * 1e9;
+    const int64_t t_ns = cam_timestamps_s[i] * S_TO_NS;
     Sophus::SE3d T_w_i = imu_cam_calibrator.trajectory_.getPose(t_ns);
     Sophus::SE3d T_w_c = T_w_i * imu_cam_calibrator.trajectory_.getT_i_c();
     theia::ViewId v_id_theia =
@@ -301,7 +302,7 @@ int main(int argc, char *argv[]) {
       const double timestamp_us = std::stod(view.key());
       const double timestamp_s = timestamp_us * 1e-6; // to seconds
       const auto image_points = view.value()["image_points"];
-      std::string view_name = std::to_string((uint64_t)(timestamp_s * 1e9));
+      std::string view_name = std::to_string((uint64_t)(timestamp_s * S_TO_NS));
       theia::ViewId view_id =
           recon_calib_dataset.AddView(view_name, 0, timestamp_s);
 
@@ -325,9 +326,10 @@ int main(int argc, char *argv[]) {
         continue;
       }
 
-      const double timstamp_s = input_video.get(cv::CAP_PROP_POS_MSEC) * 1e-3;
+      const double timstamp_s =
+          input_video.get(cv::CAP_PROP_POS_MSEC) * MS_TO_S;
 
-      const int64_t t_ns = timstamp_s * 1e9;
+      const int64_t t_ns = timstamp_s * S_TO_NS;
 
       const theia::ViewId view_id_spline =
           output_spline_recon.ViewIdFromName(std::to_string(t_ns));
