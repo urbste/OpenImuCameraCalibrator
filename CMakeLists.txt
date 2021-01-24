@@ -3,7 +3,7 @@ if (COMMAND cmake_policy)
   cmake_policy(SET CMP0003 NEW)
 endif (COMMAND cmake_policy)
 
-project(OpenCameraCalibrator C CXX)
+project(OpenImuCameraCalibrator C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # c++17 is important, otherwise template deduction in so3 spline will fail
