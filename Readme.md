@@ -47,14 +47,29 @@ Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy
 ## Installation instructions
 ToDo
 
-1. Clone and build OpenCV > 4.5
+1. Clone and build OpenCV >= 4.5.0
 
-2. Clone and build the TheiaSfM fork
-```
+2. Install ceres 2.0 http://ceres-solver.org/installation.html
+
+3. Clone and build the TheiaSfM fork.
+``` bash
 git clone https://github.com/urbste/TheiaSfM
+cd TheiaSfM && mkdir -p build && cd build
+cmake .. && make -j4
+sudo make install
 ```
 
-3. Build this project
+4. Install nodejs (needed to extract GoPro telemetry)
+``` bash
+sudo apt install nodejs npm
+``` 
+
+5. Build this project
+``` bash
+git clone https://github.com/urbste/OpenImuCameraCalibrator
+mkdir -p build && cd build && cmake ..
+make -j
+``` 
 
 ## Example: Visual-Inertial Calibration of a GoPro Camera
 For this example I am using a GoPro 9. To calibrate the camera and the IMU to camera transformation we will use the following script: **python/run_gopro_calibration.py** 
