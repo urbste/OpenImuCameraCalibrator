@@ -74,6 +74,8 @@ make -j
 ## Example: Visual-Inertial Calibration of a GoPro Camera
 For this example I am using a GoPro 9. To calibrate the camera and the IMU to camera transformation we will use the following script: **python/run_gopro_calibration.py** 
 
+0. Get the test data from here: [ipfs-link](https://ipfs.io/ipfs/QmVNrzBEVgfN63MneoAvvzsVGpihbuhz3BGTgKGMhuad1w). Then you can skip step 1. & 2. 
+
 1. Data acquisition
 
    1.1 Print out the target: resource/board.png to a paper and attach it to something rigid (e.g. a wall). Measure the size of a black square in meter (e.g. 0.021m).
