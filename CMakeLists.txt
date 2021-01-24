@@ -49,5 +49,5 @@ include_directories(${CMAKE_SOURCE_DIR}/include
                     ${THEIA_INCLUDE_DIRS}
                     ${OpenCV_INCLUDE_DIRS})
 
-add_library(OpenCameraCalibrator STATIC ${CAMCALIB_SOURCE_FILES})
+add_library(OpenImuCameraCalibrator STATIC ${CAMCALIB_SOURCE_FILES})
 add_subdirectory(applications)
