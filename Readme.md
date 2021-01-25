@@ -22,9 +22,9 @@ This section provides some results for my two GoPro cameras (6 and 9). You can u
 ### Camera Calibration
 Dataset | Camera | Setting | Camera model | Intrinsics (f, cx, cy) | Reproj error | 
 |--|--|--|--|--|--|
-| 1 | GoPro 9 | 960x540 / 60fps / Wide | Division Undistortion | (871.81, 980.123, 544.36) Dist: -3.588e-07 | 0.62 |
-| 2 | GoPro 9 | 960x540 / 60fps / Wide | Double Sphere | (790.152, 978.640, 545.584) XI: -0.09694 Alpha: 0.52873  | 0.41 |
-| 3 | GoPro 9 | 960x540 / 60fps / Wide | Extended Unified | (871.94, 960.91, 551.49) Alpha: 0.6010 Beta: 0.8661  | 0.41 |
+| 1 | GoPro 9 | 960x540 / 60fps / Wide | Division Undistortion | (437.13, 489.07, 270.87) Dist: -1.4386e-06 | 0.31 |
+| 2 | GoPro 9 | 960x540 / 60fps / Wide | Extended Unified | (437.97, 489.47, 272.02) Alpha: 0.5115 Beta: 1.062  | 0.209 |
+| 3 | GoPro 9 | 960x540 / 60fps / Wide | Fisheye | (435.45, 479.12, 274.46) d1:0.05 d2:0.07 d3:-0.11 d4:0.05  | 0.24 |
 | 4 | GoPro 6 | 960x540 / 60fps / Wide | Division Undistortion | (438.59, 480.80, 274.80) Dist: -1.47079-06  | 0.09 |
 | 5 | GoPro 6 | 960x540 / 60fps / Wide | Double Sphere | (342.43, 472.60, 273.88) XI: -0.215 Alpha 0.5129 | 0.16 | 
 | 6 | GoPro 6 | 960x540 / 60fps / Wide | Fisheye | (439.13, 479.66, 273.19) d1: 0.046, d2: 0.064, d3:-0.10, d4: 0.052 | 0.17 | 
