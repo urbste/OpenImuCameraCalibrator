@@ -19,7 +19,8 @@
 #include <third_party/Sophus/sophus/so3.hpp>
 
 template <int _N>
-struct CalibAccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
+struct CalibAccelerationCostFunctorSplit
+    : public CeresSplineHelper<double, _N> {
   static constexpr int N = _N;       // Order of the spline.
   static constexpr int DEG = _N - 1; // Degree of the spline.
 
@@ -121,7 +122,8 @@ struct CalibGyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
 };
 
 template <int _N>
-struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
+struct CalibReprojectionCostFunctorSplit
+    : public CeresSplineHelper<double, _N> {
   static constexpr int N = _N;       // Order of the spline.
   static constexpr int DEG = _N - 1; // Degree of the spline.
 
@@ -153,7 +155,7 @@ struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> 
         sKnots, T(u_so3), T(inv_so3_dt), &R_w_i);
 
     Vector3 t_w_i;
-    CeresSplineHelper<T, N>::template evaluate<3, 0>(sKnots + N,T(u_so3),
+    CeresSplineHelper<T, N>::template evaluate<3, 0>(sKnots + N, T(u_so3),
                                                      T(inv_r3_dt), &t_w_i);
 
     Eigen::Map<Sophus::SE3<T> const> const T_i_c(sKnots[2 * N]);
@@ -216,7 +218,8 @@ struct CalibReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> 
 };
 
 template <int _N>
-struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
+struct CalibRSReprojectionCostFunctorSplit
+    : public CeresSplineHelper<double, _N> {
   static constexpr int N = _N;       // Order of the spline.
   static constexpr int DEG = _N - 1; // Degree of the spline.
 
@@ -229,13 +232,11 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CalibRSReprojectionCostFunctorSplit(const CalibCornerData *corner_data,
                                       const theia::Reconstruction *calib,
-                                      const theia::Camera *cam,
-                                      double u_so3,
+                                      const theia::Camera *cam, double u_so3,
                                       double u_r3, double inv_so3_dt,
-                                      double inv_r3_dt,
-                                      double weight = 1.0)
+                                      double inv_r3_dt, double weight = 1.0)
       : corners(corner_data), calib(calib), cam(cam), u_so3(u_so3), u_r3(u_r3),
-        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt),  weight(weight) {}
+        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt), weight(weight) {}
 
   template <class T>
   bool operator()(T const *const *sKnots, T *sResiduals) const {
@@ -246,10 +247,15 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
 
     using Matrix4 = Eigen::Matrix<T, 4, 4>;
 
-    for (size_t i = 0; i < corners->track_ids.size(); ++i) {
+    Eigen::Map<Vector1 const> const line_delay(sKnots[2 * N + 1]);
 
-      Eigen::Map<Vector1 const> const line_delay(sKnots[2 * N + 1]);
-      //std::cout<<"line delay: "<<line_delay[0]<<"\n";
+    T intr[10];
+    for (int i = 0; i < cam->CameraIntrinsics()->NumParameters(); ++i) {
+      intr[i] = T(cam->intrinsics()[i]);
+    }
+
+    for (size_t i = 0; i < corners->track_ids.size(); ++i) {
+      // std::cout<<"line delay: "<<line_delay[0]<<"\n";
       const T y_coord = T(corners->corners[i][1]) * line_delay[0];
       const T t_so3_row = T(u_so3) + y_coord;
       const T t_r3_row = T(u_r3) + y_coord;
@@ -266,49 +272,46 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
       Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
       Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();
 
-      T intr[10];
-      for (int i = 0; i < cam->CameraIntrinsics()->NumParameters(); ++i) {
-        intr[i] = T(cam->intrinsics()[i]);
+      Vector3 p3d =
+          (T_c_w_matrix * calib->Track(corners->track_ids[i])->Point())
+              .hnormalized();
+      T reprojection[2];
+      bool success = false;
+      if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION ==
+          cam->GetCameraIntrinsicsModelType()) {
+        success =
+            theia::DivisionUndistortionCameraModel::CameraToPixelCoordinates(
+                intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::DOUBLE_SPHERE ==
+                 cam->GetCameraIntrinsicsModelType()) {
+        success = theia::DoubleSphereCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::PINHOLE ==
+                 cam->GetCameraIntrinsicsModelType()) {
+        success = theia::PinholeCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::FISHEYE ==
+                 cam->GetCameraIntrinsicsModelType()) {
+        success = theia::FisheyeCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::EXTENDED_UNIFIED ==
+                 cam->GetCameraIntrinsicsModelType()) {
+        success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
       }
-      for (size_t i = 0; i < corners->track_ids.size(); ++i) {
-        Vector3 p3d =
-            (T_c_w_matrix * calib->Track(corners->track_ids[i])->Point())
-                .hnormalized();
-        T reprojection[2];
-        bool success = false;
-        if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION ==
-            cam->GetCameraIntrinsicsModelType()) {
-          success =
-              theia::DivisionUndistortionCameraModel::CameraToPixelCoordinates(
-                  intr, p3d.data(), reprojection);
-        } else if (theia::CameraIntrinsicsModelType::DOUBLE_SPHERE ==
-                   cam->GetCameraIntrinsicsModelType()) {
-          success = theia::DoubleSphereCameraModel::CameraToPixelCoordinates(
-              intr, p3d.data(), reprojection);
-        } else if (theia::CameraIntrinsicsModelType::PINHOLE ==
-                   cam->GetCameraIntrinsicsModelType()) {
-          success = theia::PinholeCameraModel::CameraToPixelCoordinates(
-              intr, p3d.data(), reprojection);
-        } else if (theia::CameraIntrinsicsModelType::FISHEYE ==
-                   cam->GetCameraIntrinsicsModelType()) {
-          success = theia::FisheyeCameraModel::CameraToPixelCoordinates(
-              intr, p3d.data(), reprojection);
-        } else if (theia::CameraIntrinsicsModelType::EXTENDED_UNIFIED ==
-                   cam->GetCameraIntrinsicsModelType()) {
-          success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
-              intr, p3d.data(), reprojection);
-        }
-        if (!success) {
-          sResiduals[2 * i + 0] = T(1e10);
-          sResiduals[2 * i + 1] = T(1e10);
-        } else {
-          sResiduals[2 * i + 0] = T(weight) * (reprojection[0] - T(corners->corners[i][0]));
-          sResiduals[2 * i + 1] = T(weight) * (reprojection[1] - T(corners->corners[i][1]));
-        }
+      if (!success) {
+        sResiduals[2 * i + 0] = T(1e10);
+        sResiduals[2 * i + 1] = T(1e10);
+      } else {
+        sResiduals[2 * i + 0] =
+            T(weight) * (reprojection[0] - T(corners->corners[i][0]));
+        sResiduals[2 * i + 1] =
+            T(weight) * (reprojection[1] - T(corners->corners[i][1]));
       }
-      return true;
     }
+    return true;
   }
+
   const CalibCornerData *corners;
   const theia::Camera *cam;
   const theia::Reconstruction *calib;
@@ -316,5 +319,114 @@ struct CalibRSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N
   double u_r3;
   double inv_so3_dt;
   double inv_r3_dt;
+  double weight;
+};
+
+template <int _N>
+struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
+  static constexpr int N = _N;       // Order of the spline.
+  static constexpr int DEG = _N - 1; // Degree of the spline.
+
+  using MatN = Eigen::Matrix<double, _N, _N>;
+  using VecN = Eigen::Matrix<double, _N, 1>;
+
+  using Vec3 = Eigen::Matrix<double, 3, 1>;
+  using Mat3 = Eigen::Matrix<double, 3, 3>;
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  RSReprojectionCostFunctorSplit(const theia::View *view,
+                                 const theia::Reconstruction *image_data,
+                                 const double u_so3, const double inv_dt_so3,
+                                 const double u_r3, const double inv_dt_r3,
+                                 const double weight = 1.)
+      : view(view), image_data(image_data), u_so3(u_so3),
+        inv_dt_so3(inv_dt_so3), inv_dt_r3(inv_dt_r3), u_r3(u_r3),
+        weight(weight) {}
+
+  template <class T>
+  bool operator()(T const *const *sKnots, T *sResiduals) const {
+    using Vector2 = Eigen::Matrix<T, 2, 1>;
+    using Vector3 = Eigen::Matrix<T, 3, 1>;
+    using Vector4 = Eigen::Matrix<T, 4, 1>;
+    using Vector1 = Eigen::Matrix<T, 1, 1>;
+
+    using Matrix4 = Eigen::Matrix<T, 4, 4>;
+
+    const std::vector<theia::TrackId> track_ids = view->TrackIds();
+
+    T intr[10];
+    for (int c = 0; c < view->Camera().CameraIntrinsics()->NumParameters();
+         ++c) {
+      intr[c] = T(view->Camera().intrinsics()[c]);
+    }
+    // iterate all tracks of that view and add the reprojection residuals
+    // also take the correct camera intrinsics into account
+    for (size_t i = 0; i < track_ids.size(); ++i) {
+      const theia::Feature *feature = view->GetFeature(track_ids[i]);
+      Eigen::Map<Vector1 const> const line_delay(sKnots[2 * N + 1]);
+
+      const T y_coord = T((*feature)[1]) * line_delay[0];
+      const T t_so3_row = T(u_so3) + y_coord;
+      const T t_r3_row = T(u_r3) + y_coord;
+      Sophus::SO3<T> R_w_i;
+      CeresSplineHelper<T, N>::template evaluate_lie<Sophus::SO3>(
+          sKnots, t_so3_row, T(inv_dt_so3), &R_w_i);
+
+      Vector3 t_w_i;
+      CeresSplineHelper<T, N>::template evaluate<3, 0>(sKnots + N, t_r3_row,
+                                                       T(inv_dt_r3), &t_w_i);
+
+      Eigen::Map<Sophus::SE3<T> const> const T_i_c(sKnots[2 * N]);
+
+      Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
+      Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();
+
+      Vector3 p3d =
+          (T_c_w_matrix * image_data->Track(track_ids[i])->Point().normalized())
+              .hnormalized();
+      T reprojection[2];
+      bool success = false;
+      if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION ==
+          view->Camera().GetCameraIntrinsicsModelType()) {
+        success =
+            theia::DivisionUndistortionCameraModel::CameraToPixelCoordinates(
+                intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::DOUBLE_SPHERE ==
+                 view->Camera().GetCameraIntrinsicsModelType()) {
+        success = theia::DoubleSphereCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::PINHOLE ==
+                 view->Camera().GetCameraIntrinsicsModelType()) {
+        success = theia::PinholeCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::FISHEYE ==
+                 view->Camera().GetCameraIntrinsicsModelType()) {
+        success = theia::FisheyeCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::EXTENDED_UNIFIED ==
+                 view->Camera().GetCameraIntrinsicsModelType()) {
+        success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      }
+
+      if (!success) {
+        sResiduals[2 * i + 0] = T(1e10);
+        sResiduals[2 * i + 1] = T(1e10);
+      } else {
+        sResiduals[2 * i + 0] =
+            T(weight) * (reprojection[0] - T((*feature)[0]));
+        sResiduals[2 * i + 1] =
+            T(weight) * (reprojection[1] - T((*feature)[1]));
+      }
+
+      return true;
+    }
+  }
+  const theia::View *view;
+  const theia::Reconstruction *image_data;
+  double u_so3;
+  double inv_dt_so3;
+  double u_r3;
+  double inv_dt_r3;
   double weight;
 };

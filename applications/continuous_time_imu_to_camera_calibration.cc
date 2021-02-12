@@ -171,9 +171,8 @@ int main(int argc, char *argv[]) {
   double reproj_error = imu_cam_calibrator.Optimize(20, false, false, false, true);
   double reproj_error_after_ld = reproj_error;
   if (FLAGS_calibrate_cam_line_delay) {
-     reproj_error_after_ld = imu_cam_calibrator.Optimize(5, true, true, true, false);
+     reproj_error_after_ld = imu_cam_calibrator.Optimize(20, false, false, true, false);
   }
-
   LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";
   LOG(INFO) << "Mean reprojection error after line delay optim " << reproj_error_after_ld << "px\n";
 
@@ -210,6 +209,8 @@ int main(int argc, char *argv[]) {
   json_calibspline_results_out["so3_dt"] = weight_data.dt_so3;
   json_calibspline_results_out["init_line_delay_us"] = imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US;
   json_calibspline_results_out["calib_line_delay_us"] = calib_line_delay_us;
+  json_calibspline_results_out["time_offset_imu_to_cam_s"] = time_offset_imu_to_cam;
+
   std::vector<double> cam_timestamps_s = imu_cam_calibrator.GetCamTimestamps();
   std::sort(cam_timestamps_s.begin(), cam_timestamps_s.end(), std::less<>());
 

@@ -4,7 +4,7 @@ adaptiveThreshWinSizeMin: 3
 adaptiveThreshWinSizeMax: 23
 adaptiveThreshWinSizeStep: 10
 adaptiveThreshWinSize: 21
-adaptiveThreshConstant: 7
+adaptiveThreshConstant: 3
 minMarkerPerimeterRate: 0.03
 maxMarkerPerimeterRate: 4.0
 polygonalApproxAccuracyRate: 0.05
@@ -23,9 +23,9 @@ maxErroneousBitsInBorderRate: 0.04
 minOtsuStdDev: 5.0
 errorCorrectionRate: 0.6
 # new functionality
-useAruco3Detection: 0
+useAruco3Detection: 1
 minSideLengthCanonicalImg: 32
-minMarkerLengthRatioOriginalImg: 0.04
+minMarkerLengthRatioOriginalImg: 0.03
 cameraMotionSpeed: 0.2
 useGlobalThreshold: 1
 
