@@ -123,6 +123,7 @@ private:
   std::unordered_map<TimeCamId, CalibCornerData> calib_corners_;
   std::unordered_map<TimeCamId, CalibInitPoseData> calib_init_poses_;
   std::unordered_map<TimeCamId, CalibInitPoseData> spline_init_poses_;
+  theia::Reconstruction image_data_;
 };
 
 } // namespace core

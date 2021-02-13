@@ -193,7 +193,8 @@ public:
   }
 
   void initAll(
-      const std::unordered_map<TimeCamId, CalibInitPoseData> &init_spline_poses,
+      const theia::Reconstruction& image_dataset,
+      const Sophus::SE3d& T_i_c_init,
       const int num_knots_so3, const int num_knots_r3) {
 
     so3_knots_ = OpenICC::so3_vector(num_knots_so3);
@@ -206,10 +207,15 @@ public:
     OpenICC::vec3_map translations_map;
 
     // get sorted poses
-    for (auto const &data : init_spline_poses) {
-      const double t_s = data.first.frame_id * NS_TO_S;
-      quat_vis_map[t_s] = data.second.T_a_c.so3().unit_quaternion();
-      translations_map[t_s] = data.second.T_a_c.translation();
+    const auto view_ids = image_dataset.ViewIds();
+    for (const auto& vid : view_ids) {
+        const auto* v = image_dataset.View(vid);
+        const double t_s = v->GetTimestamp();
+        const auto q_w_c = Eigen::Quaterniond(v->Camera().GetOrientationAsRotationMatrix().transpose());
+        const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
+        const Sophus::SE3d T_w_i = T_w_c * T_i_c_init.inverse();
+        quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
+        translations_map[t_s] = T_w_i.translation();
     }
 
     OpenICC::quat_vector quat_vis;
@@ -396,8 +402,9 @@ public:
     problem_.AddResidualBlock(cost_function, NULL, vec);
   }
 
-  void addRSCornersMeasurement(const CalibCornerData *corners,
-                               const theia::Reconstruction *calib_,
+  void addRSCornersMeasurement(//const CalibCornerData *corners,
+                               const theia::Reconstruction *calib,
+                               const theia::View* view,
                                const theia::Camera *cam, int64_t time_ns,
                                const double robust_loss_width = 3.0) {
     const int64_t st_ns = (time_ns - start_t_ns);
@@ -420,10 +427,14 @@ public:
                          "s " << s_r3 << " N " << N << " knots.size() "
                               << trans_knots_.size());
 
-    using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
-    FunctorT *functor = new FunctorT(corners, calib_, cam, u_so3, u_r3,
-                                     inv_so3_dt_, inv_r3_dt_, 1.0);
-
+//    using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
+//    FunctorT *functor = new FunctorT(corners, calib, cam, u_so3, u_r3,
+//                                     inv_so3_dt_, inv_r3_dt_, 1.0);
+        using FunctorT = RSReprojectionCostFunctorSplit<N>;
+        FunctorT *functor = new FunctorT(view, calib, cam,
+                                         u_so3, u_r3,
+                                         inv_so3_dt_, inv_r3_dt_,
+                                         1.0);
     ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
@@ -439,7 +450,8 @@ public:
     // cam line delay time
     cost_function->AddParameterBlock(1);
 
-    cost_function->SetNumResiduals(corners->track_ids.size() * 2);
+    cost_function->SetNumResiduals(view->TrackIds().size() * 2);
+    //cost_function->SetNumResiduals(corners->track_ids.size() * 2);
 
     std::vector<double *> vec;
     for (int i = 0; i < N; i++) {
@@ -563,7 +575,7 @@ public:
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.max_num_iterations = iterations;
-    options.num_threads = std::thread::hardware_concurrency();
+    options.num_threads = 1; std::thread::hardware_concurrency();
     // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
     options.minimizer_progress_to_stdout = true;
 

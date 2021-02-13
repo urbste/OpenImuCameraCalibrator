@@ -29,6 +29,7 @@ void ImuCameraCalibrator::InitSpline(
     const OpenICC::CameraTelemetryData &telemetry_data,
     const double initial_line_delay) {
 
+  image_data_ = calib_dataset;
   spline_weight_data_ = spline_weight_data;
   T_i_c_init_ = T_i_c_init;
 
@@ -69,41 +70,15 @@ void ImuCameraCalibrator::InitSpline(
   trajectory_.setCalib(calib_dataset);
   trajectory_.setT_i_c(T_i_c_init);
 
-  for (const ViewId view_id : view_ids) {
-    const View &view = *calib_dataset.View(view_id);
-    double timestamp = view.GetTimestamp();
-    if (timestamp >= tend_s_ || timestamp < t0_s_)
-      continue;
-    TimeCamId t_c_id(timestamp * S_TO_NS, 0);
-    CalibCornerData corner_data;
-    const std::vector<theia::TrackId> trackIds = view.TrackIds();
-    for (size_t t = 0; t < trackIds.size(); ++t) {
-      corner_data.corners.push_back(*view.GetFeature(trackIds[t]));
-    }
-    corner_data.track_ids = trackIds;
-    calib_corners_[t_c_id] = corner_data;
-    CalibInitPoseData pose_data;
-    pose_data.T_a_c = Sophus::SE3<double>(
-        view.Camera().GetOrientationAsRotationMatrix().transpose(),
-        view.Camera().GetPosition());
-    calib_init_poses_[t_c_id] = pose_data;
+  trajectory_.initAll(image_data_, T_i_c_init, nr_knots_so3_, nr_knots_r3_);
 
-    Sophus::SE3d T_w_i_init =
-        calib_init_poses_.at(t_c_id).T_a_c * T_i_c_init.inverse();
-    CalibInitPoseData spline_pose_data;
-    spline_pose_data.T_a_c = T_w_i_init;
-    spline_init_poses_[t_c_id] = spline_pose_data;
-  }
-
-  trajectory_.initAll(spline_init_poses_, nr_knots_so3_, nr_knots_r3_);
-
-  // add corners
-  for (const auto &kv : calib_corners_) {
-    if (kv.first.frame_id >= start_t_ns && kv.first.frame_id < end_t_ns) {
-      trajectory_.addRSCornersMeasurement(&kv.second, &calib_dataset,
-                                          &calib_dataset.View(0)->Camera(),
-                                          kv.first.frame_id);
-    }
+  // add visual measurements
+  for (const auto &vid : view_ids) {
+    const auto *view = image_data_.View(vid);
+    const double timestamp_s = view->GetTimestamp();
+    trajectory_.addRSCornersMeasurement(&image_data_, view,
+                                        &calib_dataset.View(0)->Camera(),
+                                        timestamp_s * S_TO_NS);
   }
 
   // Add Accelerometer
@@ -141,29 +116,32 @@ void ImuCameraCalibrator::InitializeGravity(
     const OpenICC::CameraTelemetryData &telemetry_data,
     const Eigen::Vector3d &accl_bias) {
   for (size_t j = 0; j < cam_timestamps_.size(); ++j) {
-    int64_t timestamp_ns = cam_timestamps_[j] * S_TO_NS;
+    const theia::View *v =
+        image_data_.View(image_data_.ViewIdFromTimestamp(cam_timestamps_[j]));
+    if (!v) {
+      continue;
+    }
 
-    TimeCamId tcid(timestamp_ns, 0);
-    const auto cp_it = calib_init_poses_.find(tcid);
+    const auto q_w_c =
+        Eigen::Quaterniond(v->Camera().GetOrientationAsRotationMatrix());
+    const auto p_w_c = v->Camera().GetPosition();
+    Sophus::SE3d T_a_i = Sophus::SE3d(q_w_c, p_w_c) * T_i_c_init_.inverse();
 
-    if (cp_it != calib_init_poses_.end()) {
-      Sophus::SE3d T_a_i = cp_it->second.T_a_c * T_i_c_init_.inverse();
-
-      if (!gravity_initialized_) {
-        for (size_t i = 0;
-             i < telemetry_data.accelerometer.measurement.size() &&
-             !gravity_initialized_;
-             i++) {
-          const Eigen::Vector3d ad =
-              telemetry_data.accelerometer.measurement[i] + accl_bias;
-          const int64_t accl_t =
-              telemetry_data.accelerometer.timestamp_ms[i] * MS_TO_S;
-          if (std::abs(accl_t - cam_timestamps_[j]) < 1. / 30.) {
-            gravity_init_ = T_a_i.so3() * ad;
-            gravity_initialized_ = true;
-            std::cout << "g_a initialized with " << gravity_init_.transpose()
-                      << " at timestamp: " << accl_t << std::endl;
-          }
+    if (!gravity_initialized_) {
+      for (size_t i = 0; i < telemetry_data.accelerometer.measurement.size();
+           i++) {
+        const Eigen::Vector3d ad =
+            telemetry_data.accelerometer.measurement[i] + accl_bias;
+        const int64_t accl_t =
+            telemetry_data.accelerometer.timestamp_ms[i] * MS_TO_S;
+        if (std::abs(accl_t - cam_timestamps_[j]) < 1. / 30.) {
+          gravity_init_ = T_a_i.so3() * ad;
+          gravity_initialized_ = true;
+          std::cout << "g_a initialized with " << gravity_init_.transpose()
+                    << " at timestamp: " << accl_t << std::endl;
+        }
+        if (gravity_initialized_) {
+          break;
         }
       }
     }
