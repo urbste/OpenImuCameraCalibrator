@@ -192,10 +192,9 @@ public:
     T_i_c_ = T_i_c_calib_;
   }
 
-  void initAll(
-      const theia::Reconstruction& image_dataset,
-      const Sophus::SE3d& T_i_c_init,
-      const int num_knots_so3, const int num_knots_r3) {
+  void initAll(const theia::Reconstruction &image_dataset,
+               const Sophus::SE3d &T_i_c_init, const int num_knots_so3,
+               const int num_knots_r3) {
 
     so3_knots_ = OpenICC::so3_vector(num_knots_so3);
     trans_knots_ = OpenICC::vec3_vector(num_knots_r3);
@@ -208,14 +207,15 @@ public:
 
     // get sorted poses
     const auto view_ids = image_dataset.ViewIds();
-    for (const auto& vid : view_ids) {
-        const auto* v = image_dataset.View(vid);
-        const double t_s = v->GetTimestamp();
-        const auto q_w_c = Eigen::Quaterniond(v->Camera().GetOrientationAsRotationMatrix().transpose());
-        const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
-        const Sophus::SE3d T_w_i = T_w_c * T_i_c_init.inverse();
-        quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
-        translations_map[t_s] = T_w_i.translation();
+    for (const auto &vid : view_ids) {
+      const auto *v = image_dataset.View(vid);
+      const double t_s = v->GetTimestamp();
+      const auto q_w_c = Eigen::Quaterniond(
+          v->Camera().GetOrientationAsRotationMatrix().transpose());
+      const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
+      const Sophus::SE3d T_w_i = T_w_c * T_i_c_init.inverse();
+      quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
+      translations_map[t_s] = T_w_i.translation();
     }
 
     OpenICC::quat_vector quat_vis;
@@ -328,7 +328,7 @@ public:
 
     std::vector<double *> vec;
     for (int i = 0; i < N; i++) {
-        const int t = s + i;
+      const int t = s + i;
       vec.emplace_back(so3_knots_[t].data());
       so3_knot_in_problem_[t] = true;
     }
@@ -402,9 +402,8 @@ public:
     problem_.AddResidualBlock(cost_function, NULL, vec);
   }
 
-  void addRSCornersMeasurement(//const CalibCornerData *corners,
-                               const theia::Reconstruction *calib,
-                               const theia::View* view,
+  void addRSCornersMeasurement(const theia::Reconstruction *calib,
+                               const theia::View *view,
                                const theia::Camera *cam, int64_t time_ns,
                                const double robust_loss_width = 3.0) {
     const int64_t st_ns = (time_ns - start_t_ns);
@@ -427,14 +426,9 @@ public:
                          "s " << s_r3 << " N " << N << " knots.size() "
                               << trans_knots_.size());
 
-//    using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
-//    FunctorT *functor = new FunctorT(corners, calib, cam, u_so3, u_r3,
-//                                     inv_so3_dt_, inv_r3_dt_, 1.0);
-        using FunctorT = RSReprojectionCostFunctorSplit<N>;
-        FunctorT *functor = new FunctorT(view, calib, cam,
-                                         u_so3, u_r3,
-                                         inv_so3_dt_, inv_r3_dt_,
-                                         1.0);
+    using FunctorT = RSReprojectionCostFunctorSplit<N>;
+    FunctorT *functor = new FunctorT(view, calib, cam, u_so3, u_r3, inv_so3_dt_,
+                                     inv_r3_dt_);
     ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
@@ -451,7 +445,6 @@ public:
     cost_function->AddParameterBlock(1);
 
     cost_function->SetNumResiduals(view->TrackIds().size() * 2);
-    //cost_function->SetNumResiduals(corners->track_ids.size() * 2);
 
     std::vector<double *> vec;
     for (int i = 0; i < N; i++) {
@@ -481,17 +474,18 @@ public:
 
   int64_t minTimeNs() const { return start_t_ns; }
 
-  double meanRSReprojection(const std::unordered_map<TimeCamId, CalibCornerData>
-                                &calib__corners) const {
+  double meanRSReprojection(const theia::Reconstruction& image_data) const {
     double sum_error = 0;
     int num_points = 0;
 
-    for (const auto &kv : calib__corners) {
-      const int64_t time_ns = kv.first.frame_id;
+    const auto view_ids = image_data.ViewIds();
+
+    for (auto i = 0; i < view_ids.size(); ++i) {
+      const theia::View *view = image_data.View(view_ids[i]);
+      const double time_ns = view->GetTimestamp() * S_TO_NS;
 
       if (time_ns < minTimeNs() || time_ns >= maxTimeNs())
         continue;
-
       const int64_t st_ns = (time_ns - start_t_ns);
 
       BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns "
@@ -499,9 +493,9 @@ public:
                                                 << start_t_ns);
 
       const int64_t s_so3 = st_ns / dt_so3_ns_;
-      const double u_so3 = double(st_ns % dt_so3_ns_) / double(dt_so3_ns_);
-      int64_t s_r3 = st_ns / dt_r3_ns_;
-      const double u_r3 = double(st_ns % dt_r3_ns_) / double(dt_r3_ns_);
+      double u_so3 = double(st_ns % dt_so3_ns_) / double(dt_so3_ns_);
+      const int64_t s_r3 = st_ns / dt_r3_ns_;
+      double u_r3 = double(st_ns % dt_r3_ns_) / double(dt_r3_ns_);
 
       BASALT_ASSERT_STREAM(s_so3 >= 0, "s " << s_so3);
       BASALT_ASSERT_STREAM(s_r3 >= 0, "s " << s_r3);
@@ -513,46 +507,49 @@ public:
                            "s " << s_r3 << " N " << N << " knots.size() "
                                 << trans_knots_.size());
 
-      using FunctorT = CalibRSReprojectionCostFunctorSplit<N>;
-
-      FunctorT *functor =
-          new FunctorT(&kv.second, &calib_, &calib_.View(0)->Camera(), u_so3,
-                       u_r3, inv_so3_dt_, inv_r3_dt_);
-
+      using FunctorT = RSReprojectionCostFunctorSplit<N>;
+      FunctorT *functor = new FunctorT(view, &image_data, &view->Camera(), u_so3, u_r3,
+                                       inv_so3_dt_, inv_r3_dt_);
       ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
           new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-      for (int i = 0; i < N; ++i) {
+      for (int i = 0; i < N; i++) {
         cost_function->AddParameterBlock(4);
       }
-      for (int i = 0; i < N; ++i) {
+      for (int i = 0; i < N; i++) {
         cost_function->AddParameterBlock(3);
       }
-      // T_i_c_
+      // T_i_c_ -> quaternion
       cost_function->AddParameterBlock(7);
+
+      // cam line delay time
       cost_function->AddParameterBlock(1);
 
-      cost_function->SetNumResiduals(kv.second.track_ids.size() * 2);
+      cost_function->SetNumResiduals(view->TrackIds().size() * 2);
 
       std::vector<const double *> vec;
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(so3_knots_[s_so3 + i].data());
+        const int t = s_so3 + i;
+        vec.emplace_back(so3_knots_[t].data());
       }
       for (int i = 0; i < N; i++) {
-        vec.emplace_back(trans_knots_[s_r3 + i].data());
+        const int t = s_r3 + i;
+        vec.emplace_back(trans_knots_[t].data());
       }
+      // camera to imu transformation
       vec.emplace_back(T_i_c_.data());
+
+      // line delay for rolling shutter cameras
       vec.emplace_back(&cam_line_delay_s_);
 
       {
         Eigen::VectorXd residual;
-        residual.setZero(kv.second.track_ids.size() * 2);
+        residual.setZero(view->TrackIds().size() * 2);
 
         cost_function->Evaluate(&vec[0], residual.data(), NULL);
 
-        for (size_t i = 0; i < kv.second.track_ids.size(); i++) {
+        for (size_t i = 0; i < view->TrackIds().size(); ++i) {
           Eigen::Vector2d res_point = residual.segment<2>(2 * i);
-          // res_point /= 1000.0;
           if (res_point[0] != 0.0 && res_point[1] != 0.0) {
             sum_error += res_point.norm();
             num_points += 1;
@@ -575,23 +572,24 @@ public:
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.max_num_iterations = iterations;
-    options.num_threads = 1; std::thread::hardware_concurrency();
+    options.num_threads = 1;
+    std::thread::hardware_concurrency();
     // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
     options.minimizer_progress_to_stdout = true;
 
     if (fix_so3_spline) {
-        for (int i = 0; i < so3_knots_.size(); ++i) {
-            if (so3_knot_in_problem_[i]) {
-                problem_.SetParameterBlockConstant(so3_knots_[i].data());
-            }
+      for (int i = 0; i < so3_knots_.size(); ++i) {
+        if (so3_knot_in_problem_[i]) {
+          problem_.SetParameterBlockConstant(so3_knots_[i].data());
         }
+      }
     }
     if (fix_r3_spline) {
-        for (int i = 0; i < trans_knots_.size(); ++i) {
-            if (r3_knot_in_problem_[i]) {
-                problem_.SetParameterBlockConstant(trans_knots_[i].data());
-            }
+      for (int i = 0; i < trans_knots_.size(); ++i) {
+        if (r3_knot_in_problem_[i]) {
+          problem_.SetParameterBlockConstant(trans_knots_[i].data());
         }
+      }
     }
     if (fix_line_delay) {
       problem_.SetParameterBlockConstant(&cam_line_delay_s_);

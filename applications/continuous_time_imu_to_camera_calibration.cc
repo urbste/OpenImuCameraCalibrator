@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
     input_video.open(FLAGS_debug_video_path);
     int cnt_wrong = 0;
     int nr_frames = 0;
-    while (true && nr_frames < 200) {
+    while (true) {
       Mat image;
       if (!input_video.read(image)) {
         cnt_wrong++;
@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
         cv::drawMarker(image, cv::Point(cvRound(pixel[0]), cvRound(pixel[1])),
                        cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 1);
 
-        reproj_error += (measurement - pixel).norm();
+        reproj_error += (measurement.point_ - pixel).norm();
       }
       reproj_error /= (double)view_calib->TrackIds().size();
       cv::putText(image,

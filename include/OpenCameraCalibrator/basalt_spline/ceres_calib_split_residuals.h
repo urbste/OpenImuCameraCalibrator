@@ -232,12 +232,9 @@ struct CalibRSReprojectionCostFunctorSplit
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CalibRSReprojectionCostFunctorSplit(const CalibCornerData *corner_data,
                                       const theia::Reconstruction *calib,
-                                      const theia::Camera *cam,
-                                      double u_so3,
-                                      double u_r3,
-                                      double inv_so3_dt,
-                                      double inv_r3_dt,
-                                      double weight = 1.0)
+                                      const theia::Camera *cam, double u_so3,
+                                      double u_r3, double inv_so3_dt,
+                                      double inv_r3_dt, double weight = 1.0)
       : corners(corner_data), calib(calib), cam(cam), u_so3(u_so3), u_r3(u_r3),
         inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt), weight(weight) {}
 
@@ -339,16 +336,11 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   RSReprojectionCostFunctorSplit(const theia::View *view,
                                  const theia::Reconstruction *image_data,
-                                 const theia::Camera *cam,
-                                 const double u_so3,
-                                 const double u_r3,
-                                 const double inv_so3_dt,
-                                 const double inv_r3_dt,
-                                 const double weight = 1.0)
-      : view(view), image_data(image_data), cam(cam),
-        u_so3(u_so3),u_r3(u_r3),
-        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt),
-        weight(weight) {}
+                                 const theia::Camera *cam, const double u_so3,
+                                 const double u_r3, const double inv_so3_dt,
+                                 const double inv_r3_dt)
+      : view(view), image_data(image_data), cam(cam), u_so3(u_so3), u_r3(u_r3),
+        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt) {}
 
   template <class T>
   bool operator()(T const *const *sKnots, T *sResiduals) const {
@@ -369,7 +361,7 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
     for (size_t i = 0; i < track_ids.size(); ++i) {
       // std::cout<<"line delay: "<<line_delay[0]<<"\n";
       const auto feature = *view->GetFeature(track_ids[i]);
-      const T y_coord = T(feature[1]) * line_delay[0];
+      const T y_coord = T(feature.point_[1]) * line_delay[0];
       const T t_so3_row = T(u_so3) + y_coord;
       const T t_r3_row = T(u_r3) + y_coord;
       Sophus::SO3<T> R_w_i;
@@ -385,9 +377,8 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
       Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
       Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();
 
-      Vector3 p3d =
-          (T_c_w_matrix * image_data->Track(track_ids[i])->Point())
-              .hnormalized();
+      Vector3 p3d = (T_c_w_matrix * image_data->Track(track_ids[i])->Point())
+                        .hnormalized();
       T reprojection[2];
       bool success = false;
       if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION ==
@@ -416,10 +407,10 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
         sResiduals[2 * i + 0] = T(1e10);
         sResiduals[2 * i + 1] = T(1e10);
       } else {
-        sResiduals[2 * i + 0] =
-            T(weight) * (reprojection[0] - T(feature[0]));
-        sResiduals[2 * i + 1] =
-            T(weight) * (reprojection[1] - T(feature[1]));
+        const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
+        const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
+        sResiduals[2 * i + 0] = inv_info_x * (reprojection[0] - T(feature.x()));
+        sResiduals[2 * i + 1] = inv_info_y * (reprojection[1] - T(feature.y()));
       }
     }
     return true;
@@ -431,5 +422,4 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
   double inv_so3_dt;
   double u_r3;
   double inv_r3_dt;
-  double weight;
 };

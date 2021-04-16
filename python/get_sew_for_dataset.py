@@ -12,17 +12,21 @@ def main():
 
     parser = ArgumentParser()
     # Cast the input to string, int or float type 
-    parser.add_argument('--path_to_json', 
+    parser.add_argument('--input_json_path', 
                         default='', 
                         help="path to metadata json")
     parser.add_argument("--output_path",
                         help="output path")
-    parser.add_argument("--q_so3", help="quality value for rotational component, i.e. gyro signal", default=0.99, type=float)
-    parser.add_argument("--q_r3", help="quality value for translational component, i.e. accelerometer signal", default=0.97, type=float)
+    parser.add_argument("--q_so3", help="quality value for rotational component, i.e. gyro signal", default=0.98, type=float)
+    parser.add_argument("--q_r3", help="quality value for translational component, i.e. accelerometer signal", default=0.96, type=float)
+    parser.add_argument("--use_gopro_importer", default=0)
     args = parser.parse_args()
 
     json_importer = TelemetryImporter()
-    json_importer.read_generic_json(args.path_to_json)
+    if args.use_gopro_importer:
+            json_importer.read_gopro_telemetry(args.input_json_path)
+    else:
+        json_importer.read_generic_json(args.input_json_path)
 
     accl_np = np.asarray(json_importer.telemetry["accelerometer"])
     gyro_np = np.asarray(json_importer.telemetry["gyroscope"])

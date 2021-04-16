@@ -255,6 +255,8 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
             << gyro_bias[1] << ", " << gyro_bias[2] << "\n";
   LOG(INFO) << "Estimated time offset: " << time_offset_imu_to_camera << "\n";
   LOG(INFO) << "Final alignment error: " << error << "\n";
+
+  return true;
 }
 
 } // namespace core

@@ -14,20 +14,24 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('--input_json_path', 
                         help="path to metadata json",
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_30/dataset1/imu_bias/GX010019.json')
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/ActionVISFM_Tests/visfm_test/GX016626.json')
     parser.add_argument('--output_path', 
                         help="output path",
-                        default='')
+                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/ActionVISFM_Tests/visfm_test/GX016626_bias.json')
     parser.add_argument("--gravity_const", 
                         help="gravity constant", 
                         default=9.81, type=float)
     parser.add_argument("--remove_sec", 
                         help="How many seconds to remove from start and end of sequence", 
                         default=0.0, type=float)
+    parser.add_argument("--use_gopro_importer", default=0)
     args = parser.parse_args()
 
     json_importer = TelemetryImporter()
-    json_importer.read_generic_json(args.input_json_path, args.remove_sec)
+    if args.use_gopro_importer:
+            json_importer.read_gopro_telemetry(args.input_json_path, args.remove_sec)
+    else:
+        json_importer.read_generic_json(args.input_json_path, args.remove_sec)
 
     accl_np = np.asarray(json_importer.telemetry["accelerometer"])
     gyro_np = np.asarray(json_importer.telemetry["gyroscope"])

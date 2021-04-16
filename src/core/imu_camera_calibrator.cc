@@ -156,7 +156,7 @@ double ImuCameraCalibrator::Optimize(const int iterations,
                                      const bool fix_line_delay) {
   ceres::Solver::Summary summary = trajectory_.optimize(
       iterations, fix_so3_spline, fix_r3_spline, fix_T_i_c, fix_line_delay);
-  return trajectory_.meanRSReprojection(calib_corners_);
+  return trajectory_.meanRSReprojection(image_data_);
 }
 
 void ImuCameraCalibrator::ToTheiaReconDataset(Reconstruction &output_recon) {

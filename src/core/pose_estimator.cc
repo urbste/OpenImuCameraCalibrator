@@ -27,10 +27,10 @@
 
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
 #include <theia/sfm/camera/double_sphere_camera_model.h>
+#include <theia/sfm/camera/extended_unified_camera_model.h>
 #include <theia/sfm/camera/fisheye_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/camera/pinhole_radial_tangential_camera_model.h>
-#include <theia/sfm/camera/extended_unified_camera_model.h>
 
 namespace OpenICC {
 namespace core {
@@ -75,8 +75,9 @@ bool PoseEstimator::EstimatePosePinhole(
   for (int i = 0; i < ransac_summary.inliers.size(); ++i) {
     int inlier = ransac_summary.inliers[i];
 
-    pose_dataset_.AddObservation(view_id, board_pts3_ids[inlier],
-                                 correspondences_undist[inlier].feature);
+    pose_dataset_.AddObservation(
+        view_id, board_pts3_ids[inlier],
+        theia::Feature(correspondences_undist[inlier].feature));
   }
 
   // optimize pose
@@ -93,7 +94,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
   const double image_diag =
       std::sqrt(camera.ImageWidth() * camera.ImageWidth() +
                 camera.ImageHeight() * camera.ImageHeight());
-  ransac_params_.error_thresh =  max_reproj_error / image_diag;
+  ransac_params_.error_thresh = max_reproj_error / image_diag;
   // get scene points and fill them into
   io::scene_points_to_calib_dataset(scene_json, pose_dataset_);
 
@@ -103,7 +104,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
 
   for (const auto &view : views.items()) {
     const double timestamp_us = std::stod(view.key());
-    const double timestamp_s = timestamp_us * 1e-6; // to seconds
+    const double timestamp_s = timestamp_us * US_TO_S; // to seconds
     const auto image_points = view.value()["image_points"];
     std::vector<int> board_pts3_ids;
     aligned_vector<Eigen::Vector2d> corners;
@@ -134,11 +135,12 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     std::string view_name = std::to_string((uint64_t)(timestamp_s * S_TO_US));
     theia::ViewId view_id = pose_dataset_.AddView(view_name, 0, timestamp_s);
 
-    theia::Camera* cam = pose_dataset_.MutableView(view_id)->MutableCamera();
-    cam->SetCameraIntrinsicsModelType(theia::CameraIntrinsicsModelType::PINHOLE);
+    theia::Camera *cam = pose_dataset_.MutableView(view_id)->MutableCamera();
+    cam->SetCameraIntrinsicsModelType(
+        theia::CameraIntrinsicsModelType::PINHOLE);
     cam->SetFocalLength(1.0);
-    cam->SetPrincipalPoint(0.0,0.0);
-    cam->SetImageSize(1.0,1.0);
+    cam->SetPrincipalPoint(0.0, 0.0);
+    cam->SetImageSize(1.0, 1.0);
     if (!EstimatePosePinhole(view_id, correspondences_undist, board_pts3_ids)) {
       LOG(INFO) << "Pose estimation failed for view at timestamp "
                 << timestamp_s << "s.";
@@ -155,7 +157,8 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
       pose_dataset_.View(view_id)->Camera().ProjectPoint(track->Point(),
                                                          &reproj_point);
       reproj_error +=
-          (reproj_point - (*pose_dataset_.View(view_id)->GetFeature(track_id)))
+          (reproj_point -
+           (*pose_dataset_.View(view_id)->GetFeature(track_id)).point_)
               .norm();
     }
     const double repro_error_n =
@@ -169,14 +172,30 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     total_repro_error += repro_error_n;
     ++processed_frames;
   }
+  return true;
 }
 
 void PoseEstimator::OptimizeBoardPoints() {
   ba_options_.constant_camera_orientation = true;
   ba_options_.constant_camera_position = true;
 
+  std::map<theia::TrackId, Eigen::Matrix3d> emp_covariance_matrices;
+  double empirical_variance_factor;
   theia::BundleAdjustTracks(ba_options_, pose_dataset_.TrackIds(),
-                            &pose_dataset_);
+                            &pose_dataset_, &emp_covariance_matrices,
+                            &empirical_variance_factor);
+  std::cout << "Empirical variance factor after board point optimization: "
+            << empirical_variance_factor << "\n";
+  Eigen::Vector3d mean_std(0.0, 0.0, 0.0);
+  for (const auto &c : emp_covariance_matrices) {
+    Eigen::Vector3d stddev = c.second.diagonal().array().sqrt() * 1e3;
+    mean_std += stddev;
+    std::cout << "Track Id: " << c.first << " std dev: " << stddev.transpose()
+              << " mm\n";
+  }
+  mean_std /= (double)emp_covariance_matrices.size();
+  std::cout << "Mean board point standard deviation after optimization: " << mean_std.transpose()
+            << " mm\n";
 }
 
 void PoseEstimator::OptimizeAllPoses() {

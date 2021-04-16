@@ -227,7 +227,7 @@ def main():
     # print("==================================================================")
     # start = time.time()
     # spline_init = Popen(["python", py_spline_file,
-    #                    "--path_to_json=" + cam_telemetry_gen,
+    #                    "--input_json_path=" + cam_telemetry_gen,
     #                    "--output_path=" + spline_weighting_json,
     #                    "--q_so3=" + str(0.99),
     #                    "--q_r3=" + str(0.97)])

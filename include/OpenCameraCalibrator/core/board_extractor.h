@@ -36,6 +36,7 @@ inline BoardType StringToBoardType(const std::string &board_type) {
   } else if (board_type == "radon") {
     return BoardType::RADON;
   }
+  return BoardType::CHARUCO;
 }
 
 class BoardExtractor {

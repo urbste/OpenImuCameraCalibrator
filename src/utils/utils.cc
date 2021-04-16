@@ -158,7 +158,7 @@ double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
     const theia::Track *track = recon_dataset.Track(track_ids[t]);
     Eigen::Vector2d pt;
     v->Camera().ProjectPoint(track->Point(), &pt);
-    view_reproj_error += (pt - (*feat)).norm();
+    view_reproj_error += (pt - (*feat).point_).norm();
   }
   view_reproj_error /= track_ids.size();
   return view_reproj_error;

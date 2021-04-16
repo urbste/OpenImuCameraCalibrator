@@ -329,6 +329,8 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
         recon_calib_dataset_.NumViews(), total_repro_error))
         << "Could not write calibration file.\n";
   }
+
+  return true;
 }
 
 void CameraCalibrator::PrintResult() {

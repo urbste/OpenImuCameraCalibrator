@@ -246,6 +246,8 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
   std::ofstream calib_txt_output(save_path, std::ios::out | std::ios::binary);
   calib_txt_output.write(reinterpret_cast<const char *>(&v_bson[0]),
                          v_bson.size() * sizeof(std::uint8_t));
+
+  return true;
 }
 
 } // namespace core

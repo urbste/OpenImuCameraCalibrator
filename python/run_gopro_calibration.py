@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="EXTENDED_UNIFIED", type=str)
+                        default="DIVISION_UNDISTORTION", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 
@@ -43,7 +43,7 @@ def main():
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
                         default=0.04)
     parser.add_argument("--calib_cam_line_delay",
-                        help="If camera line delay should be calibrated", default=1)
+                        help="If camera line delay should be calibrated", default=0)
     parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
     parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
@@ -243,7 +243,7 @@ def main():
     print("==================================================================")
     start = time.time()
     spline_init = Popen(["python", py_spline_file,
-                       "--path_to_json=" + gopro_telemetry_gen,
+                       "--input_json_path=" + gopro_telemetry_gen,
                        "--output_path=" + spline_weighting_json,
                        "--q_so3=" + str(0.99),
                        "--q_r3=" + str(0.97)])

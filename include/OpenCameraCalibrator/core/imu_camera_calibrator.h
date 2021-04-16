@@ -25,7 +25,7 @@
 namespace OpenICC {
 namespace core {
 
-const int SPLINE_N = 5;
+const int SPLINE_N = 6;
 const bool USE_OLD_TIME_DERIV = false;
 
 class ImuCameraCalibrator {
