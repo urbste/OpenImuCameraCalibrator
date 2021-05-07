@@ -42,8 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <Eigen/Core>
 #include <Eigen/StdVector>
-#include "third_party/Sophus/sophus/se3.hpp"
-
+#include "sophus/se3.hpp"
 #include "sophus_utils.h"
 
 #include "OpenCameraCalibrator/utils/types.h"

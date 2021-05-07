@@ -14,7 +14,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_60/dataset1', 
+                        default='/home/steffen/Dokumente/noise_analysis/full_dataset', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="DIVISION_UNDISTORTION", type=str)
+                        default="PINHOLE", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 
@@ -43,7 +43,7 @@ def main():
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
                         default=0.04)
     parser.add_argument("--calib_cam_line_delay",
-                        help="If camera line delay should be calibrated", default=0)
+                        help="If camera line delay should be calibrated", default=1)
     parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
     parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)

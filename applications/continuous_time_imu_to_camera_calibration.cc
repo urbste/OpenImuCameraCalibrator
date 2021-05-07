@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
   double reproj_error = imu_cam_calibrator.Optimize(20, false, false, false, true);
   double reproj_error_after_ld = reproj_error;
   if (FLAGS_calibrate_cam_line_delay) {
-     reproj_error_after_ld = imu_cam_calibrator.Optimize(20, false, false, true, false);
+     reproj_error_after_ld = imu_cam_calibrator.Optimize(10, true, true, true, false);
   }
   LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";
   LOG(INFO) << "Mean reprojection error after line delay optim " << reproj_error_after_ld << "px\n";

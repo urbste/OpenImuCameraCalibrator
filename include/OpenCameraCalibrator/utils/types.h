@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "third_party/Sophus/sophus/so3.hpp"
+#include "sophus/so3.hpp"
 
 namespace OpenICC {
 
@@ -112,6 +112,33 @@ struct IMUCalibData {
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+class Data {
+public:
+  Data() : v(0.0), t(0.0) {}
+  Data(double data, double time) : v(data), t(time) {}
+
+  double v;
+  double t;
+};
+
+class AccData {
+public:
+  AccData() : a(0.0), t(0.0) {}
+  AccData(double data, double time) : a(data), t(time) {}
+
+  double a;
+  double t;
+};
+
+class GyrData {
+public:
+  GyrData() : w(0.0), t(0.0) {}
+  GyrData(double data, double time) : w(data), t(time) {}
+
+  double w;
+  double t;
 };
 
 } // namespace OpenICC

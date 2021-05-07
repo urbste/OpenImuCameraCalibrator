@@ -16,7 +16,7 @@
 
 #include <theia/sfm/reconstruction.h>
 
-#include <third_party/Sophus/sophus/so3.hpp>
+#include <sophus/so3.hpp>
 
 template <int _N>
 struct CalibAccelerationCostFunctorSplit

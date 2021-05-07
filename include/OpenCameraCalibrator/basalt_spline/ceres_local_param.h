@@ -65,8 +65,8 @@ IN THE SOFTWARE.
 #pragma once
 
 #include <ceres/local_parameterization.h>
-#include "third_party/Sophus/sophus/so3.hpp"
-#include "third_party/Sophus/sophus/se3.hpp"
+#include "sophus/so3.hpp"
+#include "sophus/se3.hpp"
 
 /// @brief Local parametrization for ceres that can be used with Sophus Lie
 /// group implementations.

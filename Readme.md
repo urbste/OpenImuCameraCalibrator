@@ -162,8 +162,10 @@ v0.2
 * [ ] Pose estimation with RSPnP
 * [ ] use only bearings in spline reproj error -> local tangent reprojection error
 * [ ] Accurate checkerboard detector (OpenCV has findCheckerboardSB. I integrated a first version but results were weird. Re-check...)
-* [ ] Model IMU - camera time difference continously (or at least optimize for different time windows)
 * [ ] Extend to multi-camera systems
 * [ ] Docker?
-* [ ] Put together a little paper on how this all works
 * [ ] Add more camera models -> Scaramuzza omni model, ...
+* [ ] Allan variance -> imu_utils
+* [ ] Calibrate axis misalignment and so on with MutliPoseOptimization from imu_tk
+* [ ] Put together a little paper on how this all works
+* [ ] Integrate updated version of spline optimizer

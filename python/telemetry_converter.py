@@ -24,13 +24,46 @@ class TelemetryImporter:
         timestamps_ns = timestamps_ns[nr_remove:len(timestamps_ns) - nr_remove]
 
         return accl, gyro, timestamps_ns
+
+    def read_gopro_telemetry(self, path_to_jsons, skip_seconds=0.0):
+        '''
+        path_to_jsons : path to json file or list of paths for multiple files
+        skip_seconds : float
+            How many seconds to cut from beginning and end of stream
+        '''
+        
+        if isinstance(path_to_jsons, (list, tuple)):
+            accl = []
+            gyro = []
+            timestamps_ns = []
+            last_timestamp = 0.0
+            for p in path_to_jsons:
+                telemetry = self._read_gopro_telemetry(p, skip_seconds=0.0)
+                accl.extend(telemetry["accelerometer"])
+                gyro.extend(telemetry["gyroscope"])
+                times = last_timestamp + np.asarray(telemetry["timestamps_ns"])
+                last_timestamp = times[-1]
+                print("setting last timestamp to: ",last_timestamp)
+                timestamps_ns.extend(times.tolist())
+            if skip_seconds != 0.0:
+                accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)
+                accl = accl[0:len(timestamps_ns)]
+                gyro = gyro[0:len(timestamps_ns)]
+            
+            self.telemetry["accelerometer"] = accl
+            self.telemetry["gyroscope"] = gyro
+            self.telemetry["timestamps_ns"] = timestamps_ns
+            self.telemetry["camera_fps"] = telemetry["camera_fps"]
+        else:
+            self.telemetry = self._read_gopro_telemetry(path_to_jsons, skip_seconds=skip_seconds)
+
     '''
-    json_data : dict
-        content of json file
+    path_to_json : str 
+        path to json file
     skip_seconds : float
         How many seconds to cut from beginning and end of stream
     '''
-    def read_gopro_telemetry(self, path_to_json, skip_seconds=0.0):
+    def _read_gopro_telemetry(self, path_to_json, skip_seconds=0.0):
 
         json_file = open(path_to_json, 'r')
         json_data = json.load(json_file)
@@ -44,7 +77,6 @@ class TelemetryImporter:
         for g in json_data['1']['streams']['GYRO']['samples']:
             gyro.append([g['value'][1], g['value'][2], g['value'][0]])
 
-
         camera_fps = json_data['frames/second']
         if skip_seconds != 0.0:
             accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)
@@ -52,10 +84,13 @@ class TelemetryImporter:
         accl = accl[0:len(timestamps_ns)]
         gyro = gyro[0:len(timestamps_ns)]
 
-        self.telemetry["accelerometer"] = accl
-        self.telemetry["gyroscope"] = gyro
-        self.telemetry["timestamps_ns"] = timestamps_ns
-        self.telemetry["camera_fps"] = camera_fps
+        telemetry = {}
+        telemetry["accelerometer"] = accl
+        telemetry["gyroscope"] = gyro
+        telemetry["timestamps_ns"] = timestamps_ns
+        telemetry["camera_fps"] = camera_fps
+
+        return telemetry
 
     def read_pilotguru_telemetry(self, path_to_accl_json, path_to_gyro_json, path_to_cam_json, skip_seconds=0.0):
         accl_json_file = open(path_to_accl_json, 'r')

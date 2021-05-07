@@ -39,7 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "third_party/Sophus/sophus/se3.hpp"
+#include "sophus/se3.hpp"
 
 namespace Sophus {
 

@@ -62,6 +62,14 @@ void InterpolateQuaternions(std::vector<double> t_old,
 void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
                          const vec3_vector &input_vec,
                          vec3_vector &interpolated_vec);
+// average calculation
+template <class T> T average(const std::vector<T> datas) {
+  T sum_data = T(0);
+  for (auto data : datas) {
+    sum_data += data;
+  }
+  return sum_data / datas.size();
+}
 
 } // namespace utils
 } // namespace OpenICC

@@ -43,7 +43,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "sophus_utils.h"
 
 #include <Eigen/Dense>
-#include "third_party/Sophus/sophus/so3.hpp"
+#include "sophus/so3.hpp"
 
 #include <array>
 

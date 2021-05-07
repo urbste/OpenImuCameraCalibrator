@@ -15,3 +15,6 @@ target_link_libraries(extract_board_to_json OpenImuCameraCalibrator ${GLOG_LIBRA
 
 add_executable(continuous_time_imu_to_camera_calibration continuous_time_imu_to_camera_calibration.cc)
 target_link_libraries(continuous_time_imu_to_camera_calibration OpenImuCameraCalibrator ${GLOG_LIBRARIES} ${THEIA_LIBRARIES} ${OpenCV_LIBRARIES} ${GFLAGS_LIBRARIES})
+
+add_executable(fit_allan_variance fit_allan_variance.cc)
+target_link_libraries(fit_allan_variance OpenImuCameraCalibrator ${GLOG_LIBRARIES} ${THEIA_LIBRARIES} ${OpenCV_LIBRARIES} ${GFLAGS_LIBRARIES})
