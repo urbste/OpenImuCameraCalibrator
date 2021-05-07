@@ -26,11 +26,11 @@ AllanVarianceFitter::AllanVarianceFitter(
   for (size_t i = 0; i < telemetry_data_.accelerometer.timestamp_ms.size();
        ++i) {
     const double t_s = telemetry_data_.accelerometer.timestamp_ms[i] * MS_TO_S;
-    data_acc_x_->pushRadPerSec(telemetry_data_.accelerometer.measurement[i][0],
+    data_acc_x_->pushMPerSec2(telemetry_data_.accelerometer.measurement[i][0],
                                t_s);
-    data_acc_y_->pushRadPerSec(telemetry_data_.accelerometer.measurement[i][1],
+    data_acc_y_->pushMPerSec2(telemetry_data_.accelerometer.measurement[i][1],
                                t_s);
-    data_acc_z_->pushRadPerSec(telemetry_data_.accelerometer.measurement[i][2],
+    data_acc_z_->pushMPerSec2(telemetry_data_.accelerometer.measurement[i][2],
                                t_s);
 
     data_gyr_x_->pushRadPerSec(telemetry_data_.gyroscope.measurement[i][0],
@@ -77,6 +77,39 @@ bool AllanVarianceFitter::RunFit() {
   std::vector< double > gyro_sim_d_y = fit_gyr_y.calcSimDeviation( gyro_ts_y );
   std::vector< double > gyro_sim_d_z = fit_gyr_z.calcSimDeviation( gyro_ts_z );
 
+  std::cout << "==============================================" << std::endl;
+    std::cout << "==============================================" << std::endl;
+
+    data_acc_x_->calc( );
+    std::vector< double > acc_v_x  = data_acc_x_->getVariance( );
+    std::vector< double > acc_d_x  = data_acc_x_->getDeviation( );
+    std::vector< double > acc_ts_x = data_acc_x_->getTimes( );
+
+    data_acc_y_->calc( );
+    std::vector< double > acc_v_y  = data_acc_y_->getVariance( );
+    std::vector< double > acc_d_y  = data_acc_y_->getDeviation( );
+    std::vector< double > acc_ts_y = data_acc_y_->getTimes( );
+
+    data_acc_z_->calc( );
+    std::vector< double > acc_v_z  = data_acc_z_->getVariance( );
+    std::vector< double > acc_d_z  = data_acc_z_->getDeviation( );
+    std::vector< double > acc_ts_z = data_acc_z_->getTimes( );
+
+    std::cout << "acc X " << std::endl;
+    allanvar::FitAllanAcc fit_acc_x( acc_v_x, acc_ts_x, data_acc_x_->getFreq( ) );
+    std::cout << "-------------------" << std::endl;
+
+    std::cout << "acc y " << std::endl;
+    allanvar::FitAllanAcc fit_acc_y( acc_v_y, acc_ts_y, data_acc_y_->getFreq( ) );
+    std::cout << "-------------------" << std::endl;
+
+    std::cout << "acc z " << std::endl;
+    allanvar::FitAllanAcc fit_acc_z( acc_v_z, acc_ts_z, data_acc_z_->getFreq( ) );
+    std::cout << "-------------------" << std::endl;
+
+    std::vector< double > acc_sim_d_x = fit_acc_x.calcSimDeviation( acc_ts_x );
+    std::vector< double > acc_sim_d_y = fit_acc_y.calcSimDeviation( acc_ts_x );
+    std::vector< double > acc_sim_d_z = fit_acc_z.calcSimDeviation( acc_ts_x );
 
   return true;
 }

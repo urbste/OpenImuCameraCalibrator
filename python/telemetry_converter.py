@@ -43,7 +43,7 @@ class TelemetryImporter:
                 gyro.extend(telemetry["gyroscope"])
                 times = last_timestamp + np.asarray(telemetry["timestamps_ns"])
                 last_timestamp = times[-1]
-                print("setting last timestamp to: ",last_timestamp)
+                print("setting last timest to: ",last_timestamp)
                 timestamps_ns.extend(times.tolist())
             if skip_seconds != 0.0:
                 accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)

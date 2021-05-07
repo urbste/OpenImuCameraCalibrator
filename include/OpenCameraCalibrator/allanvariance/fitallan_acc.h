@@ -1,3 +1,5 @@
+// see https://github.com/gaowenliang/imu_utils
+
 #pragma once
 
 #include <ceres/ceres.h>
