@@ -145,18 +145,68 @@ ters, 1(1):137–144, Jan 2016.
    * [10] Hannes Ovrén and Per-Erik Forssén Spline Error Weighting for Robust Visual-Inertial Fusion In Proceedings of the IEEE on Computer Vision and Pattern Recognition (CVPR) June 2018
 
 
+## How to compare to Kalibr
+Work-in-progress!
+
+1. Download CDE package from [here](https://github.com/ethz-asl/kalibr/wiki/downloads)
+
+2. Open AprilTag target on screen or print it from [here](https://github.com/ethz-asl/kalibr/wiki/downloads)
+
+3. Create a AprilTag yaml file and enter size of tag
+
+4. Find out your GoPro IMU noise params using allan variance
+   * Record a >2h GoPro video where the GoPro is actually standing still. Use the lowest resolution and FPS setting, as we do not need the video feed for this
+   * This will create multiple video files, so we need to extract the telemetry from each and merge it to a large one.
+   * Put all video files in a single folder
+   * Use python/allan_variance.py for this
+   * Finally run fit_allan_variance binary on the large telemetry file
+   * This will give you a value for each axis x-y-z of gyroscope and accelerometer
+   * Average these values
+
+5. Finally create a imu.yaml
+
+Example from my GoPro 9 
+``` yaml
+#Accelerometers
+accelerometer_noise_density: 1.5e-02   # White noise
+accelerometer_random_walk:   4.5e-04   # Bias instability
+
+#Gyroscopes
+gyroscope_noise_density:     1.1e-03   # White noise
+gyroscope_random_walk:       3.0e-05   # Bias instability
+
+rostopic:                    /imu0      #the IMU ROS topic
+update_rate:                 200.0      #Hz (for discretization of the values above)
+```
+
+6. Use python/extract_for_kalibr_bagcreator.py to extract telemetry and single images
+
+7. Run kalibr_bagcreator
+
+8. Run kalibr_calibrate_cameras
+
+Use omni-radtan model.
+
+9. Run kalibr_calibrate_imu_camera
+
+with --time-calibration
+
 
 ## Working on / ToDo / Contributions Welcome
 v0.1
 * [x] Code cleanup, add license header
 * [x] use different initialization for linear mode
 * [x] Use more generic JSON meta data interface, so that others cameras can be calibrated that come with different telemetry formats
-* [ ] Beautify logs
 * [x] Write example for the calibration of a Smartphone
-v0.2
-* [ ] Model time delay for optimization
+* [x]
 * [x] Rolling shutter calibration -> first resolve problems with templated spline functions
 * [x] Add readout time as a optimizable parameter -> not working well, probably residual weighting needs to be improved
+* [x] Allan variance -> imu_utils
+* [ ] Support AprilTag board from Kalibr
+* [ ] Beautify logs
+
+v0.2
+* [ ] Calibrate also imu parameters like axis misalignment
 * [ ] Model bias over time with a R3 spline
 * [ ] Pose estimation with UPNP or MLPnP to support arbitraty camera types. Right now: undistortion and then using vanilla PnP --> will lead to problems for Ultra Wide Angle fisheye lenses (e.g. GoPro Max or potentially Max lens mod)
 * [ ] Pose estimation with RSPnP
@@ -165,7 +215,6 @@ v0.2
 * [ ] Extend to multi-camera systems
 * [ ] Docker?
 * [ ] Add more camera models -> Scaramuzza omni model, ...
-* [ ] Allan variance -> imu_utils
 * [ ] Calibrate axis misalignment and so on with MutliPoseOptimization from imu_tk
 * [ ] Put together a little paper on how this all works
 * [ ] Integrate updated version of spline optimizer

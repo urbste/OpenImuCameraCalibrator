@@ -1,8 +1,7 @@
 import os
 import json
 from argparse import ArgumentParser
-import numpy as np
-from subprocess import Popen, PIPE
+from subprocess import Popen
 from os.path import join as pjoin
 import glob
 import time

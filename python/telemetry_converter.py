@@ -178,13 +178,28 @@ class TelemetryConverter:
     def _dump_final_json(self, output_path):
         with open(output_path, "w") as f:
             json.dump(self.telemetry_importer.telemetry, f)
-    
+    def _dump_kalibr_csv(self, output_path):
+        with open(output_path, "w") as f:
+            for i in range(len(self.telemetry_importer.telemetry["timestamps_ns"])):
+                t = self.telemetry_importer.telemetry["timestamps_ns"][i]
+                g = self.telemetry_importer.telemetry["gyroscope"][i]
+                a = self.telemetry_importer.telemetry["accelerometer"][i]
+                f.write(format(int(t), '09d')+','+str(g[0])+','+str(g[1])+','+str(g[2])+','+str(a[0])+','+str(a[1])+','+str(a[2])+'\n')
+            f.close()
+
     def convert_gopro_telemetry_file(self, input_telemetry_json, output_path, skip_seconds=0.0):
         self.telemetry_importer.read_gopro_telemetry(
             input_telemetry_json, skip_seconds=skip_seconds)
         self._dump_final_json(output_path)
 
+    def convert_gopro_telemetry_file_to_kalibr(self, input_telemetry_json, output_path, skip_seconds=0.0):
+        self.telemetry_importer.read_gopro_telemetry(
+            input_telemetry_json, skip_seconds=skip_seconds)
+        self._dump_kalibr_csv(output_path)
+
     def convert_pilotguru_telemetry_file(self, input_accl_json, input_gyro_json, input_cam_json, output_path, skip_seconds=0.0):
         self.telemetry_importer.read_pilotguru_telemetry(
             input_accl_json, input_gyro_json, input_cam_json, skip_seconds=skip_seconds)
         self._dump_final_json(output_path)
+
+    

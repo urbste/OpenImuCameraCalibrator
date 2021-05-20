@@ -29,13 +29,13 @@ def main():
 
     all_files = glob.glob(pjoin(args.path_calib_dataset, '*.MP4'))
 
-    # for f in all_files:
-    #     filename = f[f.rfind("/")+1:]
-    #     telemetry_extract = Popen(["node",js_extract_file,
-    #                     args.path_calib_dataset,
-    #                     filename,
-    #                     args.path_calib_dataset])
-    #     telemetry_extract.wait()
+    for f in all_files:
+        filename = f[f.rfind("/")+1:]
+        telemetry_extract = Popen(["node",js_extract_file,
+                        args.path_calib_dataset,
+                        filename,
+                        args.path_calib_dataset])
+        telemetry_extract.wait()
     # merge files to a single large file
     all_json_files = natsorted(glob.glob(pjoin(args.path_calib_dataset, '*.json')), key=lambda y: y.lower())
 
