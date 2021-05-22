@@ -18,3 +18,6 @@ target_link_libraries(continuous_time_imu_to_camera_calibration OpenImuCameraCal
 
 add_executable(fit_allan_variance fit_allan_variance.cc)
 target_link_libraries(fit_allan_variance OpenImuCameraCalibrator ${GLOG_LIBRARIES} ${THEIA_LIBRARIES} ${OpenCV_LIBRARIES} ${GFLAGS_LIBRARIES})
+
+add_executable(static_imu_calibration static_imu_calibration.cc)
+target_link_libraries(static_imu_calibration OpenImuCameraCalibrator ${GLOG_LIBRARIES} ${THEIA_LIBRARIES} ${OpenCV_LIBRARIES} ${GFLAGS_LIBRARIES})

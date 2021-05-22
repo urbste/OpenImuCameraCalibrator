@@ -77,22 +77,22 @@ int main(int argc, char *argv[]) {
 
   // fill measurementes
   vec3_map angular_velocities, acclerations;
-  for (size_t i = 0; i < telemetry_data.gyroscope.measurement.size();
+  for (size_t i = 0; i < telemetry_data.gyroscope.size();
        ++i) {
-    angular_velocities[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
-        telemetry_data.gyroscope.measurement[i] + gyro_bias;
-    acclerations[telemetry_data.gyroscope.timestamp_ms[i] * 1e-3] =
-        telemetry_data.accelerometer.measurement[i] + accl_bias;
+    angular_velocities[telemetry_data.gyroscope[i].timestamp_s()] =
+        telemetry_data.gyroscope[i].data() + gyro_bias;
+    acclerations[telemetry_data.gyroscope[i].timestamp_s()] =
+        telemetry_data.accelerometer[i].data() + accl_bias;
   }
 
   // get mean hz imu
   double imu_dt_s = 0.0;
-  for (size_t i = 1; i < telemetry_data.gyroscope.timestamp_ms.size(); ++i) {
-    imu_dt_s += telemetry_data.gyroscope.timestamp_ms[i] -
-                telemetry_data.gyroscope.timestamp_ms[i - 1];
+  for (size_t i = 1; i < telemetry_data.gyroscope.size(); ++i) {
+    imu_dt_s += telemetry_data.gyroscope[i].timestamp_s() -
+                telemetry_data.gyroscope[i-1].timestamp_s();
   }
   imu_dt_s /=
-      static_cast<double>(telemetry_data.gyroscope.timestamp_ms.size() - 1);
+      static_cast<double>(telemetry_data.gyroscope.size() - 1);
   imu_dt_s *= 1e-3;
 
   quat_map visual_rotations;

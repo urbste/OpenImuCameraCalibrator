@@ -82,14 +82,14 @@ void ImuCameraCalibrator::InitSpline(
   }
 
   // Add Accelerometer
-  for (size_t i = 0; i < telemetry_data.accelerometer.measurement.size(); ++i) {
-    const double t = telemetry_data.accelerometer.timestamp_ms[i] * MS_TO_S +
+  for (size_t i = 0; i < telemetry_data.accelerometer.size(); ++i) {
+    const double t = telemetry_data.accelerometer[i].timestamp_s() +
                      time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_)
       continue;
 
     const Eigen::Vector3d accl_unbiased =
-        telemetry_data.accelerometer.measurement[i] + accl_bias;
+        telemetry_data.accelerometer[i].data() + accl_bias;
     trajectory_.addAccelMeasurement(accl_unbiased, t * S_TO_NS,
                                     1. / spline_weight_data_.var_r3,
                                     reestimate_biases_);
@@ -97,14 +97,14 @@ void ImuCameraCalibrator::InitSpline(
   }
 
   // Add Gyroscope
-  for (size_t i = 0; i < telemetry_data.gyroscope.measurement.size(); ++i) {
-    const double t = telemetry_data.gyroscope.timestamp_ms[i] * MS_TO_S +
+  for (size_t i = 0; i < telemetry_data.gyroscope.size(); ++i) {
+    const double t = telemetry_data.gyroscope[i].timestamp_s() +
                      time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_)
       continue;
 
     const Eigen::Vector3d gyro_unbiased =
-        telemetry_data.gyroscope.measurement[i] + gyro_bias;
+        telemetry_data.gyroscope[i].data() + gyro_bias;
     trajectory_.addGyroMeasurement(gyro_unbiased, t * S_TO_NS,
                                    1. / spline_weight_data_.var_so3,
                                    reestimate_biases_);
@@ -128,12 +128,12 @@ void ImuCameraCalibrator::InitializeGravity(
     Sophus::SE3d T_a_i = Sophus::SE3d(q_w_c, p_w_c) * T_i_c_init_.inverse();
 
     if (!gravity_initialized_) {
-      for (size_t i = 0; i < telemetry_data.accelerometer.measurement.size();
+      for (size_t i = 0; i < telemetry_data.accelerometer.size();
            i++) {
         const Eigen::Vector3d ad =
-            telemetry_data.accelerometer.measurement[i] + accl_bias;
+            telemetry_data.accelerometer[i].data() + accl_bias;
         const int64_t accl_t =
-            telemetry_data.accelerometer.timestamp_ms[i] * MS_TO_S;
+            telemetry_data.accelerometer[i].timestamp_s();
         if (std::abs(accl_t - cam_timestamps_[j]) < 1. / 30.) {
           gravity_init_ = T_a_i.so3() * ad;
           gravity_initialized_ = true;

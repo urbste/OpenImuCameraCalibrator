@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--calib_cam_line_delay",
                         help="If camera line delay should be calibrated", default=1)
     parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
-    parser.add_argument("--gravity_const", help="gravity constant", default=9.81, type=float)
+    parser.add_argument("--gravity_const", help="gravity constant", default=9.811104, type=float)
     parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
     parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=0, type=int)

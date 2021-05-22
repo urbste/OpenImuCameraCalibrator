@@ -138,6 +138,9 @@ ters, 1(1):137–144, Jan 2016.
    * [5] **Division undistortion**: "Simultaneous linear estimation of multiple view distortion" by Andrew Fitzgibbon, CVPR 2001.
    * [6] **Fisheye**: Kannala, Juho, and Sami S. Brandt. "A generic camera model and calibration method for conventional, wide-angle, and fish-eye lenses." IEEE transactions on pattern analysis and machine intelligence 28.8 (2006): 1335-1340.
 
+### IMU calibration:
+   * [11] D. Tedaldi, A. Pretto and E. Menegatti, "A Robust and Easy to Implement Method for IMU Calibration without  External Equipments". In: Proceedings of the IEEE International Conference on Robotics and Automation (ICRA  2014), May 31 - June 7, 2014 Hong Kong, China, Page(s): 3042 - 3049
+
 ### Misc:
    * [7] Mustaniemi J., Kannala J., Särkkä S., Matas J., Heikkilä J. "Inertial-Based Scale Estimation for Structure from Motion on Mobile Devices", International Conference on Intelligent Robots and Systems (IROS), 2017
    * [8] Efficient Derivative Computation for Cumulative B-Splines on Lie Groups, C. Sommer, V. Usenko, D. Schubert, N. Demmel, D. Cremers, In 2020 Conference on Computer Vision and Pattern Recognition (CVPR) 
@@ -198,12 +201,13 @@ v0.1
 * [x] use different initialization for linear mode
 * [x] Use more generic JSON meta data interface, so that others cameras can be calibrated that come with different telemetry formats
 * [x] Write example for the calibration of a Smartphone
-* [x]
 * [x] Rolling shutter calibration -> first resolve problems with templated spline functions
 * [x] Add readout time as a optimizable parameter -> not working well, probably residual weighting needs to be improved
 * [x] Allan variance -> imu_utils
 * [ ] Support AprilTag board from Kalibr
+* [ ] Calibrate axis misalignment and so on with MutliPoseOptimization from imu_tk
 * [ ] Beautify logs
+* [ ] Cleanup
 
 v0.2
 * [ ] Calibrate also imu parameters like axis misalignment
@@ -215,6 +219,7 @@ v0.2
 * [ ] Extend to multi-camera systems
 * [ ] Docker?
 * [ ] Add more camera models -> Scaramuzza omni model, ...
-* [ ] Calibrate axis misalignment and so on with MutliPoseOptimization from imu_tk
-* [ ] Put together a little paper on how this all works
 * [ ] Integrate updated version of spline optimizer
+
+misc
+* [ ] Put together a little paper on how this all works

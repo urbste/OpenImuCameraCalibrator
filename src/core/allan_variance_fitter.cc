@@ -23,21 +23,21 @@ AllanVarianceFitter::AllanVarianceFitter(
   data_gyr_y_ = new allanvar::AllanGyr("gyr_y", nr_clusters);
   data_gyr_z_ = new allanvar::AllanGyr("gyr_z", nr_clusters);
 
-  for (size_t i = 0; i < telemetry_data_.accelerometer.timestamp_ms.size();
+  for (size_t i = 0; i < telemetry_data_.accelerometer.size();
        ++i) {
-    const double t_s = telemetry_data_.accelerometer.timestamp_ms[i] * MS_TO_S;
-    data_acc_x_->pushMPerSec2(telemetry_data_.accelerometer.measurement[i][0],
+    const double t_s = telemetry_data_.accelerometer[i].timestamp_s();
+    data_acc_x_->pushMPerSec2(telemetry_data_.accelerometer[i].x(),
                                t_s);
-    data_acc_y_->pushMPerSec2(telemetry_data_.accelerometer.measurement[i][1],
+    data_acc_y_->pushMPerSec2(telemetry_data_.accelerometer[i].y(),
                                t_s);
-    data_acc_z_->pushMPerSec2(telemetry_data_.accelerometer.measurement[i][2],
+    data_acc_z_->pushMPerSec2(telemetry_data_.accelerometer[i].z(),
                                t_s);
 
-    data_gyr_x_->pushRadPerSec(telemetry_data_.gyroscope.measurement[i][0],
+    data_gyr_x_->pushRadPerSec(telemetry_data_.gyroscope[i].x(),
                                t_s);
-    data_gyr_y_->pushRadPerSec(telemetry_data_.gyroscope.measurement[i][1],
+    data_gyr_y_->pushRadPerSec(telemetry_data_.gyroscope[i].y(),
                                t_s);
-    data_gyr_z_->pushRadPerSec(telemetry_data_.gyroscope.measurement[i][2],
+    data_gyr_z_->pushRadPerSec(telemetry_data_.gyroscope[i].z(),
                                t_s);
   }
 }

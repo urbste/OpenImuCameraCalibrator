@@ -46,20 +46,28 @@ bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
     return false;
   }
 
-  for (const auto& t : timestamps_ns) {
-      telemetry.accelerometer.timestamp_ms.emplace_back((double)t * US_TO_S);
-      telemetry.gyroscope.timestamp_ms.emplace_back((double)t * US_TO_S);
+  for (int i=0; i < timestamps_ns.size(); ++i) {
+      double t_s = (double)timestamps_ns[i] * NS_TO_S;
+      ImuReading<double> acc_reading(t_s, accl[i][0], accl[i][1],  accl[i][2]);
+      ImuReading<double> gyr_reading(t_s, gyro[i][0], gyro[i][1],  gyro[i][2]);
+      telemetry.accelerometer.push_back(acc_reading);
+      telemetry.gyroscope.push_back(gyr_reading);
   }
-  for (const auto& a : accl) {
-      Eigen::Vector3d v;
-      v << a[0], a[1], a[2];
-      telemetry.accelerometer.measurement.emplace_back(v);
-  }
-  for (const auto& g : gyro) {
-      Eigen::Vector3d v;
-      v << g[0], g[1], g[2];
-      telemetry.gyroscope.measurement.emplace_back(v);
-  }
+//  for (const auto& t : timestamps_ns) {
+
+//      telemetry.accelerometer.timestamp_ms.emplace_back((double)t * US_TO_S);
+//      telemetry.gyroscope.timestamp_ms.emplace_back((double)t * US_TO_S);
+//  }
+//  for (const auto& a : accl) {
+//      Eigen::Vector3d v;
+//      v << a[0], a[1], a[2];
+//      telemetry.accelerometer.measurement.emplace_back(v);
+//  }
+//  for (const auto& g : gyro) {
+//      Eigen::Vector3d v;
+//      v << g[0], g[1], g[2];
+//      telemetry.gyroscope.measurement.emplace_back(v);
+//  }
 
   file.close();
   return true;

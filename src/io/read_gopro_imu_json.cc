@@ -41,14 +41,14 @@ bool ReadGoProTelemetry(const std::string &path_to_telemetry_file,
   for (const auto &e : accl) {
     Eigen::Vector3d v;
     v << e["value"][1], e["value"][2], e["value"][0];
-    telemetry.accelerometer.measurement.emplace_back(v);
-    telemetry.accelerometer.timestamp_ms.emplace_back(e["cts"]);
+    ImuReading<double> reading((double)e["cts"] * MS_TO_S, v);
+    telemetry.accelerometer.push_back(reading);
   }
   for (const auto &e : gyro) {
     Eigen::Vector3d v;
     v << e["value"][1], e["value"][2], e["value"][0];
-    telemetry.gyroscope.measurement.emplace_back(v);
-    telemetry.gyroscope.timestamp_ms.emplace_back(e["cts"]);
+    ImuReading<double> reading((double)e["cts"] * MS_TO_S, v);
+    telemetry.accelerometer.push_back(reading);
   }
   for (const auto &e : gps5) {
     Eigen::Vector3d v;
