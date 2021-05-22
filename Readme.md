@@ -124,7 +124,8 @@ This library would not have been possible without these great OpenSource project
 * [Sophus](https://github.com/strasdat/Sophus) - C++ Lie groups
 * [GoPro-Telemetry](https://github.com/JuanIrache/gopro-telemetry) - Great JavaScript GoPro telemetry extractor
 * [Kontiki](https://github.com/hovren/kontiki) - Spline error weighting, VISFM
-
+* [IMU-TK](https://github.com/Kyle-ak/imu_tk) - Static multi pose imu calibration
+* [Allan variance](https://github.com/gaowenliang/imu_utils) - Gyro noise characterization
 ## Literature and Code
 ### Libraries
    * [1] Theia Multiview Geometry Library: Tutorial & Reference
