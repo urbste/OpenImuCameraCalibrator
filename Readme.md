@@ -229,8 +229,10 @@ misc
 
 ## Citation
 If this tool helped you and you are using it in your work consider citing it as follows for now:
+```
 @misc{OpenICC,
   author = {Steffen Urban},
   title = {OpenICC: An Open IMU and Camera Calibrator},
   howpublished = "\url{https://github.com/urbste/OpenImuCameraCalibrator}",
 }
+```
