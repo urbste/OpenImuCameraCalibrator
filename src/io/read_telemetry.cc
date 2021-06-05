@@ -53,21 +53,6 @@ bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
       telemetry.accelerometer.push_back(acc_reading);
       telemetry.gyroscope.push_back(gyr_reading);
   }
-//  for (const auto& t : timestamps_ns) {
-
-//      telemetry.accelerometer.timestamp_ms.emplace_back((double)t * US_TO_S);
-//      telemetry.gyroscope.timestamp_ms.emplace_back((double)t * US_TO_S);
-//  }
-//  for (const auto& a : accl) {
-//      Eigen::Vector3d v;
-//      v << a[0], a[1], a[2];
-//      telemetry.accelerometer.measurement.emplace_back(v);
-//  }
-//  for (const auto& g : gyro) {
-//      Eigen::Vector3d v;
-//      v << g[0], g[1], g[2];
-//      telemetry.gyroscope.measurement.emplace_back(v);
-//  }
 
   file.close();
   return true;

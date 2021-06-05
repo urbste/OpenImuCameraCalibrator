@@ -20,6 +20,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "OpenCameraCalibrator/utils/types.h"
+#include "OpenCameraCalibrator/utils/json.h"
 
 #include <algorithm>
 #include <dirent.h>
@@ -27,6 +28,8 @@
 
 namespace OpenICC {
 namespace core {
+
+const int NUM_PTS_MARKER = 4;
 
 enum BoardType { CHARUCO = 0, RADON = 1 };
 
@@ -53,6 +56,12 @@ public:
                           const std::string& save_path,
                           const double img_downsample_factor);
 
+  //! Extract the board from a folder full of images. The image names has to be time time in nanoseconds!
+  //! e.g. 1000000000000.png
+  bool ExtractImageFolderToJson(const std::string &image_folder,
+                                const std::string &save_path,
+                                const double img_downsample_factor);
+
   //! Initializes a Charuco board
   bool InitializeCharucoBoard(std::string path_to_detector_params,
                               float marker_length, float square_length,
@@ -64,12 +73,15 @@ public:
   //! Returns the 3d board points
   std::vector<std::vector<cv::Point3f>> GetBoardPts() { return board_pts3d_; }
 
-  std::vector<int> GetRadonBoardIDs() { return radon_board_indices_; }
+  std::vector<int> GetRadonBoardIDs() { return continuous_board_indices_; }
 
   //! Set verbose plot
   void SetVerbosePlot() { verbose_plot_ = true; }
 
 private:
+
+  void BoardToJson(nlohmann::json &output_json);
+
   //! Board type
   BoardType board_type_;
 
@@ -89,8 +101,8 @@ private:
   int radon_flags_;
   //! radon board size
   cv::Size radon_pattern_size_;
-  //! radon board pt continuous index
-  std::vector<int> radon_board_indices_;
+  //! board pt continuous index
+  std::vector<int> continuous_board_indices_;
 
   //! if a board is already initialized
   bool board_initialized_ = false;
@@ -101,6 +113,7 @@ private:
   //! display extracted corners
   bool verbose_plot_ = false;
 };
+
 
 }
 }

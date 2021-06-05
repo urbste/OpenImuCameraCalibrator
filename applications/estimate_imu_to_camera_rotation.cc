@@ -76,13 +76,11 @@ int main(int argc, char *argv[]) {
   }
 
   // fill measurementes
-  vec3_map angular_velocities, acclerations;
+  vec3_map angular_velocities;
   for (size_t i = 0; i < telemetry_data.gyroscope.size();
        ++i) {
     angular_velocities[telemetry_data.gyroscope[i].timestamp_s()] =
-        telemetry_data.gyroscope[i].data() + gyro_bias;
-    acclerations[telemetry_data.gyroscope[i].timestamp_s()] =
-        telemetry_data.accelerometer[i].data() + accl_bias;
+        telemetry_data.gyroscope[i].data() - gyro_bias;
   }
 
   // get mean hz imu
@@ -93,7 +91,6 @@ int main(int argc, char *argv[]) {
   }
   imu_dt_s /=
       static_cast<double>(telemetry_data.gyroscope.size() - 1);
-  imu_dt_s *= 1e-3;
 
   quat_map visual_rotations;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {

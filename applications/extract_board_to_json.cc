@@ -18,6 +18,7 @@
 #include <ios>
 #include <iostream>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include "OpenCameraCalibrator/core/board_extractor.h"
@@ -26,10 +27,10 @@
 
 using namespace cv;
 
-DEFINE_string(input_video, "", "Path to save charuco board to.");
+DEFINE_string(input_path, "", "Input path.");
 DEFINE_string(board_type, "charuco", "Board type. (charuco, radon)");
 DEFINE_string(aruco_detector_params, "", "Path detector yaml.");
-DEFINE_double(downsample_factor, 2.0,
+DEFINE_double(downsample_factor, 1.0,
               "Downsample factor for images. I_new = 1/factor * I");
 DEFINE_string(save_corners_json_path, "",
               "Where to save the recon dataset to.");
@@ -54,7 +55,7 @@ int main(int argc, char *argv[]) {
 
   if (DoesFileExist(FLAGS_save_corners_json_path) && !FLAGS_recompute_corners) {
     LOG(INFO) << "Skipping corner extraction. Already extracted for: "
-              << FLAGS_input_video << "\n";
+              << FLAGS_input_path << "\n";
     return 0;
   }
 
@@ -71,12 +72,23 @@ int main(int argc, char *argv[]) {
         FLAGS_checker_square_length_m, FLAGS_num_squares_x, FLAGS_num_squares_y,
         FLAGS_aruco_dict);
   } else if (board_type == BoardType::RADON) {
-     board_extractor.InitializeRadonBoard(FLAGS_checker_square_length_m, FLAGS_num_squares_x, FLAGS_num_squares_y);
+    board_extractor.InitializeRadonBoard(FLAGS_checker_square_length_m,
+                                         FLAGS_num_squares_x,
+                                         FLAGS_num_squares_y);
+  } else {
+      LOG(ERROR) << "This board type does not exist! Choose Charuco or Radon";
   }
 
   LOG(INFO) << "Starting board extraction. This might take a while...";
-  board_extractor.ExtractVideoToJson(
-      FLAGS_input_video, FLAGS_save_corners_json_path, FLAGS_downsample_factor);
+  if (IsPathAFile(FLAGS_input_path)) {
+    board_extractor.ExtractVideoToJson(FLAGS_input_path,
+                                       FLAGS_save_corners_json_path,
+                                       FLAGS_downsample_factor);
 
+  } else {
+    board_extractor.ExtractImageFolderToJson(FLAGS_input_path,
+                                             FLAGS_save_corners_json_path,
+                                             FLAGS_downsample_factor);
+  }
   return 0;
 }

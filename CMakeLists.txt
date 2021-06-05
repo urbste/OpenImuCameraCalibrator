@@ -39,9 +39,11 @@ else (THEIA_FOUND)
   message("Cannot find TheiaSfM!")
 endif (THEIA_FOUND)
 
+
 file(GLOB_RECURSE CAMCALIB_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/*.cc)
 file(GLOB_RECURSE CAMCALIB_HEADER_FILES ${CMAKE_SOURCE_DIR}/include/*.h)
 
+# commit d5ccee8 before fmt was added
 include_directories(third_party/Sophus)
 
 include_directories(${PROJECT_SOURCE_DIR})

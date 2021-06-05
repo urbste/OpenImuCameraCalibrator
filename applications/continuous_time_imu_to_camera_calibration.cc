@@ -52,7 +52,11 @@ DEFINE_string(input_corners, "",
 DEFINE_string(camera_calibration_json, "", "Camera calibration.");
 DEFINE_string(gyro_to_cam_initial_calibration, "",
               "Initial gyro to camera calibration json.");
+DEFINE_string(imu_intrinsics, "",
+              "IMU intrinsics, scale and misalignment matrices. E.g. estimated "
+              "with static_imu_calibration or from a datasheet.");
 DEFINE_string(imu_bias_file, "", "IMU bias json");
+DEFINE_bool(global_shutter, false, "If camera has a global shutter.");
 DEFINE_string(spline_error_weighting_json, "",
               "Path to spline error weighting data");
 DEFINE_string(output_path, "", "");
@@ -77,11 +81,6 @@ using namespace OpenICC::io;
 
 int main(int argc, char *argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
-
-  // IMU Bias
-  Eigen::Vector3d accl_bias, gyro_bias;
-  CHECK(ReadIMUBias(FLAGS_imu_bias_file, gyro_bias, accl_bias))
-      << "Could not open " << FLAGS_imu_bias_file;
 
   // Get pose dataset
   theia::Reconstruction pose_dataset;
@@ -153,6 +152,13 @@ int main(int argc, char *argv[]) {
       << "Could not read: " << FLAGS_gyro_to_cam_initial_calibration;
   Sophus::SE3<double> T_i_c_init(imu2cam.conjugate(), Eigen::Vector3d(0, 0, 0));
 
+  // Read a imu intrinsics
+  ThreeAxisSensorCalibParams<double> acc_intr, gyr_intr;
+  CHECK(ReadIMUIntrinsics(FLAGS_imu_intrinsics, FLAGS_imu_bias_file, acc_intr,
+                            gyr_intr))
+        << "Could not open " << FLAGS_imu_intrinsics;
+  std::cout << "Loaded IMU intrinsics.\n";
+
   CHECK(FLAGS_spline_error_weighting_json != "")
       << "You need to provide spline error weighting factors. Create with "
          "get_sew_for_dataset.py.";
@@ -161,20 +167,26 @@ int main(int argc, char *argv[]) {
       ReadSplineErrorWeighting(FLAGS_spline_error_weighting_json, weight_data))
       << "Could not open " << FLAGS_spline_error_weighting_json;
 
-  const double init_line_delay_us = 1./ fps / camera.ImageHeight();
-
+  double init_line_delay_us = 1. / fps / camera.ImageHeight();
+  if (FLAGS_global_shutter) {
+    init_line_delay_us = 0.0;
+  }
   ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
   imu_cam_calibrator.InitSpline(recon_calib_dataset, T_i_c_init, weight_data,
-                                time_offset_imu_to_cam, gyro_bias, accl_bias,
-                                telemetry_data, init_line_delay_us);
-  imu_cam_calibrator.InitializeGravity(telemetry_data, accl_bias);
-  double reproj_error = imu_cam_calibrator.Optimize(20, false, false, false, true);
+                                time_offset_imu_to_cam, telemetry_data,
+                                init_line_delay_us);
+  imu_cam_calibrator.InitializeGravity(telemetry_data);
+  imu_cam_calibrator.SetIMUIntrinsics(acc_intr, gyr_intr);
+  double reproj_error =
+      imu_cam_calibrator.Optimize(20, false, false, false, true);
   double reproj_error_after_ld = reproj_error;
-  if (FLAGS_calibrate_cam_line_delay) {
-     reproj_error_after_ld = imu_cam_calibrator.Optimize(10, true, true, true, false);
+  if (FLAGS_calibrate_cam_line_delay && !FLAGS_global_shutter) {
+    reproj_error_after_ld =
+        imu_cam_calibrator.Optimize(10, true, true, true, false);
   }
   LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";
-  LOG(INFO) << "Mean reprojection error after line delay optim " << reproj_error_after_ld << "px\n";
+  LOG(INFO) << "Mean reprojection error after line delay optim "
+            << reproj_error_after_ld << "px\n";
 
   std::cout << "g: " << imu_cam_calibrator.trajectory_.getG().transpose()
             << std::endl;
@@ -193,7 +205,8 @@ int main(int argc, char *argv[]) {
   std::cout << "T_i_c qw,qx,qy,qz: " << q_i_c.w() << " " << q_i_c.x() << " "
             << q_i_c.y() << " " << q_i_c.z() << std::endl;
   std::cout << "T_i_c t: " << t_i_c.transpose() << std::endl;
-  std::cout << "Initialized line delay [us]: " << imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US << "\n";
+  std::cout << "Initialized line delay [us]: "
+            << imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US << "\n";
   std::cout << "Calibrated line delay [us]: " << calib_line_delay_us << "\n";
   nlohmann::json json_calibspline_results_out;
 
@@ -207,9 +220,11 @@ int main(int argc, char *argv[]) {
   json_calibspline_results_out["final_reproj_error"] = reproj_error;
   json_calibspline_results_out["r3_dt"] = weight_data.dt_r3;
   json_calibspline_results_out["so3_dt"] = weight_data.dt_so3;
-  json_calibspline_results_out["init_line_delay_us"] = imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US;
+  json_calibspline_results_out["init_line_delay_us"] =
+      imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US;
   json_calibspline_results_out["calib_line_delay_us"] = calib_line_delay_us;
-  json_calibspline_results_out["time_offset_imu_to_cam_s"] = time_offset_imu_to_cam;
+  json_calibspline_results_out["time_offset_imu_to_cam_s"] =
+      time_offset_imu_to_cam;
 
   std::vector<double> cam_timestamps_s = imu_cam_calibrator.GetCamTimestamps();
   std::sort(cam_timestamps_s.begin(), cam_timestamps_s.end(), std::less<>());

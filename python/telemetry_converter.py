@@ -1,6 +1,6 @@
 import json
 import numpy as np
-
+from csv import reader
 
 class TelemetryImporter:
     ''' TelemetryImporter
@@ -142,6 +142,31 @@ class TelemetryImporter:
         self.telemetry["timestamps_ns"] = timestamps_ns
         self.telemetry["camera_fps"] = camera_fps
 
+    def read_csv(self, path_to_csv, skip_seconds=0.0):
+        accl = []
+        gyro  = []
+        timestamps_ns = []
+
+        # open file in read mode
+        with open(path_to_csv, 'r') as read_obj:
+            csv_reader = reader(read_obj)
+            for row in csv_reader:
+                accl.append([float(row[4]),float(row[5]),float(row[6])])
+                gyro.append([float(row[1]),float(row[2]),float(row[3])])
+                timestamps_ns.append(float(row[0]))
+        # our timestamps should always start at zero for the camera, so we normalize here
+
+        if skip_seconds != 0.0:
+            accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)
+
+        accl = accl[0:len(timestamps_ns)]
+        gyro = gyro[0:len(timestamps_ns)]
+
+        self.telemetry["accelerometer"] = accl
+        self.telemetry["gyroscope"] = gyro
+        self.telemetry["timestamps_ns"] = timestamps_ns
+        self.telemetry["camera_fps"] = 0.0
+
     def read_generic_json(self, path_to_json, skip_seconds=0.0):
         json_file = open(path_to_json, 'r')
         json_data = json.load(json_file)
@@ -202,4 +227,7 @@ class TelemetryConverter:
             input_accl_json, input_gyro_json, input_cam_json, skip_seconds=skip_seconds)
         self._dump_final_json(output_path)
 
+    def convert_csv_telemetry_file(self, csv_file, output_path, skip_seconds=0.0):
+        self.telemetry_importer.read_csv(csv_file, skip_seconds=skip_seconds)
+        self._dump_final_json(output_path)
     

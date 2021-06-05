@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <dirent.h>
 #include <vector>
+#include <sys/stat.h>
 
 #include "OpenCameraCalibrator/utils/types.h"
 
@@ -71,6 +72,8 @@ template <class T> T average(const std::vector<T> datas) {
   }
   return sum_data / datas.size();
 }
+
+bool IsPathAFile(const std::string &path);
 
 } // namespace utils
 } // namespace OpenICC

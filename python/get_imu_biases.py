@@ -46,8 +46,8 @@ def main():
     accl_np = accl_np - grav_array
 
     # negative because we model it with (imu + bias)
-    bias_gyro  = -np.mean(gyro_np,0)
-    bias_accel = -np.mean(accl_np,0)
+    bias_gyro  = np.mean(gyro_np,0)
+    bias_accel = np.mean(accl_np,0)
     print("Estimated biases:")
     print("gyroscope bias:     {:.5f} rad/s, {:.5f} rad/s, {:.5f} rad/s".format(bias_gyro[0],bias_gyro[1],bias_gyro[2]))
     print("accelerometer bias: {:.5f} m/s2,  {:.5f} m/s2,  {:.5f} m/s2".format(bias_accel[0],bias_accel[1],bias_accel[2]))
@@ -60,15 +60,15 @@ def main():
     with open(args.output_path, 'w') as json_dump:
         json.dump(biases, json_dump)
 
-    plt.plot(gyro_np[:,0],label='x')
-    plt.plot(gyro_np[:,1],label='y')
-    plt.plot(gyro_np[:,2],label='z')
-    plt.show()
+    # plt.plot(gyro_np[:,0],label='x')
+    # plt.plot(gyro_np[:,1],label='y')
+    # plt.plot(gyro_np[:,2],label='z')
+    # plt.show()
 
-    plt.plot(accl_np[:,0],'r',label='x')
-    plt.plot(accl_np[:,1],'g',label='y')
-    plt.plot(accl_np[:,2],'b',label='z')
-    plt.show()
+    # plt.plot(accl_np[:,0],'r',label='x')
+    # plt.plot(accl_np[:,1],'g',label='y')
+    # plt.plot(accl_np[:,2],'b',label='z')
+    # plt.show()
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ minCornerDistance: 10.0
 minDistanceToBorder: 3
 minMarkerDistance: 5.0
 minMarkerDistanceRate: 0.05
-cornerRefinementMethod: 1
+cornerRefinementMethod: 1 # 1->subpix 3->apriltag
 cornerRefinementWinSize: 3
 cornerRefinementMaxIterations: 20
 cornerRefinementMinAccuracy: 0.05
@@ -23,7 +23,7 @@ maxErroneousBitsInBorderRate: 0.04
 minOtsuStdDev: 5.0
 errorCorrectionRate: 0.6
 # new functionality
-useAruco3Detection: 1
+useAruco3Detection: 0
 minSideLengthCanonicalImg: 32
 minMarkerLengthRatioOriginalImg: 0.03
 cameraMotionSpeed: 0.2

@@ -265,6 +265,11 @@ public:
     Update();
   }
 
+  inline void SetMisalignmentMatrix(const Eigen::Matrix<_T, 3, 3> &mis_mat) {
+    mis_mat_ = mis_mat;
+    Update();
+  }
+
   inline void SetBias(const Eigen::Matrix<_T, 3, 1> &b_vec) {
     bias_vec_ = b_vec;
     Update();
@@ -307,4 +312,7 @@ private:
   /** @brief Misalignment * scale matrix */
   Eigen::Matrix<_T, 3, 3> ms_mat_;
 };
+
+using ThreeAxisSensorCalibParamsd = ThreeAxisSensorCalibParams<double>;
+
 } // namespace OpenICC

@@ -245,7 +245,16 @@ void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
   }
 }
 
-
+bool IsPathAFile(const std::string &path) {
+  struct stat s;
+  if (stat(path.c_str(), &s) == 0) {
+    if (s.st_mode & S_IFREG) {
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
 
 } // namespace utils
 } // namespace OpenICC

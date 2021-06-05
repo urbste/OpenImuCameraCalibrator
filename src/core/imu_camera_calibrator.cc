@@ -24,8 +24,7 @@ void ImuCameraCalibrator::InitSpline(
     const theia::Reconstruction &calib_dataset,
     const Sophus::SE3<double> &T_i_c_init,
     const SplineWeightingData &spline_weight_data,
-    const double time_offset_imu_to_cam, const Eigen::Vector3d &gyro_bias,
-    const Eigen::Vector3d &accl_bias,
+    const double time_offset_imu_to_cam,
     const OpenICC::CameraTelemetryData &telemetry_data,
     const double initial_line_delay) {
 
@@ -89,7 +88,7 @@ void ImuCameraCalibrator::InitSpline(
       continue;
 
     const Eigen::Vector3d accl_unbiased =
-        telemetry_data.accelerometer[i].data() + accl_bias;
+        acc_intrinsics_.UnbiasNormalize(telemetry_data.accelerometer[i].data());
     trajectory_.addAccelMeasurement(accl_unbiased, t * S_TO_NS,
                                     1. / spline_weight_data_.var_r3,
                                     reestimate_biases_);
@@ -104,7 +103,8 @@ void ImuCameraCalibrator::InitSpline(
       continue;
 
     const Eigen::Vector3d gyro_unbiased =
-        telemetry_data.gyroscope[i].data() + gyro_bias;
+        gyr_intrinsics_.UnbiasNormalize(telemetry_data.gyroscope[i].data());
+
     trajectory_.addGyroMeasurement(gyro_unbiased, t * S_TO_NS,
                                    1. / spline_weight_data_.var_so3,
                                    reestimate_biases_);
@@ -113,8 +113,7 @@ void ImuCameraCalibrator::InitSpline(
 }
 
 void ImuCameraCalibrator::InitializeGravity(
-    const OpenICC::CameraTelemetryData &telemetry_data,
-    const Eigen::Vector3d &accl_bias) {
+    const OpenICC::CameraTelemetryData &telemetry_data) {
   for (size_t j = 0; j < cam_timestamps_.size(); ++j) {
     const theia::View *v =
         image_data_.View(image_data_.ViewIdFromTimestamp(cam_timestamps_[j]));
@@ -131,7 +130,7 @@ void ImuCameraCalibrator::InitializeGravity(
       for (size_t i = 0; i < telemetry_data.accelerometer.size();
            i++) {
         const Eigen::Vector3d ad =
-            telemetry_data.accelerometer[i].data() + accl_bias;
+            acc_intrinsics_.UnbiasNormalize(telemetry_data.accelerometer[i].data());
         const int64_t accl_t =
             telemetry_data.accelerometer[i].timestamp_s();
         if (std::abs(accl_t - cam_timestamps_[j]) < 1. / 30.) {

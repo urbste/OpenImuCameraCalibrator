@@ -28,7 +28,7 @@
 
 #include <opencv2/core/eigen.hpp>
 
-const size_t MIN_NUM_POINTS = 10;
+const size_t MIN_NUM_POINTS = 20;
 
 namespace OpenICC {
 namespace utils {
@@ -74,28 +74,52 @@ bool initialize_radial_undistortion_camera(
   }
   theia::RadialDistUncalibratedAbsolutePoseMetaData meta_data;
   theia::RadialDistUncalibratedAbsolutePose pose_division_undist;
-  meta_data.max_focal_length = 0.5 * img_size.width + 0.15 * img_size.width;
-  meta_data.min_focal_length = 0.5 * img_size.width - 0.15 * img_size.width;
+  meta_data.max_focal_length = 0.75 * img_size.width + 0.5 * img_size.width;
+  meta_data.min_focal_length = 0.75 * img_size.width - 0.5 * img_size.width;
 
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
       ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
       &pose_division_undist, &ransac_summary);
-  if (verbose) {
-    std::cout << "Estimated focal length: " << pose_division_undist.focal_length
-              << std::endl;
-    std::cout << "Estimated radial distortion: "
-              << pose_division_undist.radial_distortion << std::endl
-              << std::endl;
-    std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
-              << std::endl;
-  }
 
   rotation = pose_division_undist.rotation;
   position = -pose_division_undist.rotation.transpose() *
              pose_division_undist.translation;
   radial_distortion = pose_division_undist.radial_distortion;
   focal_length = pose_division_undist.focal_length;
-  if (ransac_summary.inliers.size() < MIN_NUM_POINTS)
+
+  theia::Camera cam;
+  cam.SetCameraIntrinsicsModelType(
+      theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
+  std::shared_ptr<theia::CameraIntrinsicsModel> intrinsics =
+      cam.MutableCameraIntrinsics();
+  intrinsics->SetFocalLength(focal_length);
+  intrinsics->SetPrincipalPoint(0.0,0.0);
+  intrinsics->SetParameter(
+      theia::DivisionUndistortionCameraModel::InternalParametersIndex::RADIAL_DISTORTION_1,
+      radial_distortion);
+  cam.SetPosition(position);
+  cam.SetOrientationFromRotationMatrix(rotation);
+  // calculate reprojection error
+  double repro_error = 0.0;
+  for (int i = 0; i < correspondences.size(); ++i) {
+    Eigen::Vector2d pixel;
+    cam.ProjectPoint(correspondences[i].world_point.homogeneous(),
+                     &pixel);
+      repro_error += (pixel - correspondences[i].feature).norm();
+  }
+  repro_error /= (double)correspondences.size();
+  if (verbose) {
+    std::cout << "Estimated focal length: " << pose_division_undist.focal_length
+              << std::endl;
+    std::cout << "Estimated radial distortion: "
+              << pose_division_undist.radial_distortion
+              << std::endl;
+    std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
+              << std::endl;
+    std::cout << "Reprojection error: " << repro_error
+              << std::endl<< std::endl;
+  }
+  if (ransac_summary.inliers.size() < MIN_NUM_POINTS || repro_error > 4.0)
     return false;
   return success;
 }
@@ -117,8 +141,6 @@ bool initialize_doublesphere_model(
   }
 
   const double _xi = 1.0;
-  const double _cu = img_cols / 2.0 - 0.5;
-  const double _cv = img_rows / 2.0 - 0.5;
 
   // Initialize some temporaries needed.
   double gamma0 = 0.0;
@@ -190,7 +212,7 @@ bool initialize_doublesphere_model(
       std::shared_ptr<theia::CameraIntrinsicsModel> intrinsics =
           cam.MutableCameraIntrinsics();
       intrinsics->SetFocalLength(0.5 * gamma);
-      intrinsics->SetPrincipalPoint(_cu, _cv);
+      intrinsics->SetPrincipalPoint(0.0, 0.0);
       intrinsics->SetParameter(
           theia::DoubleSphereCameraModel::InternalParametersIndex::XI,
           0.5 * _xi);
@@ -206,32 +228,34 @@ bool initialize_doublesphere_model(
       }
 
       theia::CalibratedAbsolutePose pose;
+      theia::RansacParameters params = ransac_params;
+      params.error_thresh = 0.5 / img_cols;
       theia::EstimateCalibratedAbsolutePose(
-          ransac_params, theia::RansacType::RANSAC, correspondences_new, &pose,
+          params, theia::RansacType::RANSAC, correspondences_new, &pose,
           &ransac_summary);
       cam.SetPosition(pose.position);
       cam.SetOrientationFromRotationMatrix(pose.rotation);
 
       double repro_error = 0.0;
       int in_image = 0;
-      for (int i = 0; i < correspondences_new.size(); ++i) {
+      for (int i = 0; i < correspondences.size(); ++i) {
         Eigen::Vector2d pixel;
-        cam.ProjectPoint(correspondences_new[i].world_point.homogeneous(),
+        cam.ProjectPoint(correspondences[i].world_point.homogeneous(),
                          &pixel);
         if (pixel(0) >= 0.0 && pixel(1) >= 0.0 && pixel(0) < img_cols &&
             pixel(1) < img_rows) {
-          repro_error += (pixel - correspondences[i].feature).squaredNorm();
+          repro_error += (pixel - correspondences[i].feature).norm();
           in_image++;
         }
       }
-      if (verbose) {
-        std::cout << "numReprojected " << in_image << " reprojErr "
-                  << repro_error / in_image << std::endl;
-      }
+//      if (verbose) {
+//        std::cout << "numReprojected " << in_image << " reprojErr "
+//                  << repro_error / in_image << std::endl;
+//      }
       if (in_image > MIN_CORNERS) {
         double avg_reproj_error = repro_error / in_image;
 
-        if (avg_reproj_error < min_reproj_error && avg_reproj_error < 1000.0) {
+        if (avg_reproj_error < min_reproj_error && avg_reproj_error < 5.0 && ransac_summary.inliers.size() > 10) {
           min_reproj_error = avg_reproj_error;
           gamma0 = gamma;
           success = true;
@@ -242,13 +266,11 @@ bool initialize_doublesphere_model(
             std::cout << "new min_reproj_error: " << min_reproj_error
                       << std::endl;
           }
-
+          return success;
         } // if clause
       }   // if in_image
     }     // if P.size()
   }       // for target cols
-  if (ransac_summary.inliers.size() < 10)
-    return false;
   return success;
 } // for target rows
 

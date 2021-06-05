@@ -32,5 +32,10 @@ bool ReadIMUBias(const std::string &path_to_imu_bias,
 bool ReadIMU2CamInit(const std::string &path_to_file,
                      Eigen::Quaterniond &imu_to_cam_rotation,
                      double &time_offset_imu_to_cam);
+
+bool ReadIMUIntrinsics(const std::string &path_to_imu_intrinsics,
+                       const std::string &path_to_initial_imu_bias,
+                       ThreeAxisSensorCalibParamsd &acc_params,
+                       ThreeAxisSensorCalibParamsd &gyro_params);
 } // namespace io
 } // namespace OpenICC

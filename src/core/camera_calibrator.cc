@@ -260,10 +260,17 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
       success_init = utils::initialize_pinhole_camera(
           correspondences, ransac_params_, ransac_summary, rotation, position,
           focal_length, verbose_);
+    } else if (camera_model_ == "DIVISION_UNDISTORTION") {
+        success_init = utils::initialize_radial_undistortion_camera(
+                correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
+                rotation, position, focal_length, radial_distortion, verbose_);
     } else {
         success_init = utils::initialize_radial_undistortion_camera(
                 correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
                 rotation, position, focal_length, radial_distortion, verbose_);
+//        success_init = utils::initialize_doublesphere_model(
+//                correspondences, board_pt3_ids, cv::Size(9, 7), ransac_params_, image_width, image_height, ransac_summary,
+//                rotation, position, focal_length, verbose_);
     }
     if (views_initialized % 100 == 0) {
         std::cout<<"View: "<<views_initialized<< "/"<<total_nr_views<<" initialized for calibration.\n";

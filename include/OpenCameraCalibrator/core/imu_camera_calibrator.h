@@ -37,13 +37,10 @@ public:
                   const Sophus::SE3<double> &T_i_c_init,
                   const OpenICC::SplineWeightingData &spline_weight_data,
                   const double time_offset_imu_to_cam,
-                  const Eigen::Vector3d &gyro_bias,
-                  const Eigen::Vector3d &accl_bias,
                   const OpenICC::CameraTelemetryData &telemetry_data,
                   const double initial_line_delay);
 
-  void InitializeGravity(const OpenICC::CameraTelemetryData &telemetry_data,
-                         const Eigen::Vector3d &accl_bias);
+  void InitializeGravity(const OpenICC::CameraTelemetryData &telemetry_data);
 
   double Optimize(const int iterations,
                   const bool fix_so3_spline,
@@ -80,6 +77,11 @@ public:
   }
   double GetInitialRSLineDelay() { return inital_cam_line_delay_s_; }
 
+  void SetIMUIntrinsics(const ThreeAxisSensorCalibParams<double>& acc_intrinsics,
+                        const ThreeAxisSensorCalibParams<double>& gyr_intrinsics) {
+      acc_intrinsics_ = acc_intrinsics;
+      gyr_intrinsics_ = gyr_intrinsics;
+  }
 private:
   //! camera timestamps
   std::vector<double> cam_timestamps_;
@@ -124,6 +126,10 @@ private:
   std::unordered_map<TimeCamId, CalibInitPoseData> calib_init_poses_;
   std::unordered_map<TimeCamId, CalibInitPoseData> spline_init_poses_;
   theia::Reconstruction image_data_;
+
+  //! IMU intrinsics
+  ThreeAxisSensorCalibParams<double> acc_intrinsics_;
+  ThreeAxisSensorCalibParams<double> gyr_intrinsics_;
 };
 
 } // namespace core

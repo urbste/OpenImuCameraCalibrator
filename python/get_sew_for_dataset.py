@@ -30,7 +30,7 @@ def main():
 
     accl_np = np.asarray(json_importer.telemetry["accelerometer"])
     gyro_np = np.asarray(json_importer.telemetry["gyroscope"])
-    timestamps_np = np.asarray(json_importer.telemetry["timestamps_ns"]) * 1e-9
+    timestamps_np = np.asarray(json_importer.telemetry["timestamps_ns"]).squeeze() * 1e-9
 
     r3_dt, r3_var = knot_spacing_and_variance(accl_np.T, timestamps_np, args.q_r3, min_dt=0.01, max_dt=0.15, verbose=False)
     so3_dt, so3_var = knot_spacing_and_variance(gyro_np.T, timestamps_np, args.q_so3, min_dt=0.01, max_dt=0.2, verbose=False)
