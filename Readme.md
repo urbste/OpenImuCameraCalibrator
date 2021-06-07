@@ -54,7 +54,7 @@ ToDo
 3. Clone and build the TheiaSfM fork.
 ``` bash
 git clone https://github.com/urbste/TheiaSfM
-cd TheiaSfM && mkdir -p build && cd build
+cd TheiaSfM && git checkout cda5d4f && mkdir -p build && cd build
 cmake .. && make -j4
 sudo make install
 ```
