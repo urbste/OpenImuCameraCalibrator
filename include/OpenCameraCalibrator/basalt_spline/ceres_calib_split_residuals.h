@@ -439,15 +439,15 @@ struct RSInvDepthReprojCostFunctorSplit : public CeresSplineHelper<double, _N> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   RSInvDepthReprojCostFunctorSplit(
       const theia::View *view, const theia::Reconstruction *image_data,
-      const Sophus::SE3d &T_i_c, const theia::TrackId& track_id,
+      const Sophus::SE3d &T_i_c, const theia::TrackId &track_id,
       const double u_so3_obs, const double u_r3_obs, const double u_so3_ref,
       const double u_r3_ref, const double inv_so3_dt, const double inv_r3_dt,
-      std::vector<int>& ptr_offsets,
-      const double weight = 1.0)
+      std::vector<int> &ptr_offsets, const double weight = 1.0)
       : view(view), image_data(image_data), T_i_c(T_i_c),
         T_c_i(T_i_c.inverse()), track_id(track_id), u_so3_obs(u_so3_obs),
         u_r3_obs(u_r3_obs), u_so3_ref(u_so3_ref), u_r3_ref(u_r3_ref),
-        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt), ptr_offsets(ptr_offsets),weight(weight) {}
+        inv_so3_dt(inv_so3_dt), inv_r3_dt(inv_r3_dt), ptr_offsets(ptr_offsets),
+        weight(weight) {}
 
   template <class T>
   bool operator()(T const *const *sKnots, T *sResiduals) const {
@@ -474,8 +474,8 @@ struct RSInvDepthReprojCostFunctorSplit : public CeresSplineHelper<double, _N> {
     CeresSplineHelper<T, N>::template evaluate_lie<Sophus::SO3>(
         sKnots + ptr_offsets[0], t_so3_obs_row, T(inv_so3_dt), &R_obs_w_i);
     Vector3 t_obs_w_i;
-    CeresSplineHelper<T, N>::template evaluate<3, 0>(sKnots + ptr_offsets[2], t_r3_obs_row,
-                                                     T(inv_r3_dt), &t_obs_w_i);
+    CeresSplineHelper<T, N>::template evaluate<3, 0>(
+        sKnots + ptr_offsets[2], t_r3_obs_row, T(inv_r3_dt), &t_obs_w_i);
 
     const Vector2 feature(T((*view->GetFeature(track_id)).x()),
                           T((*view->GetFeature(track_id)).y()));
@@ -494,25 +494,25 @@ struct RSInvDepthReprojCostFunctorSplit : public CeresSplineHelper<double, _N> {
     T inverse_depth = T(1.0) / *(sKnots + ptr_offsets[4])[0];
 
     T reprojection[2];
-    const Eigen::Vector3d bearing_d = image_data->Track(track_id)->RefBearing();
+    const Eigen::Vector3d bearing_d =
+        image_data->Track(track_id)->ReferenceBearingVector();
     Vector3 bearing;
-    bearing << T(bearing_d[0]),T(bearing_d[1]),T(bearing_d[2]);
+    bearing << T(bearing_d[0]), T(bearing_d[1]), T(bearing_d[2]);
     bearing *= inverse_depth;
 
     bool success = false;
 
     // inverse depth projection
     // 1. convert point from bearing vector to 3d point using
-    // inverse depth from reference view and transform from camera to IMU reference frame
-    Vector3 X_ref =
-        T_i_c.so3() * bearing + T_i_c.translation();
+    // inverse depth from reference view and transform from camera to IMU
+    // reference frame
+    Vector3 X_ref = T_i_c.so3() * bearing + T_i_c.translation();
     // 2. Transform point from IMU to world frame
     Vector3 X = R_ref_w_i * X_ref + t_ref_w_i;
     // 3. Transform point from world to IMU reference frame at observation view
     Vector3 X_obs = R_obs_w_i.inverse() * (X - t_obs_w_i);
     // 4. Transform point from IMU reference frame to camera frame
-    Vector3 X_camera =
-        T_c_i.so3() * X_obs + T_c_i.translation();
+    Vector3 X_camera = T_c_i.so3() * X_obs + T_c_i.translation();
 
     // project back to camera space
     if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION ==
