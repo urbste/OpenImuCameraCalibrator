@@ -205,6 +205,7 @@ int main(int argc, char *argv[]) {
   std::cout << "T_i_c qw,qx,qy,qz: " << q_i_c.w() << " " << q_i_c.x() << " "
             << q_i_c.y() << " " << q_i_c.z() << std::endl;
   std::cout << "T_i_c t: " << t_i_c.transpose() << std::endl;
+  std::cout << "T_i_c R: " << q_i_c.matrix() << std::endl;
   std::cout << "Initialized line delay [us]: "
             << imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US << "\n";
   std::cout << "Calibrated line delay [us]: " << calib_line_delay_us << "\n";

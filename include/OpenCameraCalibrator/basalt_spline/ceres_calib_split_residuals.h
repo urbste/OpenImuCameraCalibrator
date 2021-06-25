@@ -15,6 +15,7 @@
 #include <theia/sfm/camera/extended_unified_camera_model.h>
 #include <theia/sfm/camera/fisheye_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
+#include <theia/sfm/camera/pinhole_radial_tangential_camera_model.h>
 #include <theia/sfm/reconstruction.h>
 
 #include <sophus/so3.hpp>
@@ -195,7 +196,11 @@ struct CalibReprojectionCostFunctorSplit
                  cam->GetCameraIntrinsicsModelType()) {
         success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
             intr, p3d.data(), reprojection);
-      }
+      }else if (theia::CameraIntrinsicsModelType::PINHOLE_RADIAL_TANGENTIAL ==
+                cam->GetCameraIntrinsicsModelType()) {
+       success = theia::PinholeRadialTangentialCameraModel::CameraToPixelCoordinates(
+           intr, p3d.data(), reprojection);
+     }
       if (!success) {
         sResiduals[2 * i + 0] = T(1e10);
         sResiduals[2 * i + 1] = T(1e10);
@@ -299,7 +304,11 @@ struct CalibRSReprojectionCostFunctorSplit
                  cam->GetCameraIntrinsicsModelType()) {
         success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
             intr, p3d.data(), reprojection);
-      }
+      }else if (theia::CameraIntrinsicsModelType::PINHOLE_RADIAL_TANGENTIAL ==
+                cam->GetCameraIntrinsicsModelType()) {
+       success = theia::PinholeRadialTangentialCameraModel::CameraToPixelCoordinates(
+           intr, p3d.data(), reprojection);
+     }
       if (!success) {
         sResiduals[2 * i + 0] = T(1e10);
         sResiduals[2 * i + 1] = T(1e10);
@@ -403,7 +412,11 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
                  cam->GetCameraIntrinsicsModelType()) {
         success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
             intr, p3d.data(), reprojection);
-      }
+      }else if (theia::CameraIntrinsicsModelType::PINHOLE_RADIAL_TANGENTIAL ==
+                cam->GetCameraIntrinsicsModelType()) {
+       success = theia::PinholeRadialTangentialCameraModel::CameraToPixelCoordinates(
+           intr, p3d.data(), reprojection);
+     }
       if (!success) {
         sResiduals[2 * i + 0] = T(1e10);
         sResiduals[2 * i + 1] = T(1e10);
@@ -533,7 +546,11 @@ struct RSInvDepthReprojCostFunctorSplit : public CeresSplineHelper<double, _N> {
                cam_model) {
       success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
           intr, X_camera.data(), reprojection);
-    }
+    }else if (theia::CameraIntrinsicsModelType::PINHOLE_RADIAL_TANGENTIAL ==
+              cam_model) {
+     success = theia::PinholeRadialTangentialCameraModel::CameraToPixelCoordinates(
+         intr, X_camera.data(), reprojection);
+   }
     if (!success) {
       sResiduals[0] = T(1e10);
       sResiduals[1] = T(1e10);

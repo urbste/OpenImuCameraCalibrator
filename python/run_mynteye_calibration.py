@@ -27,8 +27,8 @@ def main():
                         default=1, type=float)
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
-                        choices=['PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="EXTENDED_UNIFIED", type=str)
+                        choices=['PINHOLE', 'PINHOLE_RADIAL_TANGENTIAL', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
+                        default="FISHEYE", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.0385, 

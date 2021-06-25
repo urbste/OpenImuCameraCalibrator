@@ -15,6 +15,8 @@ def get_abbr_from_cam_model(model_name):
         return "ex"
     elif model_name == "FISHEYE":
         return "fi"
+    elif model_name == "PINHOLE_RADIAL_TANGENTIAL":
+        return "pr"
     else:
         print("Model name ", model_name, " does not exist.")
         exit(-1)

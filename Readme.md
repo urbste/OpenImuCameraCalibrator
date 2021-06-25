@@ -11,7 +11,7 @@ This is where the OpenImuCameraCalibrator comes in. With this toolbox you can:
   * Double Sphere [2]
   * Extended Unified [4]
   * Pinhole
-  * RadTan pinhole
+  * Pinhole with radial-tangential distortion
 * Extract the meta data integrated in the MP4 video file (called **telemetry data**)
 * Calibrate the **Camera to IMU rotation matrix** and find the dataset dependent **time offset**
 * Perform full **continuous time batch optimization** to find the full transformation matrix between IMU and camera
@@ -59,9 +59,10 @@ cmake .. && make -j4
 sudo make install
 ```
 
-4. Install nodejs (needed to extract GoPro telemetry)
+4. Install node >= 12.x (needed to extract GoPro telemetry)
 ``` bash
-sudo apt install nodejs npm
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+sudo apt-get install -y nodejs
 ``` 
 
 5. Build this project
@@ -70,6 +71,11 @@ git clone https://github.com/urbste/OpenImuCameraCalibrator
 mkdir -p build && cd build && cmake ..
 make -j
 ``` 
+
+6. Create a python >3.5 environment (or use your local python - not recommended)
+``` bash
+pip install -r requirements.txt
+```
 
 ## Example: Visual-Inertial Calibration of a GoPro Camera
 For this example I am using a GoPro 9. To calibrate the camera and the IMU to camera transformation we will use the following script: **python/run_gopro_calibration.py** 
@@ -105,6 +111,7 @@ MyDataset
 ```
 
 3. Run the calibration
+Only use the PINHOLE model whenever you do not expect any distortion (e.g. smartphone)!
 ``` python
 python python/run_gopro_calibration.py --path_calib_dataset=/your/path/MyDataset --checker_size_m=0.021 --image_downsample_factor=2 --camera_model=DIVISION_UNDISTORTION
 ```

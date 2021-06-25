@@ -19,21 +19,20 @@
 #include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/opencv.hpp>
 #include <theia/io/reconstruction_writer.h>
+#include <theia/io/write_ply_file.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjuster.h>
 #include <theia/sfm/bundle_adjustment/bundle_adjustment.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/solvers/ransac.h>
-#include <theia/io/write_ply_file.h>
 // camera types
 #include <theia/sfm/camera/division_undistortion_camera_model.h>
+#include <theia/sfm/camera/double_sphere_camera_model.h>
 #include <theia/sfm/camera/extended_unified_camera_model.h>
 #include <theia/sfm/camera/fisheye_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
-#include <theia/sfm/camera/double_sphere_camera_model.h>
-
-
+#include <theia/sfm/camera/pinhole_radial_tangential_camera_model.h>
 
 #include "OpenCameraCalibrator/io/read_scene.h"
 #include "OpenCameraCalibrator/io/write_camera_calibration.h"
@@ -108,15 +107,15 @@ theia::ViewId CameraCalibrator::AddView(
         theia::DivisionUndistortionCameraModel::RADIAL_DISTORTION_1,
         initial_distortion);
   } else if (camera_model_ == "DOUBLE_SPHERE") {
-    cam->CameraIntrinsics()->SetParameter(
-          theia::DoubleSphereCameraModel::XI, -0.25);
-    cam->CameraIntrinsics()->SetParameter(
-        theia::DoubleSphereCameraModel::ALPHA, 0.5);
+    cam->CameraIntrinsics()->SetParameter(theia::DoubleSphereCameraModel::XI,
+                                          -0.25);
+    cam->CameraIntrinsics()->SetParameter(theia::DoubleSphereCameraModel::ALPHA,
+                                          0.5);
   } else if (camera_model_ == "EXTENDED_UNIFIED") {
-      cam->CameraIntrinsics()->SetParameter(
-          theia::ExtendedUnifiedCameraModel::ALPHA, 0.5);
-      cam->CameraIntrinsics()->SetParameter(
-          theia::ExtendedUnifiedCameraModel::BETA, 1.0);
+    cam->CameraIntrinsics()->SetParameter(
+        theia::ExtendedUnifiedCameraModel::ALPHA, 0.5);
+    cam->CameraIntrinsics()->SetParameter(
+        theia::ExtendedUnifiedCameraModel::BETA, 1.0);
   } else if (camera_model_ == "FISHEYE") {
   }
 
@@ -179,10 +178,15 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS |
-      theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
+      theia::OptimizeIntrinsicsType::FOCAL_LENGTH |
+      theia::OptimizeIntrinsicsType::ASPECT_RATIO;
+
   if (camera_model_ == "PINHOLE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
+  } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
+    ba_options.intrinsics_to_optimize |=
+        theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION;
   }
   summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(),
                                      &recon_calib_dataset_);
@@ -261,25 +265,30 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
           correspondences, ransac_params_, ransac_summary, rotation, position,
           focal_length, verbose_);
     } else if (camera_model_ == "DIVISION_UNDISTORTION") {
-        success_init = utils::initialize_radial_undistortion_camera(
-                correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
-                rotation, position, focal_length, radial_distortion, verbose_);
+      success_init = utils::initialize_radial_undistortion_camera(
+          correspondences, ransac_params_, ransac_summary,
+          cv::Size(image_width, image_height), rotation, position, focal_length,
+          radial_distortion, verbose_);
     } else {
-        success_init = utils::initialize_radial_undistortion_camera(
-                correspondences, ransac_params_, ransac_summary, cv::Size(image_width, image_height),
-                rotation, position, focal_length, radial_distortion, verbose_);
-//        success_init = utils::initialize_doublesphere_model(
-//                correspondences, board_pt3_ids, cv::Size(9, 7), ransac_params_, image_width, image_height, ransac_summary,
-//                rotation, position, focal_length, verbose_);
+      success_init = utils::initialize_radial_undistortion_camera(
+          correspondences, ransac_params_, ransac_summary,
+          cv::Size(image_width, image_height), rotation, position, focal_length,
+          radial_distortion, verbose_);
+      //        success_init = utils::initialize_doublesphere_model(
+      //                correspondences, board_pt3_ids, cv::Size(9, 7),
+      //                ransac_params_, image_width, image_height,
+      //                ransac_summary, rotation, position, focal_length,
+      //                verbose_);
     }
     if (views_initialized % 100 == 0) {
-        std::cout<<"View: "<<views_initialized<< "/"<<total_nr_views<<" initialized for calibration.\n";
+      std::cout << "View: " << views_initialized << "/" << total_nr_views
+                << " initialized for calibration.\n";
     }
     ++views_initialized;
 
     // check if a very close by pose is already present
     bool take_image = true;
-    for (int i = 0; i < saved_poses.size(); ++i) {
+    for (size_t i = 0; i < saved_poses.size(); ++i) {
       if ((position - saved_poses[i]).norm() < grid_size_) {
         take_image = false;
         break;
@@ -296,12 +305,13 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
         AddView(rotation, position, focal_length, radial_distortion,
                 image_width, image_height, timestamp_s);
 
-    for (int i = 0; i < board_pt3_ids.size(); ++i) {
+    for (size_t i = 0; i < board_pt3_ids.size(); ++i) {
       AddObservation(view_id, board_pt3_ids[i], corners[i]);
     }
   }
 
-  theia::WritePlyFile(output_path+"_ransac_pose.ply",recon_calib_dataset_,Eigen::Vector3i(255,0,0), 1);
+  theia::WritePlyFile(output_path + "_ransac_pose.ply", recon_calib_dataset_,
+                      Eigen::Vector3i(255, 0, 0), 1);
 
   if (!RunCalibration()) {
     LOG(ERROR) << "Calibration failed.\n";
@@ -347,13 +357,15 @@ void CameraCalibrator::PrintResult() {
             << "px Principal Point: " << cam.PrincipalPointX() << "/"
             << cam.PrincipalPointY() << "px.\n";
   if (camera_model_ == "DIVISION_UNDISTORTION") {
-    std::cout <<"DIVISION_UNDISTORTION model: "
+    std::cout
+        << "DIVISION_UNDISTORTION model: "
         << "Distortion: "
         << cam.intrinsics()[theia::DivisionUndistortionCameraModel::
                                 InternalParametersIndex::RADIAL_DISTORTION_1]
         << "\n";
   } else if (camera_model_ == "DOUBLE_SPHERE") {
-    std::cout <<"DOUBLE_SPHERE model: "
+    std::cout
+        << "DOUBLE_SPHERE model: "
         << "XI: "
         << cam.intrinsics()
                [theia::DoubleSphereCameraModel::InternalParametersIndex::XI]
@@ -362,7 +374,7 @@ void CameraCalibrator::PrintResult() {
                [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA]
         << "\n";
   } else if (camera_model_ == "EXTENDED_UNIFIED") {
-    std::cout <<"EXTENDED_UNIFIED model: "
+    std::cout << "EXTENDED_UNIFIED model: "
               << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::
                                       InternalParametersIndex::ALPHA]
               << " BETA: "
@@ -370,7 +382,8 @@ void CameraCalibrator::PrintResult() {
                                       InternalParametersIndex::BETA]
               << "\n";
   } else if (camera_model_ == "FISHEYE") {
-    std::cout <<"FISHEYE model: "
+    std::cout
+        << "FISHEYE model: "
         << "Radial distortion 1: "
         << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
                                 RADIAL_DISTORTION_1]
@@ -383,6 +396,27 @@ void CameraCalibrator::PrintResult() {
         << " Radial distortion 4: "
         << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
                                 RADIAL_DISTORTION_4]
+        << "\n";
+  } else if (camera_model_ == "PINHOLE_DISTORTION") {
+    std::cout
+        << "Pinhole with radial-tangential distortion: "
+        << "Radial distortion 1: "
+        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::
+                                InternalParametersIndex::RADIAL_DISTORTION_1]
+        << " Radial distortion 2: "
+        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::
+                                InternalParametersIndex::RADIAL_DISTORTION_2]
+        << " Radial distortion 3: "
+        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::
+                                InternalParametersIndex::RADIAL_DISTORTION_3]
+        << " Tangential distortion 1: "
+        << cam.intrinsics()
+               [theia::PinholeRadialTangentialCameraModel::
+                    InternalParametersIndex::TANGENTIAL_DISTORTION_1]
+        << " Tangential distortion 2: "
+        << cam.intrinsics()
+               [theia::PinholeRadialTangentialCameraModel::
+                    InternalParametersIndex::TANGENTIAL_DISTORTION_2]
         << "\n";
   }
 }

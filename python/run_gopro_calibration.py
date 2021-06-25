@@ -13,24 +13,24 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
+                        default='/media/steffen/platte1/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='') 
+                        default='/media/steffen/platte1/projects/OpenICCBuilds/RelDebug/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 
+                        default='/media/steffen/platte1/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 
     parser.add_argument('--path_to_src', 
                         help="Path to OpenCameraCalibrator src folder.",
-                        default='/home/steffen/Projects/OpenCameraCalibrator')   
+                        default='/media/steffen/platte1/projects/OpenImuCameraCalibrator')   
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
-                        default=2, type=float)
+                        default=3, type=float)
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
-                        choices=['PINHOLE', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="FISHEYE", type=str)
+                        choices=['PINHOLE', 'PINHOLE_RADIAL_TANGENTIAL', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
+                        default="PINHOLE_RADIAL_TANGENTIAL", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 

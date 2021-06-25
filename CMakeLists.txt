@@ -10,7 +10,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_STANDARD 17)
 # getting some weird errors with alignment in theia view->features_
 # add_definitions(-DEIGEN_MAX_ALIGN_BYTES=0)
-set(BUILD_WITH_MARCH_NATIVE ON CACHE BOOL "Enable architecture-aware optimization (-march=native)")
+set(BUILD_WITH_MARCH_NATIVE OFF CACHE BOOL "Enable architecture-aware optimization (-march=native)")
 if(BUILD_WITH_MARCH_NATIVE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mtune=native -march=native")
     set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -mtune=native -march=native")

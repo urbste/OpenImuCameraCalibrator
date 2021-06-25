@@ -25,6 +25,7 @@
 #include "theia/sfm/camera/extended_unified_camera_model.h"
 #include "theia/sfm/camera/fisheye_camera_model.h"
 #include "theia/sfm/camera/pinhole_camera_model.h"
+#include "theia/sfm/camera/pinhole_radial_tangential_camera_model.h"
 
 using nlohmann::json;
 
@@ -50,7 +51,7 @@ bool read_camera_calibration(const std::string &input_json,
                       json_content["image_height"]);
   camera.SetPrincipalPoint(json_content["intrinsics"]["principal_pt_x"],
                            json_content["intrinsics"]["principal_pt_y"]);
-  camera.SetFocalLength(json_content["intrinsics"]["focal_length"]);
+  camera.SetFocalLength(json_content["intrinsics"]["focal_length_x"]);
 
   fps = json_content["fps"];
 
@@ -90,7 +91,25 @@ bool read_camera_calibration(const std::string &input_json,
         json_content["intrinsics"]["radial_distortion_4"];
     intr[theia::FisheyeCameraModel::InternalParametersIndex::ASPECT_RATIO] =
         json_content["intrinsics"]["aspect_ratio"];
-  } else if (json_content["intrinsic_type"] == "LINEAR_PINHOLE") {
+  } else if (json_content["intrinsic_type"] == "PINHOLE_RADIAL_TANGENTIAL") {
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+             RADIAL_DISTORTION_1] =
+        json_content["intrinsics"]["radial_distortion_1"];
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+             RADIAL_DISTORTION_2] =
+        json_content["intrinsics"]["radial_distortion_2"];
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+             RADIAL_DISTORTION_3] =
+        json_content["intrinsics"]["radial_distortion_3"];
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+             TANGENTIAL_DISTORTION_1] =
+        json_content["intrinsics"]["tangential_distortion_1"];
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+             TANGENTIAL_DISTORTION_2] =
+        json_content["intrinsics"]["tangential_distortion_2"];
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::ASPECT_RATIO] =
+        json_content["intrinsics"]["aspect_ratio"];
+  } else if (json_content["intrinsic_type"] == "PINHOLE") {
     intr[theia::PinholeCameraModel::InternalParametersIndex::ASPECT_RATIO] =
         json_content["intrinsics"]["aspect_ratio"];
   }
