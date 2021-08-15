@@ -37,9 +37,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "common_types.h"
 
-#include <tbb/concurrent_unordered_map.h>
-#include <tbb/tbb.h>
-
 #include <theia/sfm/track.h>
 #include "OpenCameraCalibrator/utils/types.h"
 

@@ -38,8 +38,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unordered_map>
 #include <vector>
 
-#include <tbb/concurrent_unordered_map.h>
-
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 #include "sophus/se3.hpp"
@@ -107,8 +105,6 @@ struct KeypointsData {
   HashBowVector bow_vector;
 };
 
-/// feature corners is a collection of { imageId => KeypointsData }
-using Corners = tbb::concurrent_unordered_map<TimeCamId, KeypointsData>;
 
 /// feature matches for an image pair
 struct MatchData {
@@ -122,14 +118,6 @@ struct MatchData {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-
-/// feature matches is a collection of { (imageId, imageId) => MatchData }
-using Matches = tbb::concurrent_unordered_map<
-    std::pair<TimeCamId, TimeCamId>, MatchData,
-    tbb::tbb_hash<std::pair<TimeCamId, TimeCamId>>,
-    std::equal_to<std::pair<TimeCamId, TimeCamId>>,
-    Eigen::aligned_allocator<
-        std::pair<const std::pair<TimeCamId, TimeCamId>, MatchData>>>;
 
 /// pair of image and feature indices
 using ImageFeaturePair = std::pair<TimeCamId, FeatureId>;
@@ -250,24 +238,6 @@ struct ProjectedLandmark {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-using ProjectedLandmarkPtr = std::shared_ptr<ProjectedLandmark>;
-using ProjectedLandmarkConstPtr = std::shared_ptr<const ProjectedLandmark>;
-
-/// all landmark projections for inlier and outlier observations for a single
-/// image
-struct ImageProjection {
-  std::vector<ProjectedLandmarkConstPtr> obs;
-  std::vector<ProjectedLandmarkConstPtr> outlier_obs;
-};
-
-/// projections for all images
-using ImageProjections = std::map<TimeCamId, ImageProjection>;
-
-/// inlier projections indexed per track
-using TrackProjections =
-    std::unordered_map<TrackId, std::map<TimeCamId, ProjectedLandmarkConstPtr>>;
-
-
 namespace std {
 
 inline void hash_combine(std::size_t& seed, std::size_t value) {
@@ -298,14 +268,4 @@ struct hash<std::pair<TimeCamId, TimeCamId>> {
 };
 }  // namespace std
 
-namespace tbb {
-
-template <>
-struct tbb_hash<TimeCamId> : public std::hash<TimeCamId> {};
-
-template <>
-struct tbb_hash<std::pair<TimeCamId, TimeCamId>>
-    : public std::hash<std::pair<TimeCamId, TimeCamId>> {};
-
-}  // namespace tbb
 

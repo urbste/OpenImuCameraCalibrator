@@ -13,17 +13,17 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/steffen/platte1/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='/media/steffen/platte1/projects/OpenICCBuilds/RelDebug/applications') 
+                        default='/media/Data/builds/openicc_release/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
-                        default='/media/steffen/platte1/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 
     parser.add_argument('--path_to_src', 
                         help="Path to OpenCameraCalibrator src folder.",
-                        default='/media/steffen/platte1/projects/OpenImuCameraCalibrator')   
+                        default='/media/Data/projects/OpenImuCameraCalibrator')   
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
                         default=3, type=float)
