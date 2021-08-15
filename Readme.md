@@ -47,11 +47,11 @@ Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy
 ## Installation instructions
 ToDo
 
-1. Clone and build OpenCV >= 4.5.0
+1. Clone and build [OpenCV](https://github.com/opencv/opencv) >= 4.5.0 **with** [contrib]((https://github.com/opencv/opencv) modules. Latter are needed for Aruco marker detection.
 
-2. Install ceres 2.0 http://ceres-solver.org/installation.html
+2. Install [ceres 2.0](http://ceres-solver.org/installation.html)
 
-3. Clone and build the TheiaSfM fork.
+3. Clone and build the [TheiaSfM fork](https://github.com/urbste/TheiaSfM).
 ``` bash
 git clone https://github.com/urbste/TheiaSfM
 cd TheiaSfM && git checkout cda5d4f && mkdir -p build && cd build
