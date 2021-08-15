@@ -26,13 +26,12 @@ using namespace OpenICC::core;
 
 DEFINE_string(
     telemetry_json,
-    "/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/"
-    "StaticMultiPose/GoPro9/dataset1/GX016705_gen.json",
+    "",
     "Path to the telemetry json.");
 
 DEFINE_double(gravity_magnitude, 9.811107, "Gravity magnitude.");
 
-DEFINE_double(initial_static_interval_s, 29.0,
+DEFINE_double(initial_static_interval_s, 10.0,
               "Length of the initial static interval for bias estimation.");
 
 DEFINE_string(output_calibration_path, "", "path to output calibration json");

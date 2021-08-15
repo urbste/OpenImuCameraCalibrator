@@ -15,17 +15,17 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_static_calib_dataset', 
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2', 
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset3', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='') 
+                        default='/media/Data/builds/openicc_release/applications') 
     parser.add_argument('--path_to_src', 
                         help="Path to OpenCameraCalibrator src folder.",
-                        default='/home/steffen/Projects/OpenCameraCalibrator')   
+                        default='/media/Data/projects/OpenImuCameraCalibrator')   
     parser.add_argument("--gravity_const", help="gravity constant", default=9.811104, type=float)
     parser.add_argument("--initial_static_duration_s", 
-    help="duration of the initial static phase for bias estimation", default=30, type=float)
+    help="duration of the initial static phase for bias estimation", default=10, type=float)
 
     parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
 
@@ -79,6 +79,7 @@ def main():
     print("==================================================================")
     start = time.time()
     spline_init = Popen([pjoin(bin_path,"static_imu_calibration"),
+                       "--telemetry_json="+gopro_telemetry_gen,
                        "--gravity_magnitude="+str(args.gravity_const),
                        "--initial_static_interval_s="+str(args.initial_static_duration_s),
                        "--verbose="+str(args.verbose), 
