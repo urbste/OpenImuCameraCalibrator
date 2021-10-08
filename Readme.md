@@ -137,6 +137,14 @@ Also check out all the other parameters you can set!
 4. The spline calibration in the end should converge smoothly after 8-15 iterations. If not, your recordings are probably not good enough to perform a decent calibration. Also have a look at the final spline fit to the IMU readings:
 ![SplineFit](resource/ExampleSplineFit.png)
 
+## Estimate IMU Noise Parameters
+1. Record a > 2h GoPro video where the GoPro is actually standing still. Use the lowest resolution and FPS setting, as we do not need the video feed for this
+2. Still this will create multiple video files, so we need to extract the telemetry from each and merge it to a large one.
+3. Put all video files in a single folder
+4. Use [allan_variance.py](python/allan_variance.py) to concatenate all telemetry files into a single on
+5. Finally run [fit_allan_variance](applications/fit_allan_variance) binary on the concatenated telemetry file
+6. This will give you noise density and random walk values for each axis x-y-z of gyroscope and accelerometer
+7. Average these values and use them in your favorite VIO or SLAM, e.g. [ORB-SLAM3](https://github.com/urbste/ORB_SLAM3)
 
 ## Acknowlegements
 This library would not have been possible without these great OpenSource projects:
@@ -182,14 +190,7 @@ Work-in-progress!
 
 3. Create a AprilTag yaml file and enter size of tag
 
-4. Find out your GoPro IMU noise params using allan variance
-   * Record a >2h GoPro video where the GoPro is actually standing still. Use the lowest resolution and FPS setting, as we do not need the video feed for this
-   * This will create multiple video files, so we need to extract the telemetry from each and merge it to a large one.
-   * Put all video files in a single folder
-   * Use python/allan_variance.py for this
-   * Finally run fit_allan_variance binary on the large telemetry file
-   * This will give you a value for each axis x-y-z of gyroscope and accelerometer
-   * Average these values
+4. Find out your GoPro IMU noise params (see above)
 
 5. Finally create a imu.yaml
 
