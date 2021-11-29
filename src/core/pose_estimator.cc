@@ -47,6 +47,7 @@ PoseEstimator::PoseEstimator() {
   ba_options_.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options_.robust_loss_width = 1.345;
   ba_options_.intrinsics_to_optimize = theia::OptimizeIntrinsicsType::NONE;
+  ba_options_.num_threads = 4;
 }
 
 bool PoseEstimator::EstimatePosePinhole(

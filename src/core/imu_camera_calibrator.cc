@@ -122,7 +122,7 @@ void ImuCameraCalibrator::InitializeGravity(
     }
 
     const auto q_w_c =
-        Eigen::Quaterniond(v->Camera().GetOrientationAsRotationMatrix());
+        Eigen::Quaterniond(v->Camera().GetOrientationAsRotationMatrix().transpose());
     const auto p_w_c = v->Camera().GetPosition();
     Sophus::SE3d T_a_i = Sophus::SE3d(q_w_c, p_w_c) * T_i_c_init_.inverse();
 

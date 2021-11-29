@@ -1,6 +1,8 @@
 import json
 import numpy as np
 from csv import reader
+from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Slerp
 
 class TelemetryImporter:
     ''' TelemetryImporter
@@ -21,6 +23,7 @@ class TelemetryImporter:
 
         accl = accl[nr_remove:len(timestamps_ns) - nr_remove]
         gyro = gyro[nr_remove:len(timestamps_ns) - nr_remove]
+
         timestamps_ns = timestamps_ns[nr_remove:len(timestamps_ns) - nr_remove]
 
         return accl, gyro, timestamps_ns
@@ -70,12 +73,26 @@ class TelemetryImporter:
 
         accl = []
         gyro  = []
+        cori = []
+        gravity = []
         timestamps_ns = []
+        cori_timestamps_ns = []
         for a in json_data['1']['streams']['ACCL']['samples']:
             timestamps_ns.append(a['cts'] * self.ms_to_sec / self.ns_to_sec)
             accl.append([a['value'][1], a['value'][2], a['value'][0]])
         for g in json_data['1']['streams']['GYRO']['samples']:
             gyro.append([g['value'][1], g['value'][2], g['value'][0]])
+        # image orientation at framerate
+        for c in json_data['1']['streams']['CORI']['samples']:
+            # order w,x,z,y https://github.com/gopro/gpmf-parser/issues/100#issuecomment-656154136
+            w, x, z, y = c['value'][0], c['value'][1], c['value'][2], c['value'][3]
+            cori.append([x, y, z, w])
+            cori_timestamps_ns.append(c['cts'] * self.ms_to_sec / self.ns_to_sec)
+        
+        # gravity vector in camera coordinates at framerate
+        for g in json_data['1']['streams']['GRAV']['samples']:
+            gravity.append([g['value'][0], g['value'][1], g['value'][2]])
+        
 
         camera_fps = json_data['frames/second']
         if skip_seconds != 0.0:
@@ -89,6 +106,9 @@ class TelemetryImporter:
         telemetry["gyroscope"] = gyro
         telemetry["timestamps_ns"] = timestamps_ns
         telemetry["camera_fps"] = camera_fps
+        telemetry["gravity_vector"] = gravity 
+        telemetry["camera_orientation"] = cori
+        telemetry["cori_timestamps_ns"] = cori_timestamps_ns
 
         return telemetry
 
@@ -191,6 +211,21 @@ class TelemetryImporter:
         self.telemetry["gyroscope"] = gyro
         self.telemetry["timestamps_ns"] = timestamps_ns
         self.telemetry["camera_fps"] = json_data["camera_fps"] 
+
+    def get_camera_quaternions_at_frametimes(self):
+        # interpolate camera quaternions to frametimes
+        frame_rots = R.from_quat(self.telemetry["camera_orientation"]) 
+        frame_times = np.array(self.telemetry["cori_timestamps_ns"]) * self.ns_to_sec
+        slerp = Slerp(frame_times.tolist(), frame_rots)
+        cam_hz = 1 / self.telemetry["camera_fps"]
+        interp_frame_times = np.round(
+            np.arange(
+                np.round(frame_times[0],2), 
+                np.round(frame_times[-1],2) - cam_hz, cam_hz) ,3) / self.ns_to_sec
+
+        camera_quaternions = dict(zip( np.array(interp_frame_times), frame_rots.as_quat()))
+
+        return camera_quaternions
 
 class TelemetryConverter:
     ''' TelemetryConverter

@@ -23,7 +23,7 @@ using namespace OpenICC;
 using namespace OpenICC::core;
 
 DEFINE_string(telemetry_json,
-              "/media/steffen/0F78151A1CEDE4A2/Sparsenet/"
+              "/media/Data/Sparsenet/"
               "CameraCalibrationStudy/AllanVariance/merged_telemetry.json",
               "Path to the telemetry json.");
 

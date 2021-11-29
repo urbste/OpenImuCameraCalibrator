@@ -13,7 +13,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
+                        default='/media/Data/Sparsenet/GoProEvaluation/EvaluateCoriAndIori/gopro_9_linear_200', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -26,11 +26,11 @@ def main():
                         default='/media/Data/projects/OpenImuCameraCalibrator')   
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
-                        default=3, type=float)
+                        default=1, type=float)
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'PINHOLE_RADIAL_TANGENTIAL', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="PINHOLE_RADIAL_TANGENTIAL", type=str)
+                        default="PINHOLE", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 
@@ -43,7 +43,7 @@ def main():
                         default=8) # 8 for charuco board, 9 radon board
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
-                        default=0.04)
+                        default=0.03)
     parser.add_argument("--calib_cam_line_delay",
                         help="If camera line delay should be calibrated (EXPERIMENTAL)", default=0)
     parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)

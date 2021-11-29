@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 ms_to_sec = 1./1000.
 
@@ -54,3 +55,41 @@ def read_imu_data(path_to_json, skip_seconds=0):
 
 
     return timestamps_np, accl_np, gyro_np, camera_fps
+
+
+def load_camera_imu_calibration(user_calib):
+
+    with open(user_calib, 'r') as f:
+        imu_camera = json.load(f)
+    R_imu_cam = R.from_quat([
+        imu_camera["q_i_c"]["x"],
+        imu_camera["q_i_c"]["y"],
+        imu_camera["q_i_c"]["z"], 
+        imu_camera["q_i_c"]["w"]])
+    t_imu_cam = np.array([
+        imu_camera["t_i_c"]["x"],
+        imu_camera["t_i_c"]["y"],
+        imu_camera["t_i_c"]["z"]]).T
+    T_imu_cam = np.eye(4,dtype=np.float32)
+    T_imu_cam[:3,:3] = R_imu_cam.as_matrix()
+    T_imu_cam[:3,3] = t_imu_cam
+
+    return R_imu_cam.as_matrix(), t_imu_cam, T_imu_cam
+
+def load_camera_calibration(user_calib):
+    
+    with open(user_calib, 'r') as f:
+        camera_intrinsics = json.load(f)
+
+    cam_matrix = np.identity(3, dtype=np.float64)
+    cam_matrix[0,0] = camera_intrinsics["intrinsics"]["focal_length_x"]
+    cam_matrix[1,1] = camera_intrinsics["intrinsics"]["focal_length_y"]
+    cam_matrix[0,2] = camera_intrinsics["intrinsics"]["principal_pt_x"]
+    cam_matrix[1,2] = camera_intrinsics["intrinsics"]["principal_pt_y"]
+
+    
+    image_width = int(camera_intrinsics["image_width"])
+    image_height = int(camera_intrinsics["image_height"])
+
+
+    return cam_matrix, (image_width, image_height)
