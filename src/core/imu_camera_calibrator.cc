@@ -82,8 +82,8 @@ void ImuCameraCalibrator::InitSpline(
 
   // Add Accelerometer
   for (size_t i = 0; i < telemetry_data.accelerometer.size(); ++i) {
-    const double t = telemetry_data.accelerometer[i].timestamp_s() +
-                     time_offset_imu_to_cam;
+    const double t = telemetry_data.accelerometer[i].timestamp_s() - telemetry_data.accelerometer[0].timestamp_s();
+                     //time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_)
       continue;
 
@@ -97,8 +97,8 @@ void ImuCameraCalibrator::InitSpline(
 
   // Add Gyroscope
   for (size_t i = 0; i < telemetry_data.gyroscope.size(); ++i) {
-    const double t = telemetry_data.gyroscope[i].timestamp_s() +
-                     time_offset_imu_to_cam;
+    const double t = telemetry_data.gyroscope[i].timestamp_s() - telemetry_data.gyroscope[0].timestamp_s();
+                     //time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_)
       continue;
 

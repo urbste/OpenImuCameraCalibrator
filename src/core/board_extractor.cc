@@ -23,6 +23,8 @@
 #include <theia/sfm/camera/double_sphere_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
 
+#include <third_party/apriltag/ethz_apriltag2/include/apriltags/TagDetection.h>
+
 #include <algorithm>
 #include <fstream>
 #include <ios>
@@ -88,6 +90,37 @@ bool BoardExtractor::InitializeRadonBoard(float square_length, int squaresX,
   return true;
 }
 
+bool BoardExtractor::InitializeAprilBoard(
+        double marker_length, double tag_spacing,
+        int squaresX, int squaresY) {
+
+  double x_corner_offsets[4] = {0, marker_length, marker_length, 0};
+  double y_corner_offsets[4] = {0, 0, marker_length, marker_length};
+
+  std::vector<cv::Point3f> board_pts;
+  board_pts.resize(squaresX * squaresY * NUM_PTS_MARKER);
+
+  for (int y = 0; y < squaresY; y++) {
+    for (int x = 0; x < squaresX; x++) {
+      int tag_id = squaresX * y + x;
+      double x_offset = x * marker_length * (1 + tag_spacing);
+      double y_offset = y * marker_length * (1 + tag_spacing);
+
+      for (int i = 0; i < NUM_PTS_MARKER; i++) {
+        int corner_id = (tag_id << 2) + i;
+        board_pts[corner_id].x = x_offset + x_corner_offsets[i];
+        board_pts[corner_id].y = y_offset + y_corner_offsets[i];
+        board_pts[corner_id].z = 0;
+      }
+    }
+  }
+  board_pts3d_.push_back(board_pts);
+  square_length_m_ = marker_length;
+  board_type_ = BoardType::APRILTAG;
+  board_initialized_ = true;
+  return true;
+}
+
 
 bool BoardExtractor::ExtractBoard(const Mat &image,
                                   aligned_vector<Eigen::Vector2d> &corners,
@@ -117,9 +150,8 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
                            TermCriteria());
 
           object_pt_ids = charuco_ids;
-          for (int i = 0; i < charuco_corners.size(); ++i) {
-            corners.push_back(
-                Eigen::Vector2d(charuco_corners[i].x, charuco_corners[i].y));
+          for (const auto& c : charuco_corners) {
+            corners.push_back(Eigen::Vector2d(c.x, c.y));
           }
           return true;
       } else {
@@ -134,8 +166,9 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
     cv::Mat meta;
     bool success = cv::findChessboardCornersSB(
         image, radon_pattern_size_, radon_corners, radon_flags_, meta);
-    if (!success)
+    if (!success) {
       return false;
+    }
     int lf = 0;
     for (int i = 0; i < radon_pattern_size_.height; ++i) {
       for (int j = 0; j < radon_pattern_size_.width; ++j) {
@@ -145,12 +178,21 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
         lf++;
       }
     }
-    for (int i = 0; i < radon_corners.size(); ++i) {
-      corners.push_back(
-          Eigen::Vector2d(radon_corners[i].x, radon_corners[i].y));
+    for (const auto& c : radon_corners) {
+      corners.push_back(Eigen::Vector2d(c.x, c.y));
     }
+  } else if (board_type_ == BoardType::APRILTAG) {
+      std::vector<int> marker_ids, rejected_ids;
+      std::vector<double> radii, rejected_radii;
+      std::vector<Point2f> marker_corners, rejected_markers;
+      april_detector_.detectTags(image, marker_corners,
+        marker_ids, radii, rejected_markers, rejected_ids, rejected_radii);
+      object_pt_ids = marker_ids;
+      for (const auto& c : marker_corners) {
+        corners.push_back(Eigen::Vector2d(c.x, c.y));
+      }
   } else {
-    LOG(WARNING) << " Board type does not exist.";
+    LOG(WARNING) << "Board type does not exist.";
     return false;
   }
 
@@ -170,6 +212,13 @@ void BoardExtractor::BoardToJson(nlohmann::json &output_json) {
       output_json["scene_pts"][board_ids[i]] = {board_pts[i].x, board_pts[i].y,
                                                 board_pts[i].z};
     }
+  } else if (board_type_ == BoardType::APRILTAG) {
+    for (size_t i = 0; i < board_pts.size(); ++i) {
+      output_json["scene_pts"][std::to_string(i)] = {
+          board_pts[i].x, board_pts[i].y, board_pts[i].z};
+    }
+  } else {
+    LOG(ERROR) << "Board type does not exist.";
   }
 }
 
@@ -208,10 +257,10 @@ bool BoardExtractor::ExtractImageFolderToJson(
   int frame_cnt = 0;
   bool set_img_size = false;
   std::set<double> timestamps_s;
-  for (auto i = 0; i < total_nr_frames; ++i) {
+  for (size_t i = 0; i < total_nr_frames; ++i) {
     const std::string image_path = filenames[i];
-    // get timestamp in nanoseconds
 
+    // get timestamp in nanoseconds
     std::size_t slash = image_path.find_last_of("/\\");
     std::size_t ending = image_path.find_last_of(".");
 
@@ -245,7 +294,8 @@ bool BoardExtractor::ExtractImageFolderToJson(
         << total_nr_frames << "\n";
 
     if (verbose_plot_) {
-      for (int i = 0; i < corners.size(); ++i) {
+      cv::cvtColor(image,image,cv::COLOR_GRAY2BGR);
+      for (size_t i = 0; i < corners.size(); ++i) {
         cv::drawMarker(
             image, cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
             cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 3);
@@ -265,7 +315,7 @@ bool BoardExtractor::ExtractImageFolderToJson(
   for (const auto& t : timestamps_s) {
       times.push_back(t);
   }
-  for (auto i=0; i < times.size()-2; ++i) {
+  for (size_t i=0; i < times.size()-2; ++i) {
       delta_ts.push_back(times[i+1] - times[i]);
   }
 
@@ -295,7 +345,7 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
   VideoCapture input_video;
   input_video.open(video_path);
   int cnt_wrong = 0;
-  double fps = input_video.get(cv::CAP_PROP_FPS);
+  const double fps = input_video.get(cv::CAP_PROP_FPS);
 
   output_json["camera_fps"] = fps;
   output_json["calibration_board_type"] = board_type_;
@@ -343,7 +393,7 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
         << total_nr_frames << "\n";
 
     if (verbose_plot_) {
-      for (int i = 0; i < corners.size(); ++i) {
+      for (size_t i = 0; i < corners.size(); ++i) {
         cv::drawMarker(
             image, cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
             cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 3);

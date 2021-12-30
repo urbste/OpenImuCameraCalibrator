@@ -18,6 +18,7 @@
 #include <opencv2/aruco.hpp>
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/opencv.hpp>
+#include <third_party/apriltag/apriltag.h>
 
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/json.h"
@@ -31,14 +32,16 @@ namespace core {
 
 const int NUM_PTS_MARKER = 4;
 
-enum BoardType { CHARUCO = 0, RADON = 1 };
+enum BoardType { CHARUCO = 0, RADON = 1, APRILTAG = 2};
 
 inline BoardType StringToBoardType(const std::string &board_type) {
   if (board_type == "charuco") {
     return BoardType::CHARUCO;
   } else if (board_type == "radon") {
     return BoardType::RADON;
-  }
+  }else if (board_type == "apriltag") {
+      return BoardType::APRILTAG;
+    }
   return BoardType::CHARUCO;
 }
 
@@ -69,6 +72,12 @@ public:
 
   //! Initializes a Radon checkerboard
   bool InitializeRadonBoard(float square_length, int squaresX, int squaresY);
+
+  //! Initialize a Apriltag board
+  bool InitializeAprilBoard(double marker_length, double tag_spacing,
+          int squaresX, int squaresY) ;
+
+  bool DetectAprilBoard(const cv::Mat& image);
 
   //! Returns the 3d board points
   std::vector<std::vector<cv::Point3f>> GetBoardPts() { return board_pts3d_; }
@@ -103,6 +112,9 @@ private:
   cv::Size radon_pattern_size_;
   //! board pt continuous index
   std::vector<int> continuous_board_indices_;
+
+  //! Apriltag stuff
+  ApriltagDetector april_detector_;
 
   //! if a board is already initialized
   bool board_initialized_ = false;

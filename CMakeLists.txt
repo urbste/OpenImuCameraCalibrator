@@ -43,6 +43,7 @@ endif (THEIA_FOUND)
 file(GLOB_RECURSE CAMCALIB_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/*.cc)
 file(GLOB_RECURSE CAMCALIB_HEADER_FILES ${CMAKE_SOURCE_DIR}/include/*.h)
 
+add_subdirectory(third_party/apriltag)
 # commit d5ccee8 before fmt was added
 include_directories(third_party/Sophus)
 
@@ -52,4 +53,5 @@ include_directories(${CMAKE_SOURCE_DIR}/include
                     ${OpenCV_INCLUDE_DIRS})
 
 add_library(OpenImuCameraCalibrator STATIC ${CAMCALIB_SOURCE_FILES})
+target_link_libraries(OpenImuCameraCalibrator apriltag)
 add_subdirectory(applications)

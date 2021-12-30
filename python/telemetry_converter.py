@@ -238,13 +238,16 @@ class TelemetryConverter:
     def _dump_final_json(self, output_path):
         with open(output_path, "w") as f:
             json.dump(self.telemetry_importer.telemetry, f)
+
     def _dump_kalibr_csv(self, output_path):
+        from utils import time_to_s_nsec
         with open(output_path, "w") as f:
             for i in range(len(self.telemetry_importer.telemetry["timestamps_ns"])):
                 t = self.telemetry_importer.telemetry["timestamps_ns"][i]
                 g = self.telemetry_importer.telemetry["gyroscope"][i]
                 a = self.telemetry_importer.telemetry["accelerometer"][i]
-                f.write(format(int(t), '09d')+','+str(g[0])+','+str(g[1])+','+str(g[2])+','+str(a[0])+','+str(a[1])+','+str(a[2])+'\n')
+                t_s, t_ns = time_to_s_nsec(t*1e-9)
+                f.write(str(t_s)+format(int(t_ns), '09d')+','+str(g[0])+','+str(g[1])+','+str(g[2])+','+str(a[0])+','+str(a[1])+','+str(a[2])+'\n')
             f.close()
 
     def convert_gopro_telemetry_file(self, input_telemetry_json, output_path, skip_seconds=0.0):

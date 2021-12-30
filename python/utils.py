@@ -2,8 +2,10 @@ import os
 import json
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+import math
 
 ms_to_sec = 1./1000.
+s_to_nsec = 1e9
 
 def get_abbr_from_cam_model(model_name):
     if model_name == "DIVISION_UNDISTORTION":
@@ -93,3 +95,11 @@ def load_camera_calibration(user_calib):
 
 
     return cam_matrix, (image_width, image_height)
+
+# bagcreater expects image filenames with 
+# filename = "{0}{1:09d}.png".format(timestamp.secs, timestamp.nsecs)
+# https://github.com/ethz-asl/kalibr/blob/master/aslam_offline_calibration/kalibr/python/kalibr_bagextractor#L66
+def time_to_s_nsec(timestamp_s):
+    dec, sec = math.modf(timestamp_s) 
+    nanosecs = dec * s_to_nsec
+    return int(sec), int(nanosecs)

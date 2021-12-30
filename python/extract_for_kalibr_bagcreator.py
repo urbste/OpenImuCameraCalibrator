@@ -5,8 +5,10 @@ from subprocess import Popen, PIPE
 from os.path import join as pjoin
 from argparse import ArgumentParser
 from telemetry_converter import TelemetryConverter
+import math
+from utils import time_to_s_nsec
 
-def extract_frames(gopro_video, output_image_path, skip_frames=3):
+def extract_frames(gopro_video, output_image_path, downsample_fac=2.0, skip_frames=3):
     if not os.path.exists(output_image_path):
         os.makedirs(output_image_path)
     cap = cv2.VideoCapture(gopro_video)
@@ -15,11 +17,15 @@ def extract_frames(gopro_video, output_image_path, skip_frames=3):
     while (cap.isOpened()):
         # Capture frame-by-frame
         ret, frame = cap.read()
-        timestamp_ns = cap.get(cv2.CAP_PROP_POS_MSEC) * 1e6
+        timestamp_ns = cap.get(cv2.CAP_PROP_POS_MSEC) * 1e-3
+        timestamp_s, timestamp_ns = time_to_s_nsec(timestamp_ns)
+        num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if count % skip_frames == 0:
             if ret:
-                print('Read %d frame: ' % count, ret)
-                cv2.imwrite(os.path.join(output_image_path, "{:09d}.png".format(int(timestamp_ns))), frame) 
+                if count % 100 == 0:
+                    print('Wrote frame {}/{}: '.format(count,num_frames))
+                frame = cv2.resize(frame, (0,0), fx=1/downsample_fac, fy=1/downsample_fac)
+                cv2.imwrite(os.path.join(output_image_path, "{0}{1:09d}.png".format(timestamp_s, timestamp_ns)), frame) 
             else:
                 if empty_frame > 200:
                     break
@@ -35,14 +41,15 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('--input_path', 
                         help="path to metadata json",
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/Kalibr/Gopro9/1080_50/imu_calib')
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/Kalibr/Gopro9/1080_50/imu_calib')
     parser.add_argument('--output_path', 
                         help="output path",
-                        default='/media/steffen/0F78151A1CEDE4A2/Sparsenet/CameraCalibrationStudy/Kalibr/Gopro9/1080_50/imu_calib/bag_input')
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/Kalibr/Gopro9/1080_50/imu_calib/bag_input')
     parser.add_argument('--path_to_src', 
                         help="Path to OpenCameraCalibrator src folder.",
-                        default='/home/steffen/Projects/OpenCameraCalibrator')   
-    parser.add_argument('--skip_frames', default=3)                          
+                        default='/home/Data/Projects/OpenCameraCalibrator')  
+    parser.add_argument('--downsample_fac', default=2, type=float)
+    parser.add_argument('--skip_frames', default=0, type=int)   
     args = parser.parse_args()
 
     if not os.path.exists(args.output_path):
