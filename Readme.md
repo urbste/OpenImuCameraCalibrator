@@ -79,7 +79,7 @@ sudo apt-get install -y nodejs npm
 git clone https://github.com/urbste/OpenImuCameraCalibrator
 mkdir -p build && cd build && cmake ..
 make -j
-cd javascript && npm install
+cd ../javascript && npm install
 ``` 
 
 6. Create a python >3.5 environment (or use your local python - not recommended)
