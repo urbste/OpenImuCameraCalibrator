@@ -71,7 +71,7 @@ sudo make install
 4. Install node >= 12.x (needed to extract GoPro telemetry)
 ``` bash
 curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-sudo apt-get install -y nodejs
+sudo apt-get install -y nodejs npm
 ``` 
 
 5. Build this project
@@ -79,6 +79,7 @@ sudo apt-get install -y nodejs
 git clone https://github.com/urbste/OpenImuCameraCalibrator
 mkdir -p build && cd build && cmake ..
 make -j
+cd javascript && npm install
 ``` 
 
 6. Create a python >3.5 environment (or use your local python - not recommended)
