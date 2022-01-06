@@ -21,38 +21,35 @@
 
 #include "OpenCameraCalibrator/basalt_spline/calib_helpers.h"
 #include "OpenCameraCalibrator/basalt_spline/ceres_calib_spline_split.h"
+#include "OpenCameraCalibrator/core/spline_trajectory_estimator.h"
 
 namespace OpenICC {
 namespace core {
 
 const int SPLINE_N = 6;
-const bool USE_OLD_TIME_DERIV = false;
 
 class ImuCameraCalibrator {
 public:
   ImuCameraCalibrator(const bool reestimate_biases) {
     reestimate_biases_ = reestimate_biases;
   }
-  void InitSpline(const theia::Reconstruction &calib_dataset,
+
+  void BatchInitSpline(const theia::Reconstruction &vision_dataset,
                   const Sophus::SE3<double> &T_i_c_init,
                   const OpenICC::SplineWeightingData &spline_weight_data,
                   const double time_offset_imu_to_cam,
                   const OpenICC::CameraTelemetryData &telemetry_data,
-                  const double initial_line_delay);
+                  const double initial_line_delay,
+                  const ThreeAxisSensorCalibParams<double> accl_intrinsics,
+                  const ThreeAxisSensorCalibParams<double> gyro_intrinsics);
 
-  void InitializeGravity(const OpenICC::CameraTelemetryData &telemetry_data);
-
-  double Optimize(const int iterations,
-                  const bool fix_so3_spline,
-                  const bool fix_r3_spline,
-                  const bool fix_T_i_c,
-                  const bool fix_line_delay);
+  double Optimize(const int iterations, const int optim_flags);
 
   void ToTheiaReconDataset(theia::Reconstruction &output_recon);
 
   void ClearSpline();
 
-  CeresCalibrationSplineSplit<SPLINE_N, USE_OLD_TIME_DERIV> trajectory_;
+  SplineTrajectoryEstimator<SPLINE_N> trajectory_;
 
   //! camera timestamps in seconds
   std::vector<double> GetCamTimestamps() { return cam_timestamps_; }
@@ -67,22 +64,25 @@ public:
     return accl_measurements_;
   }
 
+  //! Use this function if we really know the gravity direction of
+  //! the calibration board (e.g. flat on the ground -> [0,0,9.81])
+  void SetKnownGravityDir(const Eigen::Vector3d& gravity);
+
   void SetCalibrateRSLineDelay() { calibrate_cam_line_delay_ = true; }
   bool GetCalibrateRSLineDelay() { return calibrate_cam_line_delay_; }
   void SetRSLineDelay(const double line_delay) {
     inital_cam_line_delay_s_ = line_delay;
   }
   double GetCalibratedRSLineDelay() {
-    return trajectory_.GetOptimizedRSLineDelay();
+    return trajectory_.GetRSLineDelay();
   }
   double GetInitialRSLineDelay() { return inital_cam_line_delay_s_; }
 
-  void SetIMUIntrinsics(const ThreeAxisSensorCalibParams<double>& acc_intrinsics,
-                        const ThreeAxisSensorCalibParams<double>& gyr_intrinsics) {
-      acc_intrinsics_ = acc_intrinsics;
-      gyr_intrinsics_ = gyr_intrinsics;
-  }
+  void GetIMUIntrinsics(ThreeAxisSensorCalibParams<double>& acc_intrinsics,
+                        ThreeAxisSensorCalibParams<double>& gyr_intrinsics);
 private:
+  void InitializeGravity(const OpenICC::CameraTelemetryData &telemetry_data);
+
   //! camera timestamps
   std::vector<double> cam_timestamps_;
 
@@ -126,10 +126,6 @@ private:
   std::unordered_map<TimeCamId, CalibInitPoseData> calib_init_poses_;
   std::unordered_map<TimeCamId, CalibInitPoseData> spline_init_poses_;
   theia::Reconstruction image_data_;
-
-  //! IMU intrinsics
-  ThreeAxisSensorCalibParams<double> acc_intrinsics_;
-  ThreeAxisSensorCalibParams<double> gyr_intrinsics_;
 };
 
 } // namespace core

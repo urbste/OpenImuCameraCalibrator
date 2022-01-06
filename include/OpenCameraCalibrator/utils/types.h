@@ -35,6 +35,8 @@ const double S_TO_US = 1e6;  ///< Second to museconds conversion
 const double MS_TO_S = 1e-3; ///< Milliseconds to second conversion
 const double S_TO_MS = 1e3;  ///< Second to milliseconds conversion
 
+enum class CalibBoardGravDir {UNKOWN = -1, X = 0, Y = 1, Z = 2};
+
 // alignment stuff
 template <typename T>
 using aligned_vector = std::vector<T, Eigen::aligned_allocator<T>>;

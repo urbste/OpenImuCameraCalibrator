@@ -39,14 +39,14 @@ bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
   const auto gyro = j["gyroscope"];
   const auto timestamps_ns = j["timestamps_ns"];
 
-  const int nr_datapoints = timestamps_ns.size();
+  const size_t nr_datapoints = timestamps_ns.size();
   if (gyro.size() != nr_datapoints || accl.size() != nr_datapoints) {
     std::cerr << "Telemetry should have the same amount of timestamps, "
                  "accelerometer and gyroscope values.\n";
     return false;
   }
 
-  for (int i=0; i < timestamps_ns.size(); ++i) {
+  for (size_t i=0; i < timestamps_ns.size(); ++i) {
       double t_s = (double)timestamps_ns[i] * NS_TO_S;
       ImuReading<double> acc_reading(t_s, accl[i][0], accl[i][1],  accl[i][2]);
       ImuReading<double> gyr_reading(t_s, gyro[i][0], gyro[i][1],  gyro[i][2]);

@@ -310,7 +310,7 @@ public:
                          "s " << s << " N " << N << " knots.size() "
                               << so3_knots_.size());
 
-    using FunctorT = CalibGyroCostFunctorSplit<N, Sophus::SO3, OLD_TIME_DERIV>;
+    using FunctorT = GyroCostFunctorSplit<N>;
 
     FunctorT *functor =
         new FunctorT(meas, u, inv_so3_dt_, weight_so3, calib_bias);
@@ -360,7 +360,7 @@ public:
                          "s " << s_r3 << " N " << N << " knots.size() "
                               << trans_knots_.size());
 
-    using FunctorT = CalibAccelerationCostFunctorSplit<N>;
+    using FunctorT = AccelerationCostFunctorSplit<N>;
 
     FunctorT *functor = new FunctorT(meas, u_r3, inv_r3_dt_, u_so3, inv_so3_dt_,
                                      weight_se3, calib_bias);

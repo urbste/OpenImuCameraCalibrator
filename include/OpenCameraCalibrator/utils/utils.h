@@ -43,6 +43,9 @@ void PrintResult(const std::string cam_type,
 
 std::string CameraIDToString(const int theia_enum);
 
+int GravDirStringToInt(const std::string& string);
+
+
 double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
                             const theia::ViewId v_id);
 

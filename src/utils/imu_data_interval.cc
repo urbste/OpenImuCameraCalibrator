@@ -70,7 +70,7 @@ void ExtractIntervalsSamples(const ImuReadings &samples,
   // Check for valid intervals  (i.e., intervals with at least interval_n_samps
   // samples)
   int n_valid_intervals = 0, n_static_samples;
-  for (int i = 0; i < intervals.size(); i++) {
+  for (size_t i = 0; i < intervals.size(); i++) {
     if ((intervals[i].end_idx - intervals[i].start_idx + 1) >= interval_n_samps)
       n_valid_intervals++;
   }
@@ -86,7 +86,7 @@ void ExtractIntervalsSamples(const ImuReadings &samples,
   extracted_intervals.reserve(n_valid_intervals);
 
   // For each valid interval, extract the first interval_n_samps samples
-  for (int i = 0; i < intervals.size(); i++) {
+  for (size_t i = 0; i < intervals.size(); i++) {
     int interval_size = intervals[i].end_idx - intervals[i].start_idx + 1;
     if (interval_size >= interval_n_samps) {
       extracted_intervals.push_back(intervals[i]);
@@ -125,7 +125,7 @@ void StaticIntervalsDetector(const ImuReadings &samples, double threshold,
   bool look_for_start = true;
   DataInterval current_interval;
 
-  for (int i = h; i < samples.size() - h; i++) {
+  for (size_t i = h; i < samples.size() - h; i++) {
     Vector3d variance = DataVariance(samples, DataInterval(i - h, i + h));
     double norm = variance.norm();
 

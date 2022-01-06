@@ -54,9 +54,8 @@ int main(int argc, char *argv[]) {
 
   LOG(INFO) << "Start pose estimation.\n";
   PoseEstimator pose_estimator;
-  pose_estimator.EstimatePosesFromJson(scene_json, camera);
+  pose_estimator.EstimatePosesFromJson(scene_json, camera, 5.0);
   LOG(INFO) << "Finished pose estimation.\n";
-  pose_estimator.OptimizeAllPoses();
   if (FLAGS_optimize_board_points) {
     LOG(INFO) << "Optimizing board points.\n";
     pose_estimator.OptimizeBoardPoints();

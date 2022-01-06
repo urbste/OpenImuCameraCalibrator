@@ -126,8 +126,7 @@ bool write_camera_calibration(const std::string &output_file,
     std::cerr << "Camera model type not supported\n";
   }
 
-  json_obj["intrinsics"]["focal_length_x"] = camera.FocalLength();
-  json_obj["intrinsics"]["focal_length_y"] = camera.FocalLength() * (double)json_obj["intrinsics"]["aspect_ratio"];
+  json_obj["intrinsics"]["focal_length"] = camera.FocalLength();
 
   json_file << std::setw(2) << json_obj << std::endl;
   json_file.close();

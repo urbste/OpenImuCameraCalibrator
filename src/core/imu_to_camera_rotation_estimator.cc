@@ -181,6 +181,17 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
     const double diff_dt = -2.0 / dt_imu;
     Vector3d angVisVec(diff_dt * angVisQ.x(), diff_dt * angVisQ.y(),
                        diff_dt * angVisQ.z());
+    // suppress extremely large velocities 6.28 rad/s ~ >360deg/s
+    if (std::abs(angVisVec[0]) > 2*M_PI ||
+        std::abs(angVisVec[1]) > 2*M_PI ||
+        std::abs(angVisVec[2]) > 2*M_PI) {
+        if (i > 1) {
+            angVis[i] = angVis[i-1];
+        }
+        else {
+            angVisVec.setZero();
+        }
+    }
     angVis.push_back(angVisVec);
   }
 
@@ -189,7 +200,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
 
   // vec3_vector smoothed_ang_imu, smoothed_vis_vel;
-  for (int i = 0; i < angImu.size(); ++i) {
+  for (size_t i = 0; i < angImu.size(); ++i) {
     x_imu.add(angImu[i][0]);
     y_imu.add(angImu[i][1]);
     z_imu.add(angImu[i][2]);

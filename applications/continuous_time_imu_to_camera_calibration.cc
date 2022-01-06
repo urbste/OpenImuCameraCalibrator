@@ -44,31 +44,62 @@
 
 // Input/output files.
 DEFINE_string(
-    telemetry_json, "",
+    telemetry_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/GX010020_gen.json",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
-DEFINE_string(input_pose_dataset, "", "Path to pose dataset.");
-DEFINE_string(input_corners, "",
+DEFINE_string(input_pose_dataset, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/pose_calib_GX010020.calibdata", "Path to pose dataset.");
+DEFINE_string(input_corners, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/cam_imu_corners_GX010020.uson",
               "Corners of the original imu to cam calibration video file.");
-DEFINE_string(camera_calibration_json, "", "Camera calibration.");
-DEFINE_string(gyro_to_cam_initial_calibration, "",
+DEFINE_string(camera_calibration_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam/cam_calib_GX010017_ph_2.json", "Camera calibration.");
+DEFINE_string(gyro_to_cam_initial_calibration, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/imu_to_cam_calibration_GX010020.json",
               "Initial gyro to camera calibration json.");
-DEFINE_string(imu_intrinsics, "",
+DEFINE_string(imu_intrinsics, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/ImuIntrinsics/dataset2/static_calib_result.json",
               "IMU intrinsics, scale and misalignment matrices. E.g. estimated "
               "with static_imu_calibration or from a datasheet.");
-DEFINE_string(imu_bias_file, "", "IMU bias json");
+DEFINE_string(imu_bias_file, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/imu_bias/imu_bias_GX010018.json", "IMU bias json");
 DEFINE_bool(global_shutter, false, "If camera has a global shutter.");
-DEFINE_string(spline_error_weighting_json, "",
+DEFINE_string(spline_error_weighting_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/spline_info_GX010020.json",
               "Path to spline error weighting data");
-DEFINE_string(output_path, "", "");
+DEFINE_string(output_path, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu", "");
 DEFINE_bool(calibrate_cam_line_delay, false,
             "If camera rolling shutter line delay should be calibrated.");
-DEFINE_string(result_output_json, "", "Path to result json file");
+DEFINE_string(result_output_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/cam_imu_calib_result_GX010020.json", "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 DEFINE_bool(reestimate_biases, false,
             "If accelerometer and gyroscope biases should be estimated during "
             "spline optim");
-DEFINE_string(debug_video_path, "",
+DEFINE_double(gravity_const, 9.81, "gravity constant");
+DEFINE_string(known_grav_dir_axis, "UNKNOWN", "Possible values (X,Y,Z,UNKNOWN) if the gravity direction of your calibration board is exactly known (e.g. supplying Z we will fix gravity to [0,0,gravity_const]. UNKNOWN means it is not known and will be estimated.");
+DEFINE_string(debug_video_path, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/GX010020.MP4",
               "Load the video to display the reprojection error.");
+
+//// Input/output files.
+//DEFINE_string(
+//    telemetry_json, "",
+//    "Path to gopro telemetry json extracted with Sparsnet extractor.");
+//DEFINE_string(input_pose_dataset, "", "Path to pose dataset.");
+//DEFINE_string(input_corners, "",
+//              "Corners of the original imu to cam calibration video file.");
+//DEFINE_string(camera_calibration_json, "", "Camera calibration.");
+//DEFINE_string(gyro_to_cam_initial_calibration, "",
+//              "Initial gyro to camera calibration json.");
+//DEFINE_string(imu_intrinsics, "",
+//              "IMU intrinsics, scale and misalignment matrices. E.g. estimated "
+//              "with static_imu_calibration or from a datasheet.");
+//DEFINE_string(imu_bias_file, "", "IMU bias json");
+//DEFINE_bool(global_shutter, false, "If camera has a global shutter.");
+//DEFINE_string(spline_error_weighting_json, "",
+//              "Path to spline error weighting data");
+//DEFINE_string(output_path, "", "");
+//DEFINE_bool(calibrate_cam_line_delay, false,
+//            "If camera rolling shutter line delay should be calibrated.");
+//DEFINE_string(result_output_json, "", "Path to result json file");
+//DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
+//DEFINE_bool(reestimate_biases, false,
+//            "If accelerometer and gyroscope biases should be estimated during "
+//            "spline optim");
+
+//DEFINE_string(debug_video_path, "",
+//              "Load the video to display the reprojection error.");
 
 using json = nlohmann::json;
 
@@ -172,34 +203,46 @@ int main(int argc, char *argv[]) {
     init_line_delay_us = 0.0;
   }
   ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
-  imu_cam_calibrator.InitSpline(recon_calib_dataset, T_i_c_init, weight_data,
+  imu_cam_calibrator.BatchInitSpline(recon_calib_dataset, T_i_c_init, weight_data,
                                 time_offset_imu_to_cam, telemetry_data,
-                                init_line_delay_us);
-  imu_cam_calibrator.InitializeGravity(telemetry_data);
-  imu_cam_calibrator.SetIMUIntrinsics(acc_intr, gyr_intr);
+                                init_line_delay_us, acc_intr, gyr_intr);
+  const int grav_dir_axis = GravDirStringToInt(FLAGS_known_grav_dir_axis);
+  int flags = SplineOptimFlags::T_I_C;
+
+  if (grav_dir_axis != -1) {
+      Eigen::Vector3d grav_dir(0,0,0);
+      grav_dir[grav_dir_axis] = FLAGS_gravity_const;
+      imu_cam_calibrator.SetKnownGravityDir(grav_dir);
+      std::cout<<"Setting a-priori gravity direction supplied by the user to: "<<grav_dir.transpose()<<"\n";
+  } else {
+    flags |= SplineOptimFlags::GRAVITY_DIR;
+  }
+
   double reproj_error =
-      imu_cam_calibrator.Optimize(20, false, false, false, true);
+      imu_cam_calibrator.Optimize(50, flags);
+
   double reproj_error_after_ld = reproj_error;
   if (FLAGS_calibrate_cam_line_delay && !FLAGS_global_shutter) {
+    flags = SplineOptimFlags::CAM_LINE_DELAY;
     reproj_error_after_ld =
-        imu_cam_calibrator.Optimize(10, true, true, true, false);
+        imu_cam_calibrator.Optimize(10, flags);
   }
   LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";
   LOG(INFO) << "Mean reprojection error after line delay optim "
             << reproj_error_after_ld << "px\n";
 
-  std::cout << "g: " << imu_cam_calibrator.trajectory_.getG().transpose()
+  std::cout << "g: " << imu_cam_calibrator.trajectory_.GetGravity().transpose()
             << std::endl;
   std::cout << "accel_bias: "
-            << imu_cam_calibrator.trajectory_.getAccelBias().transpose()
+            << imu_cam_calibrator.trajectory_.GetAccelBias().transpose()
             << std::endl;
   std::cout << "gyro_bias: "
-            << imu_cam_calibrator.trajectory_.getGyroBias().transpose()
+            << imu_cam_calibrator.trajectory_.GetGyroBias().transpose()
             << std::endl;
   const Eigen::Quaterniond q_i_c =
-      imu_cam_calibrator.trajectory_.getT_i_c().so3().unit_quaternion();
+      imu_cam_calibrator.trajectory_.GetT_i_c().so3().unit_quaternion();
   const Eigen::Vector3d t_i_c =
-      imu_cam_calibrator.trajectory_.getT_i_c().translation();
+      imu_cam_calibrator.trajectory_.GetT_i_c().translation();
   const double calib_line_delay_us =
       imu_cam_calibrator.GetCalibratedRSLineDelay() * S_TO_US;
   std::cout << "T_i_c qw,qx,qy,qz: " << q_i_c.w() << " " << q_i_c.x() << " "
@@ -207,7 +250,7 @@ int main(int argc, char *argv[]) {
   std::cout << "T_i_c t: " << t_i_c.transpose() << std::endl;
   std::cout << "T_i_c R: " << q_i_c.matrix() << std::endl;
   std::cout << "Initialized line delay [us]: "
-            << imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US << "\n";
+            << init_line_delay_us * S_TO_US << "\n";
   std::cout << "Calibrated line delay [us]: " << calib_line_delay_us << "\n";
   nlohmann::json json_calibspline_results_out;
 
@@ -222,7 +265,7 @@ int main(int argc, char *argv[]) {
   json_calibspline_results_out["r3_dt"] = weight_data.dt_r3;
   json_calibspline_results_out["so3_dt"] = weight_data.dt_so3;
   json_calibspline_results_out["init_line_delay_us"] =
-      imu_cam_calibrator.GetInitialRSLineDelay() * S_TO_US;
+      init_line_delay_us * S_TO_US;
   json_calibspline_results_out["calib_line_delay_us"] = calib_line_delay_us;
   json_calibspline_results_out["time_offset_imu_to_cam_s"] =
       time_offset_imu_to_cam;
@@ -246,7 +289,8 @@ int main(int argc, char *argv[]) {
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_imu"]["z"] =
         g.second[2];
     // write out spline estimates
-    Eigen::Vector3d gyro_spline = imu_cam_calibrator.trajectory_.getGyro(t_ns);
+    Eigen::Vector3d gyro_spline;
+    imu_cam_calibrator.trajectory_.GetAngularVelocity(t_ns, gyro_spline);
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["x"] =
         gyro_spline[0];
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["y"] =
@@ -265,7 +309,8 @@ int main(int argc, char *argv[]) {
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_imu"]["z"] =
         a.second[2];
     // write out spline estimates
-    Eigen::Vector3d accl_spline = imu_cam_calibrator.trajectory_.getAccel(t_ns);
+    Eigen::Vector3d accl_spline;
+    imu_cam_calibrator.trajectory_.GetAcceleration(t_ns, accl_spline);
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["x"] =
         accl_spline[0];
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["y"] =
@@ -283,8 +328,9 @@ int main(int argc, char *argv[]) {
   theia::Reconstruction output_spline_recon;
   for (size_t i = 0; i < cam_timestamps_s.size(); ++i) {
     const int64_t t_ns = cam_timestamps_s[i] * S_TO_NS;
-    Sophus::SE3d T_w_i = imu_cam_calibrator.trajectory_.getPose(t_ns);
-    Sophus::SE3d T_w_c = T_w_i * imu_cam_calibrator.trajectory_.getT_i_c();
+    Sophus::SE3d T_w_i;
+    imu_cam_calibrator.trajectory_.GetPose(t_ns, T_w_i);
+    Sophus::SE3d T_w_c = T_w_i * imu_cam_calibrator.trajectory_.GetT_i_c();
     theia::ViewId v_id_theia =
         output_spline_recon.AddView(std::to_string(t_ns), 0, t_ns);
     theia::View *view = output_spline_recon.MutableView(v_id_theia);
@@ -327,7 +373,10 @@ int main(int argc, char *argv[]) {
         const int board_pt3_id = std::stoi(img_pts.key());
         const Eigen::Vector2d corner(
             Eigen::Vector2d(img_pts.value()[0], img_pts.value()[1]));
-        recon_calib_dataset.AddObservation(view_id, board_pt3_id, corner);
+        Eigen::Matrix2d cov;
+        cov << 0.5, 0, 0, 0.5;
+        const theia::Feature feat(corner, cov);
+        recon_calib_dataset.AddObservation(view_id, board_pt3_id, feat);
       }
     }
     VideoCapture input_video;
@@ -360,13 +409,13 @@ int main(int argc, char *argv[]) {
       theia::View *view_spline =
           output_spline_recon.MutableView(view_id_spline);
       const theia::View *view_calib = recon_calib_dataset.View(view_id_calib);
-      if (!view_spline && !view_calib)
+      if (!view_spline || !view_calib)
         continue;
       cv::resize(image, image,
                  cv::Size(camera.ImageWidth(), camera.ImageHeight()));
 
       double reproj_error = 0.0;
-      for (int i = 0; i < view_calib->TrackIds().size(); ++i) {
+      for (size_t i = 0; i < view_calib->TrackIds().size(); ++i) {
         theia::TrackId id = view_calib->TrackIds()[i];
         Eigen::Vector2d pixel;
         view_spline->Camera().ProjectPoint(
@@ -384,8 +433,9 @@ int main(int argc, char *argv[]) {
                   cv::Point(20, 20), cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0,
                   cv::Scalar(255, 0, 0));
       cv::imshow("spline reprojection", image);
-      cv::waitKey(30);
+      cv::waitKey(10);
       ++nr_frames;
+      if (nr_frames > 100) break;
     }
   }
   return 0;

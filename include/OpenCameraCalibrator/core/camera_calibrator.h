@@ -79,6 +79,9 @@ private:
 
   //! also optimize board points in the end (e.g. for printed boards)
   bool optimize_board_pts_ = true;
+
+  //! min number views for calibration
+  int min_num_view_ = 10;
 };
 
 } // namespace core

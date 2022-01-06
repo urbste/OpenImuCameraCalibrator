@@ -148,12 +148,25 @@ std::string CameraIDToString(const int theia_enum) {
   }
 }
 
+int GravDirStringToInt(const std::string& string) {
+  if (string == "UNKNOWN") {
+      return (int)CalibBoardGravDir::UNKOWN;
+  } else if (string == "X") {
+      return (int)CalibBoardGravDir::X;
+  } else if (string == "Y") {
+      return (int)CalibBoardGravDir::Y;
+  } else if (string == "Z") {
+      return (int)CalibBoardGravDir::Z;
+  }
+  return -1;
+}
+
 double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
                             const theia::ViewId v_id) {
   const theia::View *v = recon_dataset.View(v_id);
   std::vector<theia::TrackId> track_ids = v->TrackIds();
   double view_reproj_error = 0.0;
-  for (int t = 0; t < track_ids.size(); ++t) {
+  for (size_t t = 0; t < track_ids.size(); ++t) {
     const theia::Feature *feat = v->GetFeature(track_ids[t]);
     const theia::Track *track = recon_dataset.Track(track_ids[t]);
     Eigen::Vector2d pt;
@@ -184,7 +197,7 @@ int FindClosestTimestamp(const double t_imu,
                          double &distance_to_nearest_timestamp) {
   double dist = std::numeric_limits<double>::max();
   int idx = 0;
-  for (int i = 0; i < vis_timestamps.size(); ++i) {
+  for (size_t i = 0; i < vis_timestamps.size(); ++i) {
     double new_dist = std::abs(t_imu - vis_timestamps[i]);
     if (new_dist < dist) {
       distance_to_nearest_timestamp = new_dist;

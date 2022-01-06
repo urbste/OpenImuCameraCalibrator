@@ -101,7 +101,7 @@ bool initialize_radial_undistortion_camera(
   cam.SetOrientationFromRotationMatrix(rotation);
   // calculate reprojection error
   double repro_error = 0.0;
-  for (int i = 0; i < correspondences.size(); ++i) {
+  for (size_t i = 0; i < correspondences.size(); ++i) {
     Eigen::Vector2d pixel;
     cam.ProjectPoint(correspondences[i].world_point.homogeneous(),
                      &pixel);
@@ -151,10 +151,10 @@ bool initialize_doublesphere_model(
   const size_t target_cols = board_size.width;
   const size_t target_rows = board_size.height;
 
-  for (int r = 0; r < target_rows; ++r) {
+  for (size_t r = 0; r < target_rows; ++r) {
     aligned_vector<Eigen::Vector4d> P;
 
-    for (int c = 0; c < target_cols; ++c) {
+    for (size_t c = 0; c < target_cols; ++c) {
       int corner_id = (r * target_cols + c);
 
       if (id_to_corner.find(corner_id) != id_to_corner.end()) {
@@ -230,15 +230,16 @@ bool initialize_doublesphere_model(
       theia::CalibratedAbsolutePose pose;
       theia::RansacParameters params = ransac_params;
       params.error_thresh = 0.5 / img_cols;
+      theia::PnPType type = theia::PnPType::SQPnP;
       theia::EstimateCalibratedAbsolutePose(
-          params, theia::RansacType::RANSAC, correspondences_new, &pose,
+          params, theia::RansacType::RANSAC, type, correspondences_new, &pose,
           &ransac_summary);
       cam.SetPosition(pose.position);
       cam.SetOrientationFromRotationMatrix(pose.rotation);
 
       double repro_error = 0.0;
       int in_image = 0;
-      for (int i = 0; i < correspondences.size(); ++i) {
+      for (size_t i = 0; i < correspondences.size(); ++i) {
         Eigen::Vector2d pixel;
         cam.ProjectPoint(correspondences[i].world_point.homogeneous(),
                          &pixel);

@@ -41,6 +41,8 @@
 #include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/utils.h"
 
+#include <thread>
+
 namespace OpenICC {
 namespace core {
 
@@ -123,18 +125,19 @@ theia::ViewId CameraCalibrator::AddView(
 }
 
 bool CameraCalibrator::RunCalibration() {
-  if (recon_calib_dataset_.NumViews() < 10) {
+  if (recon_calib_dataset_.NumViews() < min_num_view_) {
     LOG(ERROR) << "Not enough views for proper calibration!" << std::endl;
     return false;
   }
 
-  LOG(INFO) << "Using " << recon_calib_dataset_.NumViews()
-            << " in bundle adjustment\n";
+  std::cout<< "Using " << recon_calib_dataset_.NumViews()
+            << " views for camera calibration.\n";
   // bundle adjust everything
   theia::BundleAdjustmentOptions ba_options;
   ba_options.verbose = true;
   ba_options.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options.robust_loss_width = 1.345;
+  ba_options.num_threads = std::thread::hardware_concurrency();
 
   /////////////////////////////////////////////////
   /// 1. Optimize focal length and radial distortion, keep principal point fixed
@@ -166,7 +169,7 @@ bool CameraCalibrator::RunCalibration() {
   summary = theia::BundleAdjustViews(ba_options, recon_calib_dataset_.ViewIds(),
                                      &recon_calib_dataset_);
 
-  if (recon_calib_dataset_.NumViews() < 8) {
+  if (recon_calib_dataset_.NumViews() < min_num_view_) {
     std::cout << "Not enough views left for proper calibration!" << std::endl;
     return false;
   }
@@ -193,7 +196,7 @@ bool CameraCalibrator::RunCalibration() {
 
   RemoveViewsReprojError(2.0);
 
-  if (recon_calib_dataset_.NumViews() < 8) {
+  if (recon_calib_dataset_.NumViews() < min_num_view_) {
     std::cout << "Not enough views left for proper calibration!" << std::endl;
     return false;
   }
@@ -243,7 +246,7 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
     // initialize cam pose
     std::vector<theia::FeatureCorrespondence2D3D> correspondences(
         board_pt3_ids.size());
-    for (int i = 0; i < board_pt3_ids.size(); ++i) {
+    for (size_t i = 0; i < board_pt3_ids.size(); ++i) {
       theia::FeatureCorrespondence2D3D correspondence;
       correspondence.feature[0] = corners[i][0] - px;
       correspondence.feature[1] = corners[i][1] - py;
@@ -260,7 +263,7 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
     double focal_length = 0.0, radial_distortion = 0.0;
     LOG(INFO) << "Initializing " << camera_model_ << " camera model.\n";
 
-    if (camera_model_ == "PINHOLE") {
+    if (camera_model_ == "PINHOLE" || camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
       success_init = utils::initialize_pinhole_camera(
           correspondences, ransac_params_, ransac_summary, rotation, position,
           focal_length, verbose_);
@@ -310,7 +313,7 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
     }
   }
 
-  theia::WritePlyFile(output_path + "_ransac_pose.ply", recon_calib_dataset_,
+  theia::WritePlyFile(output_path + "_ransac_poses.ply", recon_calib_dataset_,
                       Eigen::Vector3i(255, 0, 0), 1);
 
   if (!RunCalibration()) {
@@ -345,6 +348,8 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json &scene_json,
         output_path + ".json", cam, scene_json["camera_fps"],
         recon_calib_dataset_.NumViews(), total_repro_error))
         << "Could not write calibration file.\n";
+    theia::WritePlyFile(output_path + "_final_poses.ply", recon_calib_dataset_,
+                        Eigen::Vector3i(255, 0, 0), 1);
   }
 
   return true;

@@ -86,9 +86,11 @@ bool ReadIMUIntrinsics(const std::string &path_to_imu_intrinsics,
   if (path_to_initial_imu_bias != "") {
     LOG(INFO) << "Initial IMU biases supplied.";
     Eigen::Vector3d gyr_bias, acc_bias;
-    if (!ReadIMUBias(path_to_initial_imu_bias, gyr_bias, acc_bias)) {
+    if (ReadIMUBias(path_to_initial_imu_bias, gyr_bias, acc_bias)) {
       acc_params.SetBias(acc_bias);
       gyro_params.SetBias(gyr_bias);
+    } else {
+      LOG(INFO) << "Error loading IMU bias file: "<<path_to_initial_imu_bias;
     }
   } else {
     LOG(INFO) << "No initial IMU biases supplied. Setting bias to zero.";

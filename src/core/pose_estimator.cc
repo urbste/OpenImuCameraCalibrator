@@ -32,6 +32,8 @@
 #include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/camera/pinhole_radial_tangential_camera_model.h>
 
+#include <thread>
+
 namespace OpenICC {
 namespace core {
 
@@ -47,7 +49,6 @@ PoseEstimator::PoseEstimator() {
   ba_options_.loss_function_type = theia::LossFunctionType::HUBER;
   ba_options_.robust_loss_width = 1.345;
   ba_options_.intrinsics_to_optimize = theia::OptimizeIntrinsicsType::NONE;
-  ba_options_.num_threads = 4;
 }
 
 bool PoseEstimator::EstimatePosePinhole(
@@ -59,10 +60,10 @@ bool PoseEstimator::EstimatePosePinhole(
   theia::CalibratedAbsolutePose pose;
   theia::RansacSummary ransac_summary;
   theia::EstimateCalibratedAbsolutePose(
-      ransac_params_, theia::RansacType::RANSAC, correspondences_undist, &pose,
+      ransac_params_, theia::RansacType::RANSAC, pnp_type_, correspondences_undist, &pose,
       &ransac_summary);
 
-  if (ransac_summary.inliers.size() < 6) {
+  if (ransac_summary.inliers.size() < min_num_points_) {
     return false;
   }
 
@@ -73,7 +74,7 @@ bool PoseEstimator::EstimatePosePinhole(
   cam->SetPosition(pose.position);
   cam->SetOrientationFromRotationMatrix(pose.rotation);
 
-  for (int i = 0; i < ransac_summary.inliers.size(); ++i) {
+  for (size_t i = 0; i < ransac_summary.inliers.size(); ++i) {
     int inlier = ransac_summary.inliers[i];
 
     pose_dataset_.AddObservation(
@@ -85,7 +86,7 @@ bool PoseEstimator::EstimatePosePinhole(
   theia::BundleAdjustmentSummary summary =
       theia::BundleAdjustView(ba_options_, view_id, &pose_dataset_);
 
-  return true;
+  return summary.success;
 }
 
 bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
@@ -98,6 +99,12 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
   ransac_params_.error_thresh = max_reproj_error / image_diag;
   // get scene points and fill them into
   io::scene_points_to_calib_dataset(scene_json, pose_dataset_);
+  // init the number of observations per point to zero.
+  // It might happen, that some point are not seen at all and
+  // then BA will crash as no observations are available
+  for (const auto t_id : pose_dataset_.TrackIds()) {
+    tracks_to_nr_obs_[t_id] = 0;
+  }
 
   const auto views = scene_json["views"];
   double total_repro_error = 0.0;
@@ -128,7 +135,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
       corr_undist.feature[1] = undist_pt[1];
       correspondences_undist.push_back(corr_undist);
     }
-    if (correspondences_undist.size() < 6) {
+    if (correspondences_undist.size() < min_num_points_) {
       LOG(INFO) << "Skipping view at timestamp : " << timestamp_s
                 << "s. Not enough points found.";
       continue;
@@ -144,7 +151,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     cam->SetImageSize(1.0, 1.0);
     if (!EstimatePosePinhole(view_id, correspondences_undist, board_pts3_ids)) {
       LOG(INFO) << "Pose estimation failed for view at timestamp "
-                << timestamp_s << "s.";
+                << timestamp_s << "s from "<<correspondences_undist.size()<<" points. Max reproj error was: "<<ransac_params_.error_thresh;
       pose_dataset_.RemoveView(view_id);
       continue;
     }
@@ -153,10 +160,13 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     for (size_t i = 0; i < pose_dataset_.View(view_id)->TrackIds().size();
          ++i) {
       theia::TrackId track_id = pose_dataset_.View(view_id)->TrackIds()[i];
+      tracks_to_nr_obs_[track_id] += 1;
+
       const theia::Track *track = pose_dataset_.Track(track_id);
       Eigen::Vector2d reproj_point;
       pose_dataset_.View(view_id)->Camera().ProjectPoint(track->Point(),
                                                          &reproj_point);
+
       reproj_error +=
           (reproj_point -
            (*pose_dataset_.View(view_id)->GetFeature(track_id)).point_)
@@ -179,10 +189,18 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
 void PoseEstimator::OptimizeBoardPoints() {
   ba_options_.constant_camera_orientation = true;
   ba_options_.constant_camera_position = true;
+  ba_options_.verbose = true;
 
   std::map<theia::TrackId, Eigen::Matrix3d> emp_covariance_matrices;
   double empirical_variance_factor;
-  theia::BundleAdjustTracks(ba_options_, pose_dataset_.TrackIds(),
+  // only use track ids that have actually been observed more than 3 times
+  std::vector<theia::TrackId> track_ids_to_optimize;
+  for (const auto& pair : tracks_to_nr_obs_) {
+      if (pair.second > min_num_obs_for_optim_) {
+          track_ids_to_optimize.push_back(pair.first);
+      }
+  }
+  theia::BundleAdjustTracks(ba_options_, track_ids_to_optimize,
                             &pose_dataset_, &emp_covariance_matrices,
                             &empirical_variance_factor);
   std::cout << "Empirical variance factor after board point optimization: "
@@ -203,9 +221,11 @@ void PoseEstimator::OptimizeAllPoses() {
 
   ba_options_.constant_camera_orientation = false;
   ba_options_.constant_camera_position = false;
-
+  ba_options_.verbose = true;
+  LOG(INFO) << "Optimizing all estimated poses.";
   theia::BundleAdjustViews(ba_options_, pose_dataset_.ViewIds(),
                            &pose_dataset_);
+  LOG(INFO) << "Finished optimizing camera poses.";
 }
 
 } // namespace core

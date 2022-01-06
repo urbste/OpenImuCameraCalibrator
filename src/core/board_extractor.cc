@@ -136,18 +136,32 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
 
     // refind strategy to detect more markers
     aruco::refineDetectedMarkers(image, board_, marker_corners, marker_ids,
-                                 rejected_markers);
+                                 rejected_markers, cv::noArray(), cv::noArray(), 10);
 
     // interpolate charuco corners
     int interpolatedCorners = 0;
     if (marker_ids.size() > 0) {
       interpolatedCorners = aruco::interpolateCornersCharuco(
           marker_corners, marker_ids, image, charucoboard_, charuco_corners,
-          charuco_ids);
+          charuco_ids, cv::noArray(), cv::noArray(), 1);
 
       if (charuco_corners.size() > 0) {
-          cv::cornerSubPix(image, charuco_corners, cv::Size(5, 5), cv::Size(-1, -1),
+          cv::cornerSubPix(image, charuco_corners,
+                           cv::Size(detector_params_->cornerRefinementWinSize, detector_params_->cornerRefinementWinSize),
+                           cv::Size(-1, -1),
                            TermCriteria());
+
+//          if (marker_ids.size() > 0) {
+//              cv::Mat imageCopy;
+//              image.copyTo(imageCopy);
+//              cv::cvtColor(imageCopy,imageCopy, cv::COLOR_GRAY2BGR);
+//              cv::aruco::drawDetectedMarkers(imageCopy, marker_corners, marker_ids);
+//              // if at least one charuco corner detected
+//              if (charuco_ids.size() > 0)
+//                  cv::aruco::drawDetectedCornersCharuco(imageCopy, charuco_corners, charuco_ids, cv::Scalar(255, 0, 0));
+//              cv::imshow("out", imageCopy);
+//              cv::waitKey(0);
+//          }
 
           object_pt_ids = charuco_ids;
           for (const auto& c : charuco_corners) {
