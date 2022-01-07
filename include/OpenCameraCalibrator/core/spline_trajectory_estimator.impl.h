@@ -63,20 +63,24 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   //problem_.SetParameterization(T_i_c_.data(), local_parameterization);
 
   if (!(flags & SplineOptimFlags::T_I_C)) {
-    problem_.SetParameterBlockConstant(T_i_c_.data());
+    if (problem_.HasParameterBlock(T_i_c_.data()))
+        problem_.SetParameterBlockConstant(T_i_c_.data());
     LOG(INFO) << "Keeping T_I_C constant.";
   } else {
-    problem_.SetParameterBlockVariable(T_i_c_.data());
+    if (problem_.HasParameterBlock(T_i_c_.data()))
+        problem_.SetParameterBlockVariable(T_i_c_.data());
     LOG(INFO) << "Optimizing T_I_C.";
   }
 
   // if IMU to Cam trafo should be optimized
   if (cam_line_delay_s_ != 0.0) {
     if (!(flags & SplineOptimFlags::CAM_LINE_DELAY)) {
-      problem_.SetParameterBlockConstant(&cam_line_delay_s_);
+      if (problem_.HasParameterBlock(&cam_line_delay_s_))
+        problem_.SetParameterBlockConstant(&cam_line_delay_s_);
       LOG(INFO) << "Keeping camera line delay constant at: "<<cam_line_delay_s_;
     } else {
-      problem_.SetParameterBlockVariable(&cam_line_delay_s_);
+      if (problem_.HasParameterBlock(&cam_line_delay_s_))
+        problem_.SetParameterBlockVariable(&cam_line_delay_s_);
       LOG(INFO) << "Optimizing camera line delay.";
     }
   }
@@ -84,50 +88,62 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   // if IMU to Cam trafo should be optimized
   if (!(flags & SplineOptimFlags::GRAVITY_DIR)) {
     LOG(INFO) << "Keeping gravity direction constant at: "<<gravity_.transpose();
-    problem_.SetParameterBlockConstant(gravity_.data());
+    if (problem_.HasParameterBlock(gravity_.data()))
+      problem_.SetParameterBlockConstant(gravity_.data());
   } else {
-    problem_.SetParameterBlockVariable(gravity_.data());
+    if (problem_.HasParameterBlock(gravity_.data()))
+      problem_.SetParameterBlockVariable(gravity_.data());
     LOG(INFO) << "Optimizing gravity direction.";
   }
 
   // if world points should be optimized
-  for (const auto& t : tracks_in_problem_) {
-    ceres::LocalParameterization* local_parameterization =
-        new ceres::HomogeneousVectorParameterization(4);
-    problem_.SetParameterization(image_data_.MutableTrack(t)->MutablePoint()->data(),
-                                 local_parameterization);
-  }
   if (!(flags & SplineOptimFlags::POINTS)) {
     LOG(INFO) << "Keeping object points constant.";
-    for (const auto& t : tracks_in_problem_) {
-        problem_.SetParameterBlockConstant(image_data_.MutableTrack(t)->MutablePoint()->data());
+    for (const auto& tid : tracks_in_problem_) {
+        const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+        if (problem_.HasParameterBlock(track))
+            problem_.SetParameterBlockConstant(track);
     }
   } else {
-    for (const auto& t : tracks_in_problem_) {
-      problem_.SetParameterBlockVariable(image_data_.MutableTrack(t)->MutablePoint()->data());
-    }
+      for (const auto& tid : tracks_in_problem_) {
+          const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+          if (problem_.HasParameterBlock(track)) {
+              problem_.SetParameterBlockVariable(track);
+              ceres::LocalParameterization* local_parameterization =
+                  new ceres::HomogeneousVectorParameterization(4);
+              problem_.SetParameterization(track, local_parameterization);
+          }
+      }
     LOG(INFO) << "Optimizing object points.";
   }
 
   // if imu intrinics should be optimized
   if (!(flags & SplineOptimFlags::IMU_INTRINSICS)) {
     LOG(INFO) << "Keeping IMU intrinsics constant.";
-    problem_.SetParameterBlockConstant(accl_intrinsics_.data());
-    problem_.SetParameterBlockConstant(gyro_intrinsics_.data());
+    if (problem_.HasParameterBlock(accl_intrinsics_.data()))
+      problem_.SetParameterBlockConstant(accl_intrinsics_.data());
+    if (problem_.HasParameterBlock(gyro_intrinsics_.data()))
+      problem_.SetParameterBlockConstant(gyro_intrinsics_.data());
   } else {
-    problem_.SetParameterBlockVariable(accl_intrinsics_.data());
-    problem_.SetParameterBlockVariable(gyro_intrinsics_.data());
+    if (problem_.HasParameterBlock(accl_intrinsics_.data()))
+      problem_.SetParameterBlockVariable(accl_intrinsics_.data());
+    if (problem_.HasParameterBlock(gyro_intrinsics_.data()))
+      problem_.SetParameterBlockVariable(gyro_intrinsics_.data());
     LOG(INFO) << "Optimizing IMU intrinsics.";
   }
 
   // if imu intrinics should be optimized
   if (!(flags & SplineOptimFlags::IMU_BIASES)) {
     LOG(INFO) << "Keeping IMU biases constant.";
-    problem_.SetParameterBlockConstant(accl_bias_.data());
-    problem_.SetParameterBlockConstant(gyro_bias_.data());
+    if (problem_.HasParameterBlock(accl_bias_.data()))
+      problem_.SetParameterBlockConstant(accl_bias_.data());
+    if (problem_.HasParameterBlock(gyro_bias_.data()))
+      problem_.SetParameterBlockConstant(gyro_bias_.data());
   } else {
-    problem_.SetParameterBlockVariable(accl_bias_.data());
-    problem_.SetParameterBlockVariable(gyro_bias_.data());
+    if (problem_.HasParameterBlock(accl_bias_.data()))
+      problem_.SetParameterBlockVariable(accl_bias_.data());
+    if (problem_.HasParameterBlock(gyro_bias_.data()))
+      problem_.SetParameterBlockVariable(gyro_bias_.data());
     LOG(INFO) << "Optimizing IMU biases and intrinsics.";
   }
 

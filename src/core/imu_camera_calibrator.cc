@@ -81,15 +81,15 @@ void ImuCameraCalibrator::BatchInitSpline(const theia::Reconstruction &vision_da
   LOG(INFO) << "Adding Vision measurements to spline";
 
   // rolling shutter camera
-  if (inital_cam_line_delay_s_ != 0.0) {
-    for (const auto& vid : vision_dataset.ViewIds()) {
-       trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 3.0);
-    }
-  } else {
-    for (const auto& vid : vision_dataset.ViewIds()) {
-       trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 3.0);
-    }
-  }
+//  if (inital_cam_line_delay_s_ != 0.0) {
+//    for (const auto& vid : vision_dataset.ViewIds()) {
+//       trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 3.0);
+//    }
+//  } else {
+//    for (const auto& vid : vision_dataset.ViewIds()) {
+//       trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 3.0);
+//    }
+//  }
   LOG(INFO) << "Added all Vision measurements to the spline estimator";
 
   LOG(INFO) << "Adding IMU measurements to spline";
@@ -99,10 +99,10 @@ void ImuCameraCalibrator::BatchInitSpline(const theia::Reconstruction &vision_da
       continue;
     gyro_measurements_[t] = telemetry_data.gyroscope[i].data();
     accl_measurements_[t] = telemetry_data.accelerometer[i].data();
-    if (!trajectory_.AddAccelerometerMeasurement(accl_intrinsics.UnbiasNormalize(telemetry_data.accelerometer[i].data()),
-                                t * S_TO_NS, 1./spline_weight_data.var_r3)) {
-        std::cerr<<"Failed to add accelerometer measurement at time: "<<t<<"\n";
-    }
+//    if (!trajectory_.AddAccelerometerMeasurement(accl_intrinsics.UnbiasNormalize(telemetry_data.accelerometer[i].data()),
+//                                t * S_TO_NS, 1./spline_weight_data.var_r3)) {
+//        std::cerr<<"Failed to add accelerometer measurement at time: "<<t<<"\n";
+//    }
     if(!trajectory_.AddGyroscopeMeasurement(gyro_intrinsics.UnbiasNormalize(telemetry_data.gyroscope[i].data()),
                             t * S_TO_NS, 1./spline_weight_data.var_so3)) {
         std::cerr<<"Failed to add gyroscope measurement at time: "<<t<<"\n";

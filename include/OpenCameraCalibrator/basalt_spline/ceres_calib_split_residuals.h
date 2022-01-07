@@ -122,7 +122,7 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
     Vector3 gyro_raw;
     gyro_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
     //Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
-    residuals = T(inv_std) * (rot_vel - gyro_raw);
+    residuals = T(inv_std) * (rot_vel - measurement);
     return true;
   }
 
