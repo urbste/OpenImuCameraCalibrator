@@ -60,10 +60,10 @@ Tested on Ubuntu 18.04 and 20.04.
 
 2. Install [ceres 2.0](http://ceres-solver.org/installation.html)
 
-3. Clone and build the [TheiaSfM fork](https://github.com/urbste/TheiaSfM).
+3. Clone and build the [TheiaSfM fork](https://github.com/urbste/pyTheiaSfM).
 ``` bash
-git clone https://github.com/urbste/TheiaSfM
-cd TheiaSfM && git checkout cda5d4f && mkdir -p build && cd build
+git clone https://github.com/urbste/pyTheiaSfM
+cd TheiaSfM && mkdir -p build && cd build
 cmake .. && make -j
 sudo make install
 ```

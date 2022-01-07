@@ -58,8 +58,9 @@ bool PoseEstimator::EstimatePosePinhole(
   // Estimate camera pose using
   theia::CalibratedAbsolutePose pose;
   theia::RansacSummary ransac_summary;
+  theia::PnPType pnpr = theia::PnPType::DLS;
   theia::EstimateCalibratedAbsolutePose(
-      ransac_params_, theia::RansacType::RANSAC, correspondences_undist, &pose,
+      ransac_params_, theia::RansacType::RANSAC, pnpr, correspondences_undist, &pose,
       &ransac_summary);
 
   if (ransac_summary.inliers.size() < 6) {

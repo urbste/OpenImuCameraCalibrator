@@ -230,8 +230,9 @@ bool initialize_doublesphere_model(
       theia::CalibratedAbsolutePose pose;
       theia::RansacParameters params = ransac_params;
       params.error_thresh = 0.5 / img_cols;
+      theia::PnPType pnpr = theia::PnPType::DLS;
       theia::EstimateCalibratedAbsolutePose(
-          params, theia::RansacType::RANSAC, correspondences_new, &pose,
+          params, theia::RansacType::RANSAC, pnpr, correspondences_new, &pose,
           &ransac_summary);
       cam.SetPosition(pose.position);
       cam.SetOrientationFromRotationMatrix(pose.rotation);
