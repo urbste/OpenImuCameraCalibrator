@@ -46,15 +46,25 @@ def main():
                         default=0.03)
     parser.add_argument("--calib_cam_line_delay",
                         help="If camera line delay should be calibrated (EXPERIMENTAL)", default=0)
-    parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
-    parser.add_argument("--gravity_const", help="gravity constant", default=9.811104, type=float)
-    parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
-    parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
-    parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=0, type=int)
-    parser.add_argument("--optimize_board_points", help="if board points should be optimized during camera calibration and after pose estimation.", default=0, type=int)
-    parser.add_argument("--known_gravity_axis", help="If the gravity direction in the calibration board is exactly known.", choices=["X","Y","Z","UNKOWN"], default="UNKOWN", type=str)
-    parser.add_argument("--global_shutter", help="If the camera is a global shutter cam.", default=0, type=int)
-    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
+    parser.add_argument("--board_type", 
+                        help="Board type (radon or charuco)", default="charuco", type=str)
+    parser.add_argument("--gravity_const", 
+                        help="gravity constant", default=9.811104, type=float)
+    parser.add_argument("--recompute_corners", 
+                        help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
+    parser.add_argument("--bias_calib_remove_s", 
+                        help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
+    parser.add_argument("--reestimate_bias_spline_opt", 
+                        help="If biases should be also estimated during spline optimization", default=0, type=int)
+    parser.add_argument("--optimize_board_points", 
+                        help="if board points should be optimized during camera calibration and after pose estimation.", default=0, type=int)
+    parser.add_argument("--known_gravity_axis", 
+                        help="If the gravity direction in the calibration board is exactly known.", 
+                        choices=["X","Y","Z","UNKOWN"], default="UNKOWN", type=str)
+    parser.add_argument("--global_shutter", 
+                        help="If the camera is a global shutter cam.", default=0, type=int)
+    parser.add_argument("--verbose", 
+                        help="If calibration steps should output more information.", default=0, type=int)
 
     args = parser.parse_args()
 

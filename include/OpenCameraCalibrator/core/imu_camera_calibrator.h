@@ -28,10 +28,7 @@ const int SPLINE_N = 6;
 
 class ImuCameraCalibrator {
  public:
-  ImuCameraCalibrator(const bool reestimate_biases) {
-    reestimate_biases_ = reestimate_biases;
-  }
-
+  ImuCameraCalibrator() {}
   void BatchInitSpline(
       const theia::Reconstruction& vision_dataset,
       const Sophus::SE3<double>& T_i_c_init,

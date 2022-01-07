@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
   if (FLAGS_global_shutter) {
     init_line_delay_us = 0.0;
   }
-  ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
+  ImuCameraCalibrator imu_cam_calibrator;
   imu_cam_calibrator.BatchInitSpline(recon_calib_dataset,
                                      T_i_c_init,
                                      weight_data,
@@ -192,7 +192,9 @@ int main(int argc, char* argv[]) {
                                      gyr_intr);
   const int grav_dir_axis = GravDirStringToInt(FLAGS_known_grav_dir_axis);
   int flags = SplineOptimFlags::SPLINE | SplineOptimFlags::T_I_C;
-
+  if (FLAGS_reestimate_biases) {
+      flags |= SplineOptimFlags::IMU_BIASES;
+  }
   if (grav_dir_axis != -1) {
     Eigen::Vector3d grav_dir(0, 0, 0);
     grav_dir[grav_dir_axis] = FLAGS_gravity_const;
