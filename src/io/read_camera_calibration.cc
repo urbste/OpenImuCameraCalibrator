@@ -51,7 +51,7 @@ bool read_camera_calibration(const std::string &input_json,
                       json_content["image_height"]);
   camera.SetPrincipalPoint(json_content["intrinsics"]["principal_pt_x"],
                            json_content["intrinsics"]["principal_pt_y"]);
-  camera.SetFocalLength(json_content["intrinsics"]["focal_length_x"]);
+  camera.SetFocalLength(json_content["intrinsics"]["focal_length"]);
 
   fps = json_content["fps"];
 

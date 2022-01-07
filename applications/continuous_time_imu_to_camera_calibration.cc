@@ -44,30 +44,32 @@
 
 // Input/output files.
 DEFINE_string(
-    telemetry_json, "",
+    telemetry_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/GX010020_gen.json",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
-DEFINE_string(input_pose_dataset, "", "Path to pose dataset.");
-DEFINE_string(input_corners, "",
+DEFINE_string(input_pose_dataset, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/pose_calib_GX010020.calibdata", "Path to pose dataset.");
+DEFINE_string(input_corners, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/cam_imu_corners_GX010020.uson",
               "Corners of the original imu to cam calibration video file.");
-DEFINE_string(camera_calibration_json, "", "Camera calibration.");
-DEFINE_string(gyro_to_cam_initial_calibration, "",
+DEFINE_string(camera_calibration_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam/cam_calib_GX010017_ph_2.json", "Camera calibration.");
+DEFINE_string(gyro_to_cam_initial_calibration, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/imu_to_cam_calibration_GX010020.json",
               "Initial gyro to camera calibration json.");
-DEFINE_string(imu_intrinsics, "",
+DEFINE_string(imu_intrinsics, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/ImuIntrinsics/dataset2/static_calib_result.json",
               "IMU intrinsics, scale and misalignment matrices. E.g. estimated "
               "with static_imu_calibration or from a datasheet.");
-DEFINE_string(imu_bias_file, "", "IMU bias json");
+DEFINE_string(imu_bias_file, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/imu_bias/imu_bias_GX010018.json", "IMU bias json");
 DEFINE_bool(global_shutter, false, "If camera has a global shutter.");
-DEFINE_string(spline_error_weighting_json, "",
+DEFINE_string(spline_error_weighting_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/spline_info_GX010020.json",
               "Path to spline error weighting data");
-DEFINE_string(output_path, "", "");
+DEFINE_string(output_path, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu", "");
 DEFINE_bool(calibrate_cam_line_delay, false,
             "If camera rolling shutter line delay should be calibrated.");
-DEFINE_string(result_output_json, "", "Path to result json file");
+DEFINE_string(result_output_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/cam_imu_calib_result_GX010020.json", "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 DEFINE_bool(reestimate_biases, false,
             "If accelerometer and gyroscope biases should be estimated during "
             "spline optim");
-DEFINE_string(debug_video_path, "",
+DEFINE_double(gravity_const, 9.81, "gravity constant");
+DEFINE_string(known_grav_dir_axis, "UNKNOWN", "Possible values (X,Y,Z,UNKNOWN) if the gravity direction of your calibration board is exactly known (e.g. supplying Z we will fix gravity to [0,0,gravity_const]. UNKNOWN means it is not known and will be estimated.");
+DEFINE_string(debug_video_path, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/GX010020.MP4",
               "Load the video to display the reprojection error.");
 
 using json = nlohmann::json;

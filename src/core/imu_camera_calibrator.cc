@@ -129,8 +129,7 @@ void ImuCameraCalibrator::InitializeGravity(
     if (!gravity_initialized_) {
       for (size_t i = 0; i < telemetry_data.accelerometer.size();
            i++) {
-        const Eigen::Vector3d ad =
-            acc_intrinsics_.UnbiasNormalize(telemetry_data.accelerometer[i].data());
+        const Eigen::Vector3d ad = telemetry_data.accelerometer[i].data();
         const int64_t accl_t =
             telemetry_data.accelerometer[i].timestamp_s();
         if (std::abs(accl_t - cam_timestamps_[j]) < 1. / 30.) {

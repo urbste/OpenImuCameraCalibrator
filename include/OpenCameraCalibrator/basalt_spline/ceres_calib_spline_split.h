@@ -572,8 +572,7 @@ public:
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.max_num_iterations = iterations;
-    options.num_threads = 1;
-    std::thread::hardware_concurrency();
+    options.num_threads = std::thread::hardware_concurrency();
     // options.logging_type = ceres::LoggingType::PER_MINIMIZER_ITERATION;
     options.minimizer_progress_to_stdout = true;
 
@@ -591,17 +590,17 @@ public:
         }
       }
     }
-    if (fix_line_delay) {
-      problem_.SetParameterBlockConstant(&cam_line_delay_s_);
-    } else {
-      problem_.SetParameterBlockVariable(&cam_line_delay_s_);
-      problem_.SetParameterBlockConstant(gravity_.data());
-      problem_.SetParameterLowerBound(&cam_line_delay_s_, 0, 1e-6);
-      problem_.SetParameterUpperBound(&cam_line_delay_s_, 0, 1e-4);
-    }
-    if (fix_T_i_c) {
-      problem_.SetParameterBlockConstant(T_i_c_.data());
-    }
+//    if (fix_line_delay) {
+//      problem_.SetParameterBlockConstant(&cam_line_delay_s_);
+//    } else {
+//      problem_.SetParameterBlockVariable(&cam_line_delay_s_);
+//      problem_.SetParameterBlockConstant(gravity_.data());
+//      problem_.SetParameterLowerBound(&cam_line_delay_s_, 0, 1e-6);
+//      problem_.SetParameterUpperBound(&cam_line_delay_s_, 0, 1e-4);
+//    }
+//    if (fix_T_i_c) {
+//      problem_.SetParameterBlockConstant(T_i_c_.data());
+//    }
     // Solve
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem_, &summary);
