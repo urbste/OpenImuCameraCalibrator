@@ -29,7 +29,7 @@ DEFINE_string(telemetry_json,
 
 DEFINE_bool(verbose, false, "If more stuff should be printed");
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
 

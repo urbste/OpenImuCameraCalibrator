@@ -24,8 +24,9 @@
 namespace OpenICC {
 namespace io {
 
-bool read_camera_calibration(const std::string &input_json,
-                             theia::Camera &camera, double &fps);
+bool read_camera_calibration(const std::string& input_json,
+                             theia::Camera& camera,
+                             double& fps);
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

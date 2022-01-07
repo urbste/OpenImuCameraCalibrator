@@ -26,8 +26,8 @@ namespace OpenICC {
 namespace io {
 using json = nlohmann::json;
 
-bool ReadGoProTelemetry(const std::string &path_to_telemetry_file,
-                        CameraTelemetryData &telemetry) {
+bool ReadGoProTelemetry(const std::string& path_to_telemetry_file,
+                        CameraTelemetryData& telemetry) {
   std::ifstream file;
   file.open(path_to_telemetry_file.c_str());
   if (!file.is_open()) {
@@ -38,19 +38,19 @@ bool ReadGoProTelemetry(const std::string &path_to_telemetry_file,
   const auto accl = j["1"]["streams"]["ACCL"]["samples"];
   const auto gyro = j["1"]["streams"]["GYRO"]["samples"];
   const auto gps5 = j["1"]["streams"]["GPS5"]["samples"];
-  for (const auto &e : accl) {
+  for (const auto& e : accl) {
     Eigen::Vector3d v;
     v << e["value"][1], e["value"][2], e["value"][0];
     ImuReading<double> reading((double)e["cts"] * MS_TO_S, v);
     telemetry.accelerometer.push_back(reading);
   }
-  for (const auto &e : gyro) {
+  for (const auto& e : gyro) {
     Eigen::Vector3d v;
     v << e["value"][1], e["value"][2], e["value"][0];
     ImuReading<double> reading((double)e["cts"] * MS_TO_S, v);
     telemetry.accelerometer.push_back(reading);
   }
-  for (const auto &e : gps5) {
+  for (const auto& e : gps5) {
     Eigen::Vector3d v;
     Eigen::Vector2d vel2d_vel3d;
     v << e["value"][0], e["value"][1], e["value"][2];
@@ -65,5 +65,5 @@ bool ReadGoProTelemetry(const std::string &path_to_telemetry_file,
   return true;
 }
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

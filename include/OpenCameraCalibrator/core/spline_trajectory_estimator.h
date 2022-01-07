@@ -26,10 +26,11 @@ enum SplineOptimFlags {
 
 const double GRAVITY_MAGN = 9.81;
 
-template <int _N> class SplineTrajectoryEstimator {
-public:
-  static constexpr int N_ = _N;       // Order of the spline.
-  static constexpr int DEG_ = _N - 1; // Degree of the spline.
+template <int _N>
+class SplineTrajectoryEstimator {
+ public:
+  static constexpr int N_ = _N;        // Order of the spline.
+  static constexpr int DEG_ = _N - 1;  // Degree of the spline.
 
   SplineTrajectoryEstimator();
 
@@ -50,64 +51,64 @@ public:
 
   void SetFixedParams(const int flags);
 
-  ceres::Solver::Summary Optimize(
-          const int max_iters,
-          const int flags);
+  ceres::Solver::Summary Optimize(const int max_iters, const int flags);
 
   // keep the rest constant and only optimize a window
-  ceres::Solver::Summary Optimize(
-          const int max_iters,
-          const int flags,
-          const int64_t start_time,
-          const int64_t end_time);
+  ceres::Solver::Summary Optimize(const int max_iters,
+                                  const int flags,
+                                  const int64_t start_time,
+                                  const int64_t end_time);
 
-  bool AddGPSMeasurement(const Eigen::Vector3d &meas, const int64_t time_ns,
+  bool AddGPSMeasurement(const Eigen::Vector3d& meas,
+                         const int64_t time_ns,
                          const double weight_gps);
 
-  bool AddAccelerometerMeasurement(const Eigen::Vector3d &meas,
+  bool AddAccelerometerMeasurement(const Eigen::Vector3d& meas,
                                    const int64_t time_ns,
                                    const double weight_se3);
 
-  bool AddGyroscopeMeasurement(const Eigen::Vector3d &meas,
-                               const int64_t time_ns, const double weight_se3);
+  bool AddGyroscopeMeasurement(const Eigen::Vector3d& meas,
+                               const int64_t time_ns,
+                               const double weight_se3);
 
-  bool AddGSCameraMeasurement(const theia::View *view,
+  bool AddGSCameraMeasurement(const theia::View* view,
                               const double robust_loss_width);
-  bool AddRSCameraMeasurement(const theia::View *view,
+  bool AddRSCameraMeasurement(const theia::View* view,
                               const double robust_loss_width = 0.0);
-  bool AddGSInvCameraMeasurement(const theia::View *view,
+  bool AddGSInvCameraMeasurement(const theia::View* view,
                                  const double robust_loss_width);
-  bool AddRSInvCameraMeasurement(const theia::View *view,
+  bool AddRSInvCameraMeasurement(const theia::View* view,
                                  const double robust_loss_width);
 
   // setter
-  void SetImageData(const theia::Reconstruction &c);
+  void SetImageData(const theia::Reconstruction& c);
 
-  void SetG(const Eigen::Vector3d &g);
+  void SetG(const Eigen::Vector3d& g);
 
-  void SetT_i_c(const Sophus::SE3<double> &T);
+  void SetT_i_c(const Sophus::SE3<double>& T);
 
-  void SetTelemetryData(const CameraTelemetryData &telemetry_data);
+  void SetTelemetryData(const CameraTelemetryData& telemetry_data);
 
   void SetImuToCameraTimeOffset(const double imu_to_camera_time_offset_s);
 
   void SetCameraLineDelay(const double cam_line_delay_s);
 
-  void SetIMUIntrinsics(const ThreeAxisSensorCalibParams<double>& accl_intrinsics,
-                        const ThreeAxisSensorCalibParams<double>& gyro_intrinsics);
+  void SetIMUIntrinsics(
+      const ThreeAxisSensorCalibParams<double>& accl_intrinsics,
+      const ThreeAxisSensorCalibParams<double>& gyro_intrinsics);
 
   // getter
   Sophus::SE3d GetKnot(int i) const;
 
-  bool GetPose(const int64_t &time_ns, Sophus::SE3d &pose);
+  bool GetPose(const int64_t& time_ns, Sophus::SE3d& pose);
 
-  bool GetPosition(const int64_t &time_ns, Eigen::Vector3d &position);
+  bool GetPosition(const int64_t& time_ns, Eigen::Vector3d& position);
 
-  bool GetAngularVelocity(const int64_t &time_ns, Eigen::Vector3d &velocity);
+  bool GetAngularVelocity(const int64_t& time_ns, Eigen::Vector3d& velocity);
 
-  bool GetVelocity(const int64_t &time_ns, Eigen::Vector3d &velocity);
+  bool GetVelocity(const int64_t& time_ns, Eigen::Vector3d& velocity);
 
-  bool GetAcceleration(const int64_t &time_ns, Eigen::Vector3d &acceleration);
+  bool GetAcceleration(const int64_t& time_ns, Eigen::Vector3d& acceleration);
 
   size_t GetNumSO3Knots() const;
 
@@ -133,14 +134,18 @@ public:
 
   ThreeAxisSensorCalibParams<double> GetGyroIntrinsics() const;
 
-  void ConvertToTheiaRecon(theia::Reconstruction *recon_out);
+  void ConvertToTheiaRecon(theia::Reconstruction* recon_out);
 
   void ConvertInvDepthPointsToHom();
-private:
-  bool CalcSO3Times(const int64_t sensor_time, double &u_so3, int64_t &s_so3);
-  bool CalcR3Times(const int64_t sensor_time, double &u_r3, int64_t &s_r3);
-  bool CalcTimes(const int64_t sensor_time, double &u, int64_t &s,
-                 int64_t dt_ns, size_t nr_knots);
+
+ private:
+  bool CalcSO3Times(const int64_t sensor_time, double& u_so3, int64_t& s_so3);
+  bool CalcR3Times(const int64_t sensor_time, double& u_r3, int64_t& s_r3);
+  bool CalcTimes(const int64_t sensor_time,
+                 double& u,
+                 int64_t& s,
+                 int64_t dt_ns,
+                 size_t nr_knots);
 
   int64_t dt_so3_ns_;
   int64_t dt_r3_ns_;
@@ -187,10 +192,8 @@ private:
   bool spline_initialized_with_gps_ = false;
 };
 
-
-inline
-bool KnotInBlock(const std::vector<double *> vec, double *knot_ptr) {
-  for (const auto &v : vec) {
+inline bool KnotInBlock(const std::vector<double*> vec, double* knot_ptr) {
+  for (const auto& v : vec) {
     if (knot_ptr == v) {
       return true;
     }
@@ -198,9 +201,8 @@ bool KnotInBlock(const std::vector<double *> vec, double *knot_ptr) {
   return false;
 }
 
-inline
-int GetPtrOffset(const double *knot_ptr,
-                 const std::vector<double *> &container) {
+inline int GetPtrOffset(const double* knot_ptr,
+                        const std::vector<double*>& container) {
   for (size_t i = 0; i < container.size(); ++i) {
     if (knot_ptr == container[i]) {
       return i;
@@ -209,7 +211,7 @@ int GetPtrOffset(const double *knot_ptr,
   // this should not happen!
   return 0;
 }
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC
 
 #include "OpenCameraCalibrator/core/spline_trajectory_estimator.impl.h"

@@ -38,12 +38,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "spline_common.h"
 #include "assert.h"
 #include "sophus_utils.h"
+#include "spline_common.h"
 
-#include <Eigen/Dense>
 #include "sophus/so3.hpp"
+#include <Eigen/Dense>
 
 #include <array>
 
@@ -202,16 +202,17 @@ class So3Spline {
   SO3 evaluate(int64_t time_ns, JacobianStruct* J = nullptr) const {
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<0>(p, u);
@@ -302,16 +303,17 @@ class So3Spline {
   Vec3 velocityBody(int64_t time_ns) const {
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<0>(p, u);
@@ -348,16 +350,17 @@ class So3Spline {
   Vec3 velocityBody(int64_t time_ns, JacobianStruct* J) const {
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<0>(p, u);
@@ -428,16 +431,17 @@ class So3Spline {
   Vec3 accelerationBody(int64_t time_ns, Vec3* vel_body = nullptr) const {
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<0>(p, u);
@@ -490,23 +494,25 @@ class So3Spline {
   /// @param[out] J_vel if not nullptr, return the Jacobian of the rotational
   /// velocity in the body frame (side computation)
   /// @return rotational acceleration (3x1 vector)
-  Vec3 accelerationBody(int64_t time_ns, JacobianStruct* J_accel,
+  Vec3 accelerationBody(int64_t time_ns,
+                        JacobianStruct* J_accel,
                         Vec3* vel_body = nullptr,
                         JacobianStruct* J_vel = nullptr) const {
     BASALT_ASSERT(J_accel);
 
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<0>(p, u);
@@ -636,20 +642,22 @@ class So3Spline {
   /// @param[out] accel_body if not nullptr, return the rotational acceleration
   /// in the body frame (3x1 vector) (side computation)
   /// @return rotational jerk (3x1 vector)
-  Vec3 jerkBody(int64_t time_ns, Vec3* vel_body = nullptr,
+  Vec3 jerkBody(int64_t time_ns,
+                Vec3* vel_body = nullptr,
                 Vec3* accel_body = nullptr) const {
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<0>(p, u);
@@ -755,4 +763,3 @@ template <int _N, typename _Scalar>
 const typename So3Spline<_N, _Scalar>::MatN
     So3Spline<_N, _Scalar>::blending_matrix_ =
         computeBlendingMatrix<_N, _Scalar, true>();
-

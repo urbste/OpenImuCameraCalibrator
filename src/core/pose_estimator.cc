@@ -38,7 +38,6 @@ namespace OpenICC {
 namespace core {
 
 PoseEstimator::PoseEstimator() {
-
   ransac_params_.failure_probability = 0.001;
   ransac_params_.use_mle = true;
   ransac_params_.max_iterations = 1000;
@@ -52,25 +51,27 @@ PoseEstimator::PoseEstimator() {
 }
 
 bool PoseEstimator::EstimatePosePinhole(
-    const theia::ViewId &view_id,
-    const std::vector<theia::FeatureCorrespondence2D3D> &correspondences_undist,
-    const std::vector<int> &board_pts3_ids) {
-
+    const theia::ViewId& view_id,
+    const std::vector<theia::FeatureCorrespondence2D3D>& correspondences_undist,
+    const std::vector<int>& board_pts3_ids) {
   // Estimate camera pose using
   theia::CalibratedAbsolutePose pose;
   theia::RansacSummary ransac_summary;
-  theia::EstimateCalibratedAbsolutePose(
-      ransac_params_, theia::RansacType::RANSAC, pnp_type_, correspondences_undist, &pose,
-      &ransac_summary);
+  theia::EstimateCalibratedAbsolutePose(ransac_params_,
+                                        theia::RansacType::RANSAC,
+                                        pnp_type_,
+                                        correspondences_undist,
+                                        &pose,
+                                        &ransac_summary);
 
   if (ransac_summary.inliers.size() < min_num_points_) {
     return false;
   }
 
-  theia::View *theia_view = pose_dataset_.MutableView(view_id);
+  theia::View* theia_view = pose_dataset_.MutableView(view_id);
   theia_view->SetEstimated(true);
 
-  theia::Camera *cam = theia_view->MutableCamera();
+  theia::Camera* cam = theia_view->MutableCamera();
   cam->SetPosition(pose.position);
   cam->SetOrientationFromRotationMatrix(pose.rotation);
 
@@ -78,7 +79,8 @@ bool PoseEstimator::EstimatePosePinhole(
     int inlier = ransac_summary.inliers[i];
 
     pose_dataset_.AddObservation(
-        view_id, board_pts3_ids[inlier],
+        view_id,
+        board_pts3_ids[inlier],
         theia::Feature(correspondences_undist[inlier].feature));
   }
 
@@ -89,10 +91,9 @@ bool PoseEstimator::EstimatePosePinhole(
   return summary.success;
 }
 
-bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
+bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json& scene_json,
                                           const theia::Camera camera,
                                           const double max_reproj_error) {
-
   const double image_diag =
       std::sqrt(camera.ImageWidth() * camera.ImageWidth() +
                 camera.ImageHeight() * camera.ImageHeight());
@@ -110,15 +111,15 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
   double total_repro_error = 0.0;
   int processed_frames = 0;
 
-  for (const auto &view : views.items()) {
+  for (const auto& view : views.items()) {
     const double timestamp_us = std::stod(view.key());
-    const double timestamp_s = timestamp_us * US_TO_S; // to seconds
+    const double timestamp_s = timestamp_us * US_TO_S;  // to seconds
     const auto image_points = view.value()["image_points"];
     std::vector<int> board_pts3_ids;
     aligned_vector<Eigen::Vector2d> corners;
     std::vector<theia::FeatureCorrespondence2D3D> correspondences_undist;
 
-    for (const auto &img_pts : image_points.items()) {
+    for (const auto& img_pts : image_points.items()) {
       const int board_pt3_id = std::stoi(img_pts.key());
       board_pts3_ids.push_back(std::stoi(img_pts.key()));
       const Eigen::Vector2d corner(
@@ -143,7 +144,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     std::string view_name = std::to_string((uint64_t)(timestamp_s * S_TO_US));
     theia::ViewId view_id = pose_dataset_.AddView(view_name, 0, timestamp_s);
 
-    theia::Camera *cam = pose_dataset_.MutableView(view_id)->MutableCamera();
+    theia::Camera* cam = pose_dataset_.MutableView(view_id)->MutableCamera();
     cam->SetCameraIntrinsicsModelType(
         theia::CameraIntrinsicsModelType::PINHOLE);
     cam->SetFocalLength(1.0);
@@ -151,7 +152,9 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
     cam->SetImageSize(1.0, 1.0);
     if (!EstimatePosePinhole(view_id, correspondences_undist, board_pts3_ids)) {
       LOG(INFO) << "Pose estimation failed for view at timestamp "
-                << timestamp_s << "s from "<<correspondences_undist.size()<<" points. Max reproj error was: "<<ransac_params_.error_thresh;
+                << timestamp_s << "s from " << correspondences_undist.size()
+                << " points. Max reproj error was: "
+                << ransac_params_.error_thresh;
       pose_dataset_.RemoveView(view_id);
       continue;
     }
@@ -162,7 +165,7 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json &scene_json,
       theia::TrackId track_id = pose_dataset_.View(view_id)->TrackIds()[i];
       tracks_to_nr_obs_[track_id] += 1;
 
-      const theia::Track *track = pose_dataset_.Track(track_id);
+      const theia::Track* track = pose_dataset_.Track(track_id);
       Eigen::Vector2d reproj_point;
       pose_dataset_.View(view_id)->Camera().ProjectPoint(track->Point(),
                                                          &reproj_point);
@@ -196,37 +199,38 @@ void PoseEstimator::OptimizeBoardPoints() {
   // only use track ids that have actually been observed more than 3 times
   std::vector<theia::TrackId> track_ids_to_optimize;
   for (const auto& pair : tracks_to_nr_obs_) {
-      if (pair.second > min_num_obs_for_optim_) {
-          track_ids_to_optimize.push_back(pair.first);
-      }
+    if (pair.second > min_num_obs_for_optim_) {
+      track_ids_to_optimize.push_back(pair.first);
+    }
   }
-  theia::BundleAdjustTracks(ba_options_, track_ids_to_optimize,
-                            &pose_dataset_, &emp_covariance_matrices,
+  theia::BundleAdjustTracks(ba_options_,
+                            track_ids_to_optimize,
+                            &pose_dataset_,
+                            &emp_covariance_matrices,
                             &empirical_variance_factor);
   std::cout << "Empirical variance factor after board point optimization: "
             << empirical_variance_factor << "\n";
   Eigen::Vector3d mean_std(0.0, 0.0, 0.0);
-  for (const auto &c : emp_covariance_matrices) {
+  for (const auto& c : emp_covariance_matrices) {
     Eigen::Vector3d stddev = c.second.diagonal().array().sqrt() * 1e3;
     mean_std += stddev;
     std::cout << "Track Id: " << c.first << " std dev: " << stddev.transpose()
               << " mm\n";
   }
   mean_std /= (double)emp_covariance_matrices.size();
-  std::cout << "Mean board point standard deviation after optimization: " << mean_std.transpose()
-            << " mm\n";
+  std::cout << "Mean board point standard deviation after optimization: "
+            << mean_std.transpose() << " mm\n";
 }
 
 void PoseEstimator::OptimizeAllPoses() {
-
   ba_options_.constant_camera_orientation = false;
   ba_options_.constant_camera_position = false;
   ba_options_.verbose = true;
   LOG(INFO) << "Optimizing all estimated poses.";
-  theia::BundleAdjustViews(ba_options_, pose_dataset_.ViewIds(),
-                           &pose_dataset_);
+  theia::BundleAdjustViews(
+      ba_options_, pose_dataset_.ViewIds(), &pose_dataset_);
   LOG(INFO) << "Finished optimizing camera poses.";
 }
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

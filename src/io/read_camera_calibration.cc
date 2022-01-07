@@ -32,8 +32,9 @@ using nlohmann::json;
 namespace OpenICC {
 namespace io {
 
-bool read_camera_calibration(const std::string &input_json,
-                             theia::Camera &camera, double &fps) {
+bool read_camera_calibration(const std::string& input_json,
+                             theia::Camera& camera,
+                             double& fps) {
   std::ifstream input(input_json);
   if (!input.is_open()) {
     std::cerr << "Could not open: " << input_json << "\n";
@@ -55,7 +56,7 @@ bool read_camera_calibration(const std::string &input_json,
 
   fps = json_content["fps"];
 
-  double *intr = camera.mutable_intrinsics();
+  double* intr = camera.mutable_intrinsics();
   if (json_content["intrinsic_type"] == "DIVISION_UNDISTORTION") {
     intr[theia::DivisionUndistortionCameraModel::InternalParametersIndex::
              RADIAL_DISTORTION_1] =
@@ -107,8 +108,8 @@ bool read_camera_calibration(const std::string &input_json,
     intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
              TANGENTIAL_DISTORTION_2] =
         json_content["intrinsics"]["tangential_distortion_2"];
-    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::ASPECT_RATIO] =
-        json_content["intrinsics"]["aspect_ratio"];
+    intr[theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+             ASPECT_RATIO] = json_content["intrinsics"]["aspect_ratio"];
   } else if (json_content["intrinsic_type"] == "PINHOLE") {
     intr[theia::PinholeCameraModel::InternalParametersIndex::ASPECT_RATIO] =
         json_content["intrinsics"]["aspect_ratio"];
@@ -117,5 +118,5 @@ bool read_camera_calibration(const std::string &input_json,
   return true;
 }
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

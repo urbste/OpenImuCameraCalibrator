@@ -7,7 +7,9 @@ namespace core {
 
 template <int _T>
 SplineTrajectoryEstimator<_T>::SplineTrajectoryEstimator()
-    : dt_so3_ns_(0.1 * S_TO_NS), dt_r3_ns_(0.1 * S_TO_NS), start_t_ns_(0.0),
+    : dt_so3_ns_(0.1 * S_TO_NS),
+      dt_r3_ns_(0.1 * S_TO_NS),
+      start_t_ns_(0.0),
       gravity_(Eigen::Vector3d(0, 0, GRAVITY_MAGN)) {
   inv_so3_dt_ = S_TO_NS / dt_so3_ns_;
   inv_r3_dt_ = S_TO_NS / dt_r3_ns_;
@@ -20,9 +22,11 @@ SplineTrajectoryEstimator<_T>::SplineTrajectoryEstimator()
 
 template <int _T>
 SplineTrajectoryEstimator<_T>::SplineTrajectoryEstimator(
-    int64_t time_interval_so3_ns, int64_t time_interval_r3_ns,
+    int64_t time_interval_so3_ns,
+    int64_t time_interval_r3_ns,
     int64_t start_time_ns)
-    : dt_so3_ns_(time_interval_so3_ns), dt_r3_ns_(time_interval_r3_ns),
+    : dt_so3_ns_(time_interval_so3_ns),
+      dt_r3_ns_(time_interval_r3_ns),
       start_t_ns_(start_time_ns),
       gravity_(Eigen::Vector3d(0, 0, GRAVITY_MAGN)) {
   inv_so3_dt_ = S_TO_NS / dt_so3_ns_;
@@ -51,138 +55,137 @@ void SplineTrajectoryEstimator<_T>::SetTimes(int64_t time_interval_so3_ns,
 }
 
 template <int _T>
-void
-SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
-
-    // if IMU to Cam trafo should be optimized
-    if (problem_.HasParameterBlock(T_i_c_.data())) {
+void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
+  // if IMU to Cam trafo should be optimized
+  if (problem_.HasParameterBlock(T_i_c_.data())) {
     if (!(flags & SplineOptimFlags::T_I_C)) {
-          problem_.SetParameterBlockConstant(T_i_c_.data());
+      problem_.SetParameterBlockConstant(T_i_c_.data());
       LOG(INFO) << "Keeping T_I_C constant.";
     } else {
-        ceres::LocalParameterization *local_parameterization =
+      ceres::LocalParameterization* local_parameterization =
           new LieLocalParameterization<Sophus::SE3d>();
-        problem_.SetParameterization(T_i_c_.data(), local_parameterization);
-        problem_.SetParameterBlockVariable(T_i_c_.data());
+      problem_.SetParameterization(T_i_c_.data(), local_parameterization);
+      problem_.SetParameterBlockVariable(T_i_c_.data());
       LOG(INFO) << "Optimizing T_I_C.";
-      }
     }
+  }
 
-    // if IMU to Cam trafo should be optimized
-    if (problem_.HasParameterBlock(&cam_line_delay_s_) && cam_line_delay_s_ != 0.0) {
-      if (!(flags & SplineOptimFlags::CAM_LINE_DELAY)) {
-          problem_.SetParameterBlockConstant(&cam_line_delay_s_);
-        LOG(INFO) << "Keeping camera line delay constant at: "<<cam_line_delay_s_;
-      } else {
-          problem_.SetParameterBlockVariable(&cam_line_delay_s_);
-        LOG(INFO) << "Optimizing camera line delay.";
-      }
+  // if IMU to Cam trafo should be optimized
+  if (problem_.HasParameterBlock(&cam_line_delay_s_) &&
+      cam_line_delay_s_ != 0.0) {
+    if (!(flags & SplineOptimFlags::CAM_LINE_DELAY)) {
+      problem_.SetParameterBlockConstant(&cam_line_delay_s_);
+      LOG(INFO) << "Keeping camera line delay constant at: "
+                << cam_line_delay_s_;
+    } else {
+      problem_.SetParameterBlockVariable(&cam_line_delay_s_);
+      LOG(INFO) << "Optimizing camera line delay.";
     }
+  }
 
-    // if IMU to Cam trafo should be optimized
-    if (problem_.HasParameterBlock(gravity_.data())) {
+  // if IMU to Cam trafo should be optimized
+  if (problem_.HasParameterBlock(gravity_.data())) {
     if (!(flags & SplineOptimFlags::GRAVITY_DIR)) {
-      LOG(INFO) << "Keeping gravity direction constant at: "<<gravity_.transpose();
+      LOG(INFO) << "Keeping gravity direction constant at: "
+                << gravity_.transpose();
 
-        problem_.SetParameterBlockConstant(gravity_.data());
+      problem_.SetParameterBlockConstant(gravity_.data());
     } else {
       if (problem_.HasParameterBlock(gravity_.data()))
         problem_.SetParameterBlockVariable(gravity_.data());
       LOG(INFO) << "Optimizing gravity direction.";
     }
-    }
+  }
 
-    // if world points should be optimized
-    if (!(flags & SplineOptimFlags::POINTS)) {
-      LOG(INFO) << "Keeping object points constant.";
-      for (const auto& tid : tracks_in_problem_) {
-        const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
-        if (problem_.HasParameterBlock(track))
-            problem_.SetParameterBlockConstant(track);
+  // if world points should be optimized
+  if (!(flags & SplineOptimFlags::POINTS)) {
+    LOG(INFO) << "Keeping object points constant.";
+    for (const auto& tid : tracks_in_problem_) {
+      const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+      if (problem_.HasParameterBlock(track))
+        problem_.SetParameterBlockConstant(track);
+    }
+  } else {
+    for (const auto& tid : tracks_in_problem_) {
+      const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+      if (problem_.HasParameterBlock(track)) {
+        problem_.SetParameterBlockVariable(track);
+        ceres::LocalParameterization* local_parameterization =
+            new ceres::HomogeneousVectorParameterization(4);
+        problem_.SetParameterization(track, local_parameterization);
       }
-    } else {
-        for (const auto& tid : tracks_in_problem_) {
-          const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
-          if (problem_.HasParameterBlock(track)) {
-            problem_.SetParameterBlockVariable(track);
-            ceres::LocalParameterization* local_parameterization =
-                new ceres::HomogeneousVectorParameterization(4);
-            problem_.SetParameterization(track, local_parameterization);
-          }
-        }
-      LOG(INFO) << "Optimizing object points.";
     }
+    LOG(INFO) << "Optimizing object points.";
+  }
 
-    // if imu intrinics should be optimized
-    if (problem_.HasParameterBlock(accl_intrinsics_.data()) &&
-            problem_.HasParameterBlock(gyro_intrinsics_.data())) {
+  // if imu intrinics should be optimized
+  if (problem_.HasParameterBlock(accl_intrinsics_.data()) &&
+      problem_.HasParameterBlock(gyro_intrinsics_.data())) {
     if (!(flags & SplineOptimFlags::IMU_INTRINSICS)) {
       LOG(INFO) << "Keeping IMU intrinsics constant.";
-        problem_.SetParameterBlockConstant(accl_intrinsics_.data());
-        problem_.SetParameterBlockConstant(gyro_intrinsics_.data());
+      problem_.SetParameterBlockConstant(accl_intrinsics_.data());
+      problem_.SetParameterBlockConstant(gyro_intrinsics_.data());
     } else {
-        problem_.SetParameterBlockVariable(accl_intrinsics_.data());
-        problem_.SetParameterBlockVariable(gyro_intrinsics_.data());
+      problem_.SetParameterBlockVariable(accl_intrinsics_.data());
+      problem_.SetParameterBlockVariable(gyro_intrinsics_.data());
       LOG(INFO) << "Optimizing IMU intrinsics.";
     }
-    }
+  }
 
-    // if imu intrinics should be optimized
-    if (problem_.HasParameterBlock(accl_bias_.data()) &&
-            problem_.HasParameterBlock(gyro_bias_.data())) {
+  // if imu intrinics should be optimized
+  if (problem_.HasParameterBlock(accl_bias_.data()) &&
+      problem_.HasParameterBlock(gyro_bias_.data())) {
     if (!(flags & SplineOptimFlags::IMU_BIASES)) {
       LOG(INFO) << "Keeping IMU biases constant.";
-        problem_.SetParameterBlockConstant(accl_bias_.data());
-        problem_.SetParameterBlockConstant(gyro_bias_.data());
+      problem_.SetParameterBlockConstant(accl_bias_.data());
+      problem_.SetParameterBlockConstant(gyro_bias_.data());
     } else {
-        problem_.SetParameterBlockVariable(accl_bias_.data());
-        problem_.SetParameterBlockVariable(gyro_bias_.data());
+      problem_.SetParameterBlockVariable(accl_bias_.data());
+      problem_.SetParameterBlockVariable(gyro_bias_.data());
       LOG(INFO) << "Optimizing IMU biases and intrinsics.";
     }
+  }
+
+  // add local parametrization for SO(3)
+  for (size_t i = 0; i < so3_knots_.size(); ++i) {
+    if (problem_.HasParameterBlock(so3_knots_[i].data())) {
+      ceres::LocalParameterization* local_parameterization =
+          new LieLocalParameterization<Sophus::SO3d>();
+
+      problem_.SetParameterization(so3_knots_[i].data(),
+                                   local_parameterization);
     }
-
-    // add local parametrization for SO(3)
-    for (size_t i = 0; i < so3_knots_.size(); ++i) {
-      if (problem_.HasParameterBlock(so3_knots_[i].data())) {
-        ceres::LocalParameterization *local_parameterization =
-            new LieLocalParameterization<Sophus::SO3d>();
-
-        problem_.SetParameterization(so3_knots_[i].data(),
-                                     local_parameterization);
+  }
+  if (!(flags & SplineOptimFlags::SPLINE)) {
+    // set knots constant if asked
+    for (size_t i = 0; i < r3_knots_.size(); ++i) {
+      if (problem_.HasParameterBlock(r3_knots_[i].data())) {
+        problem_.SetParameterBlockConstant(r3_knots_[i].data());
       }
     }
-    if (!(flags & SplineOptimFlags::SPLINE)) {
-        // set knots constant if asked
-        for (size_t i = 0; i < r3_knots_.size(); ++i) {
-          if (problem_.HasParameterBlock(r3_knots_[i].data())) {
-            problem_.SetParameterBlockConstant(r3_knots_[i].data());
-          }
-        }
-          for (size_t i = 0; i < so3_knots_.size(); ++i) {
-            if (problem_.HasParameterBlock(so3_knots_[i].data())) {
-              problem_.SetParameterBlockConstant(so3_knots_[i].data());
-          }
-        }
-    } else {
-        // set knots constant if asked
-        for (size_t i = 0; i < r3_knots_.size(); ++i) {
-          if (problem_.HasParameterBlock(r3_knots_[i].data())) {
-            problem_.SetParameterBlockVariable(r3_knots_[i].data());
-          }
-        }
-          for (size_t i = 0; i < so3_knots_.size(); ++i) {
-            if (problem_.HasParameterBlock(so3_knots_[i].data())) {
-              problem_.SetParameterBlockVariable(so3_knots_[i].data());
-          }
-        }
+    for (size_t i = 0; i < so3_knots_.size(); ++i) {
+      if (problem_.HasParameterBlock(so3_knots_[i].data())) {
+        problem_.SetParameterBlockConstant(so3_knots_[i].data());
+      }
     }
-
+  } else {
+    // set knots constant if asked
+    for (size_t i = 0; i < r3_knots_.size(); ++i) {
+      if (problem_.HasParameterBlock(r3_knots_[i].data())) {
+        problem_.SetParameterBlockVariable(r3_knots_[i].data());
+      }
+    }
+    for (size_t i = 0; i < so3_knots_.size(); ++i) {
+      if (problem_.HasParameterBlock(so3_knots_[i].data())) {
+        problem_.SetParameterBlockVariable(so3_knots_[i].data());
+      }
+    }
+  }
 }
 
 template <int _T>
-ceres::Solver::Summary
-SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
-                                        const int flags) {
+ceres::Solver::Summary SplineTrajectoryEstimator<_T>::Optimize(
+    const int max_iters, const int flags) {
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
   options.max_num_iterations = max_iters;
@@ -199,70 +202,70 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   return summary;
 }
 
-template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
+template <int _T>
+void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
+  so3_knots_ = OpenICC::so3_vector(nr_knots_so3_);
+  r3_knots_ = vec3_vector(nr_knots_r3_);
+  so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
+  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
+  // first interpolate spline poses for imu update rate
+  // create zero-based maps
+  OpenICC::quat_map quat_vis_map;
+  OpenICC::vec3_map translations_map;
 
-    so3_knots_ = OpenICC::so3_vector(nr_knots_so3_);
-    r3_knots_ = vec3_vector(nr_knots_r3_);
-    so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
-    r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
-    // first interpolate spline poses for imu update rate
-    // create zero-based maps
-    OpenICC::quat_map quat_vis_map;
-    OpenICC::vec3_map translations_map;
+  // get sorted poses
+  const auto view_ids = image_data_.ViewIds();
+  for (const auto& vid : view_ids) {
+    const auto* v = image_data_.View(vid);
+    const double t_s = v->GetTimestamp();
+    const auto q_w_c = Eigen::Quaterniond(
+        v->Camera().GetOrientationAsRotationMatrix().transpose());
+    const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
+    const Sophus::SE3d T_w_i = T_w_c * T_i_c_.inverse();
+    quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
+    translations_map[t_s] = T_w_i.translation();
+  }
 
-    // get sorted poses
-    const auto view_ids = image_data_.ViewIds();
-    for (const auto &vid : view_ids) {
-      const auto *v = image_data_.View(vid);
-      const double t_s = v->GetTimestamp();
-      const auto q_w_c = Eigen::Quaterniond(
-          v->Camera().GetOrientationAsRotationMatrix().transpose());
-      const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
-      const Sophus::SE3d T_w_i = T_w_c * T_i_c_.inverse();
-      quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
-      translations_map[t_s] = T_w_i.translation();
-    }
+  OpenICC::quat_vector quat_vis;
+  OpenICC::vec3_vector translations;
+  std::vector<double> t_vis;
+  for (auto const& q : quat_vis_map) {
+    quat_vis.push_back(q.second);
+    t_vis.push_back(q.first);
+  }
 
-    OpenICC::quat_vector quat_vis;
-    OpenICC::vec3_vector translations;
-    std::vector<double> t_vis;
-    for (auto const &q : quat_vis_map) {
-      quat_vis.push_back(q.second);
-      t_vis.push_back(q.first);
-    }
+  for (auto const& t : translations_map) {
+    translations.push_back(t.second);
+  }
 
-    for (auto const &t : translations_map) {
-      translations.push_back(t.second);
-    }
+  // get time at which we want to interpolate
+  std::vector<double> t_so3_spline, t_r3_spline;
+  for (int i = 0; i < nr_knots_so3_; ++i) {
+    const double t = i * dt_so3_ns_ * NS_TO_S;
+    t_so3_spline.push_back(t);
+  }
 
-    // get time at which we want to interpolate
-    std::vector<double> t_so3_spline, t_r3_spline;
-    for (int i = 0; i < nr_knots_so3_; ++i) {
-      const double t = i * dt_so3_ns_ * NS_TO_S;
-      t_so3_spline.push_back(t);
-    }
+  for (int i = 0; i < nr_knots_r3_; ++i) {
+    const double t = i * dt_r3_ns_ * NS_TO_S;
+    t_r3_spline.push_back(t);
+  }
 
-    for (int i = 0; i < nr_knots_r3_; ++i) {
-      const double t = i * dt_r3_ns_ * NS_TO_S;
-      t_r3_spline.push_back(t);
-    }
+  OpenICC::quat_vector interp_spline_quats;
+  OpenICC::vec3_vector interpo_spline_trans;
+  OpenICC::utils::InterpolateQuaternions(
+      t_vis, t_so3_spline, quat_vis, interp_spline_quats);
+  OpenICC::utils::InterpolateVector3d(
+      t_vis, t_r3_spline, translations, interpo_spline_trans);
 
-    OpenICC::quat_vector interp_spline_quats;
-    OpenICC::vec3_vector interpo_spline_trans;
-    OpenICC::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis,
-                                           interp_spline_quats);
-    OpenICC::utils::InterpolateVector3d(t_vis, t_r3_spline, translations,
-                                        interpo_spline_trans);
-
-    for (int i = 0; i < nr_knots_so3_; ++i) {
-      so3_knots_[i] = Sophus::SO3d(interp_spline_quats[i]);
-    }
-    for (int i = 0; i < nr_knots_r3_; ++i) {
-      r3_knots_[i] = interpo_spline_trans[i];
-    }
+  for (int i = 0; i < nr_knots_so3_; ++i) {
+    so3_knots_[i] = Sophus::SO3d(interp_spline_quats[i]);
+  }
+  for (int i = 0; i < nr_knots_r3_; ++i) {
+    r3_knots_[i] = interpo_spline_trans[i];
+  }
 }
 
-//template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {
+// template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {
 
 //  r3_knots_ = vec3_vector(nr_knots_r3_);
 //  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
@@ -301,7 +304,7 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
 //  LOG(INFO) << "Initialized the spline with GPS coordinates.";
 //}
 
-//template <int _T> void SplineTrajectoryEstimator<_T>::InitR3Knots() {
+// template <int _T> void SplineTrajectoryEstimator<_T>::InitR3Knots() {
 //  r3_knots_ = vec3_vector(nr_knots_r3_);
 //  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
 //  for (auto i = 0; i < nr_knots_r3_; ++i) {
@@ -309,7 +312,7 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
 //  }
 //}
 
-//template <int _T> void SplineTrajectoryEstimator<_T>::InitSO3Knots() {
+// template <int _T> void SplineTrajectoryEstimator<_T>::InitSO3Knots() {
 //  so3_knots_ = so3_vector(nr_knots_so3_);
 //  so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
 
@@ -324,8 +327,8 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
 //  }
 //}
 
-//template <int _T>
-//bool SplineTrajectoryEstimator<_T>::AddGPSMeasurement(
+// template <int _T>
+// bool SplineTrajectoryEstimator<_T>::AddGPSMeasurement(
 //    const Eigen::Vector3d &meas, const int64_t time_ns,
 //    const double weight_gps) {
 //  double u_r3;
@@ -358,7 +361,8 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
-    const Eigen::Vector3d &meas, const int64_t time_ns,
+    const Eigen::Vector3d& meas,
+    const int64_t time_ns,
     const double weight_se3) {
   double u_r3, u_so3;
   int64_t s_r3, s_so3;
@@ -374,13 +378,13 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
   }
 
   using FunctorT = AccelerationCostFunctorSplit<N_>;
-  FunctorT *functor =
+  FunctorT* functor =
       new FunctorT(meas, u_r3, inv_r3_dt_, u_so3, inv_so3_dt_, weight_se3);
 
-  ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
+  ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-  std::vector<double *> vec;
+  std::vector<double*> vec;
   // so3
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
@@ -420,9 +424,9 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
-    const Eigen::Vector3d &meas, const int64_t time_ns,
+    const Eigen::Vector3d& meas,
+    const int64_t time_ns,
     const double weight_so3) {
-
   double u_so3;
   int64_t s_so3;
   if (!CalcSO3Times(time_ns, u_so3, s_so3)) {
@@ -432,13 +436,12 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
   }
 
   using FunctorT = GyroCostFunctorSplit<N_, Sophus::SO3, false>;
-  FunctorT *functor =
-    new FunctorT(meas, u_so3, inv_so3_dt_, weight_so3);
+  FunctorT* functor = new FunctorT(meas, u_so3, inv_so3_dt_, weight_so3);
 
-  ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
+  ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-  std::vector<double *> vec;
+  std::vector<double*> vec;
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
     const int t = s_so3 + i;
@@ -467,8 +470,7 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
-    const theia::View *view, const double robust_loss_width) {
-
+    const theia::View* view, const double robust_loss_width) {
   const int64_t image_obs_time_ns = view->GetTimestamp() * S_TO_NS;
   const auto track_ids = view->TrackIds();
 
@@ -486,13 +488,13 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
   }
 
   using FunctorT = GSReprojectionCostFunctorSplit<N_>;
-  FunctorT *functor = new FunctorT(view, &image_data_, u_so3, u_r3,
-                                   inv_so3_dt_, inv_r3_dt_, track_ids);
+  FunctorT* functor = new FunctorT(
+      view, &image_data_, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, track_ids);
 
-  ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
+  ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-  std::vector<double *> vec;
+  std::vector<double*> vec;
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
     const int t = s_so3 + i;
@@ -520,7 +522,7 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
 
   cost_function->SetNumResiduals(track_ids.size() * 2);
 
-  ceres::LossFunction *loss_function = new ceres::HuberLoss(robust_loss_width);
+  ceres::LossFunction* loss_function = new ceres::HuberLoss(robust_loss_width);
   problem_.AddResidualBlock(cost_function, loss_function, vec);
 
   return true;
@@ -528,8 +530,7 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
-    const theia::View *view, const double robust_loss_width) {
-
+    const theia::View* view, const double robust_loss_width) {
   const int64_t image_obs_time_ns = view->GetTimestamp() * S_TO_NS;
   const auto track_ids = view->TrackIds();
 
@@ -547,13 +548,13 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
   }
 
   using FunctorT = RSReprojectionCostFunctorSplit<N_>;
-  FunctorT *functor = new FunctorT(view, &image_data_, u_so3, u_r3,
-                                   inv_so3_dt_, inv_r3_dt_, track_ids);
+  FunctorT* functor = new FunctorT(
+      view, &image_data_, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, track_ids);
 
-  ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
+  ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-  std::vector<double *> vec;
+  std::vector<double*> vec;
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
     const int t = s_so3 + i;
@@ -588,23 +589,24 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
   if (robust_loss_width == 0.0) {
     problem_.AddResidualBlock(cost_function, NULL, vec);
   } else {
-    ceres::LossFunction *loss_function = new ceres::HuberLoss(robust_loss_width);
+    ceres::LossFunction* loss_function =
+        new ceres::HuberLoss(robust_loss_width);
     problem_.AddResidualBlock(cost_function, loss_function, vec);
   }
 
   // bound translation
-//  problem_.SetParameterLowerBound(T_i_c_.data(), 4, -1e-2);
-//  problem_.SetParameterUpperBound(T_i_c_.data(), 4, 1e-2);
-//  problem_.SetParameterLowerBound(T_i_c_.data(), 5, -10e-2);
-//  problem_.SetParameterUpperBound(T_i_c_.data(), 5, 10e-2);
-//  problem_.SetParameterLowerBound(T_i_c_.data(), 6, -1e-2);
-//  problem_.SetParameterUpperBound(T_i_c_.data(), 6, 1e-2);
+  //  problem_.SetParameterLowerBound(T_i_c_.data(), 4, -1e-2);
+  //  problem_.SetParameterUpperBound(T_i_c_.data(), 4, 1e-2);
+  //  problem_.SetParameterLowerBound(T_i_c_.data(), 5, -10e-2);
+  //  problem_.SetParameterUpperBound(T_i_c_.data(), 5, 10e-2);
+  //  problem_.SetParameterLowerBound(T_i_c_.data(), 6, -1e-2);
+  //  problem_.SetParameterUpperBound(T_i_c_.data(), 6, 1e-2);
 
   return true;
 }
 
-//template <int _T>
-//bool SplineTrajectoryEstimator<_T>::AddRSInvCameraMeasurement(
+// template <int _T>
+// bool SplineTrajectoryEstimator<_T>::AddRSInvCameraMeasurement(
 //    const theia::View *view, const double robust_loss_width) {
 //  std::vector<theia::TrackId> tracks = view->TrackIds();
 //  const size_t nr_obs = tracks.size();
@@ -657,15 +659,18 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
 //    // spline data for observation
 //    for (int i = 0; i < N_; i++) {
 //      const int t = s_so3_obs + i;
-//      time_to_so3_knots_in_prob.insert(std::make_pair(t, so3_knots_[t].data()));
+//      time_to_so3_knots_in_prob.insert(std::make_pair(t,
+//      so3_knots_[t].data()));
 //    }
 
 //    // spline data for reference
 //    for (int i = 0; i < N_; i++) {
 //      const int t = s_so3_ref + i;
-//      if (time_to_so3_knots_in_prob.find(t) != time_to_so3_knots_in_prob.end())
+//      if (time_to_so3_knots_in_prob.find(t) !=
+//      time_to_so3_knots_in_prob.end())
 //        continue;
-//      time_to_so3_knots_in_prob.insert(std::make_pair(t, so3_knots_[t].data()));
+//      time_to_so3_knots_in_prob.insert(std::make_pair(t,
+//      so3_knots_[t].data()));
 //    }
 
 //    // now fill the vector
@@ -675,8 +680,9 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
 //    }
 
 //    // get pointer offsets
-//    const int obs_so3_offset = GetPtrOffset(so3_knots_[s_so3_obs].data(), vec);
-//    const int ref_so3_offset = GetPtrOffset(so3_knots_[s_so3_ref].data(), vec);
+//    const int obs_so3_offset = GetPtrOffset(so3_knots_[s_so3_obs].data(),
+//    vec); const int ref_so3_offset =
+//    GetPtrOffset(so3_knots_[s_so3_ref].data(), vec);
 
 //    // spline data for observation
 //    for (int i = 0; i < N_; i++) {
@@ -719,7 +725,8 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
 //    using FunctorT = RSInvDepthReprojCostFunctorSplit<N_>;
 //    FunctorT *functor = new FunctorT(view, &image_data_, T_i_c_, tracks[i],
 //                                     u_so3_obs, u_r3_obs, u_so3_ref, u_r3_ref,
-//                                     inv_so3_dt_, inv_r3_dt_, ptr_offsets, 1.0);
+//                                     inv_so3_dt_, inv_r3_dt_,
+//                                     ptr_offsets, 1.0);
 
 //    ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
 //        new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -748,8 +755,10 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::CalcTimes(const int64_t sensor_time,
-                                              double &u, int64_t &s,
-                                              int64_t dt_ns, size_t nr_knots) {
+                                              double& u,
+                                              int64_t& s,
+                                              int64_t dt_ns,
+                                              size_t nr_knots) {
   const int64_t st_ns = (sensor_time - start_t_ns_);
 
   if (st_ns < 0.0) {
@@ -772,14 +781,15 @@ bool SplineTrajectoryEstimator<_T>::CalcTimes(const int64_t sensor_time,
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::CalcSO3Times(const int64_t sensor_time,
-                                                 double &u_so3,
-                                                 int64_t &s_so3) {
+                                                 double& u_so3,
+                                                 int64_t& s_so3) {
   return CalcTimes(sensor_time, u_so3, s_so3, dt_so3_ns_, so3_knots_.size());
 }
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::CalcR3Times(const int64_t sensor_time,
-                                                double &u_r3, int64_t &s_r3) {
+                                                double& u_r3,
+                                                int64_t& s_r3) {
   return CalcTimes(sensor_time, u_r3, s_r3, dt_r3_ns_, r3_knots_.size());
 }
 
@@ -788,19 +798,23 @@ Sophus::SE3d SplineTrajectoryEstimator<_T>::GetKnot(int i) const {
   return Sophus::SE3d(so3_knots_[i], r3_knots_[i]);
 }
 
-template <int _T> size_t SplineTrajectoryEstimator<_T>::GetNumSO3Knots() const {
+template <int _T>
+size_t SplineTrajectoryEstimator<_T>::GetNumSO3Knots() const {
   return so3_knots_.size();
 }
 
-template <int _T> size_t SplineTrajectoryEstimator<_T>::GetNumR3Knots() const {
+template <int _T>
+size_t SplineTrajectoryEstimator<_T>::GetNumR3Knots() const {
   return r3_knots_.size();
 }
 
-template <int _T> int64_t SplineTrajectoryEstimator<_T>::GetMaxTimeNs() const {
+template <int _T>
+int64_t SplineTrajectoryEstimator<_T>::GetMaxTimeNs() const {
   return start_t_ns_ + (so3_knots_.size() - N_ + 1) * dt_so3_ns_ - 1;
 }
 
-template <int _T> int64_t SplineTrajectoryEstimator<_T>::GetMinTimeNs() const {
+template <int _T>
+int64_t SplineTrajectoryEstimator<_T>::GetMinTimeNs() const {
   return start_t_ns_;
 }
 
@@ -816,36 +830,38 @@ Eigen::Vector3d SplineTrajectoryEstimator<_T>::GetAccelBias() const {
 
 template <int _T>
 void SplineTrajectoryEstimator<_T>::SetImageData(
-    const theia::Reconstruction &c) {
+    const theia::Reconstruction& c) {
   image_data_ = c;
   // calculate all reference bearings
-//  const auto track_ids = image_data_.TrackIds();
-//  for (auto t = 0; t < track_ids.size(); ++t) {
-//    theia::Track *mut_track = image_data_.MutableTrack(track_ids[t]);
-//    theia::ViewId ref_view_id = mut_track->ReferenceViewId();
-//    const theia::View *v = image_data_.View(ref_view_id);
-//    const Eigen::Vector2d feat = (*v->GetFeature(track_ids[t])).point_;
-//    Eigen::Vector3d bearing = v->Camera().PixelToNormalizedCoordinates(feat);
-//    Eigen::Vector3d adjusted_point =
-//        mut_track->Point().head<3>() -
-//        mut_track->Point()[3] * v->Camera().GetPosition();
-//    Eigen::Vector3d rotated_point =
-//        v->Camera().GetOrientationAsRotationMatrix() * adjusted_point;
-////    if (std::abs(rotated_point[2]) < 1e-10)
-////        *mut_track->MutableInverseDepth() = 1 / 1e-10;
-////    else
-////        *mut_track->MutableInverseDepth() = 1 / rotated_point[2];
-//   *mut_track->MutableInverseDepth() = 1 / 0.5;
-//    mut_track->SetReferenceBearingVector(bearing);
-//  }
+  //  const auto track_ids = image_data_.TrackIds();
+  //  for (auto t = 0; t < track_ids.size(); ++t) {
+  //    theia::Track *mut_track = image_data_.MutableTrack(track_ids[t]);
+  //    theia::ViewId ref_view_id = mut_track->ReferenceViewId();
+  //    const theia::View *v = image_data_.View(ref_view_id);
+  //    const Eigen::Vector2d feat = (*v->GetFeature(track_ids[t])).point_;
+  //    Eigen::Vector3d bearing =
+  //    v->Camera().PixelToNormalizedCoordinates(feat); Eigen::Vector3d
+  //    adjusted_point =
+  //        mut_track->Point().head<3>() -
+  //        mut_track->Point()[3] * v->Camera().GetPosition();
+  //    Eigen::Vector3d rotated_point =
+  //        v->Camera().GetOrientationAsRotationMatrix() * adjusted_point;
+  ////    if (std::abs(rotated_point[2]) < 1e-10)
+  ////        *mut_track->MutableInverseDepth() = 1 / 1e-10;
+  ////    else
+  ////        *mut_track->MutableInverseDepth() = 1 / rotated_point[2];
+  //   *mut_track->MutableInverseDepth() = 1 / 0.5;
+  //    mut_track->SetReferenceBearingVector(bearing);
+  //  }
 }
 
-template <int _T> void SplineTrajectoryEstimator<_T>::SetG(const Eigen::Vector3d &g) {
+template <int _T>
+void SplineTrajectoryEstimator<_T>::SetG(const Eigen::Vector3d& g) {
   gravity_ = g;
 }
 
 template <int _T>
-void SplineTrajectoryEstimator<_T>::SetT_i_c(const Sophus::SE3<double> &T) {
+void SplineTrajectoryEstimator<_T>::SetT_i_c(const Sophus::SE3<double>& T) {
   T_i_c_ = T;
 }
 
@@ -862,28 +878,28 @@ void SplineTrajectoryEstimator<_T>::SetCameraLineDelay(
 }
 
 template <int _T>
-bool SplineTrajectoryEstimator<_T>::GetPosition(const int64_t &time_ns,
-                                                Eigen::Vector3d &position) {
+bool SplineTrajectoryEstimator<_T>::GetPosition(const int64_t& time_ns,
+                                                Eigen::Vector3d& position) {
   double u_r3;
   int64_t s_r3;
   if (!CalcR3Times(time_ns, u_r3, s_r3)) {
     return false;
   }
 
-  std::vector<const double *> vec;
+  std::vector<const double*> vec;
   for (int i = 0; i < N_; ++i) {
     vec.emplace_back(r3_knots_[s_r3 + i].data());
   }
 
-  CeresSplineHelper<double, N_>::template evaluate<3, 0>(&vec[0], u_r3,
-                                                         inv_r3_dt_, &position);
+  CeresSplineHelper<double, N_>::template evaluate<3, 0>(
+      &vec[0], u_r3, inv_r3_dt_, &position);
 
   return true;
 }
 
 template <int _T>
-bool SplineTrajectoryEstimator<_T>::GetPose(const int64_t &time_ns,
-                                            Sophus::SE3d &pose) {
+bool SplineTrajectoryEstimator<_T>::GetPose(const int64_t& time_ns,
+                                            Sophus::SE3d& pose) {
   double u_r3, u_so3;
   int64_t s_r3, s_so3;
   if (!CalcR3Times(time_ns, u_r3, s_r3)) {
@@ -896,7 +912,7 @@ bool SplineTrajectoryEstimator<_T>::GetPose(const int64_t &time_ns,
   Sophus::SO3d rot;
   Eigen::Vector3d trans;
   {
-    std::vector<const double *> vec;
+    std::vector<const double*> vec;
     for (int i = 0; i < N_; ++i) {
       vec.emplace_back(so3_knots_[s_so3 + i].data());
     }
@@ -905,13 +921,13 @@ bool SplineTrajectoryEstimator<_T>::GetPose(const int64_t &time_ns,
         &vec[0], u_so3, inv_so3_dt_, &rot);
   }
   {
-    std::vector<const double *> vec;
+    std::vector<const double*> vec;
     for (int i = 0; i < N_; ++i) {
       vec.emplace_back(r3_knots_[s_r3 + i].data());
     }
 
-    CeresSplineHelper<double, N_>::template evaluate<3, 0>(&vec[0], u_r3,
-                                                           inv_r3_dt_, &trans);
+    CeresSplineHelper<double, N_>::template evaluate<3, 0>(
+        &vec[0], u_r3, inv_r3_dt_, &trans);
   }
   pose = Sophus::SE3d(rot, trans);
 
@@ -920,8 +936,7 @@ bool SplineTrajectoryEstimator<_T>::GetPose(const int64_t &time_ns,
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::GetAngularVelocity(
-        const int64_t &time_ns,
-        Eigen::Vector3d &velocity) {
+    const int64_t& time_ns, Eigen::Vector3d& velocity) {
   double u_r3, u_so3;
   int64_t s_r3, s_so3;
   if (!CalcR3Times(time_ns, u_r3, s_r3)) {
@@ -931,8 +946,7 @@ bool SplineTrajectoryEstimator<_T>::GetAngularVelocity(
     return false;
   }
 
-
-  std::vector<const double *> vec;
+  std::vector<const double*> vec;
   for (int i = 0; i < N_; ++i) {
     vec.emplace_back(so3_knots_[s_so3 + i].data());
   }
@@ -940,14 +954,12 @@ bool SplineTrajectoryEstimator<_T>::GetAngularVelocity(
   CeresSplineHelper<double, N_>::template evaluate_lie<Sophus::SO3>(
       &vec[0], u_so3, inv_so3_dt_, nullptr, &velocity);
 
-
   return true;
 }
 
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::GetAcceleration(
-        const int64_t &time_ns,
-        Eigen::Vector3d &acceleration) {
+    const int64_t& time_ns, Eigen::Vector3d& acceleration) {
   double u_r3, u_so3;
   int64_t s_r3, s_so3;
   if (!CalcR3Times(time_ns, u_r3, s_r3)) {
@@ -960,22 +972,22 @@ bool SplineTrajectoryEstimator<_T>::GetAcceleration(
   Sophus::SO3d rot;
   Eigen::Vector3d trans_accel_world;
   {
-    std::vector<const double *> vec;
+    std::vector<const double*> vec;
     for (int i = 0; i < N_; ++i) {
-     vec.emplace_back(so3_knots_[s_so3 + i].data());
+      vec.emplace_back(so3_knots_[s_so3 + i].data());
     }
 
     CeresSplineHelper<double, N_>::template evaluate_lie<Sophus::SO3>(
         &vec[0], u_so3, inv_so3_dt_, &rot);
   }
   {
-    std::vector<const double *> vec;
+    std::vector<const double*> vec;
     for (int i = 0; i < N_; ++i) {
       vec.emplace_back(r3_knots_[s_r3 + i].data());
     }
 
     CeresSplineHelper<double, N_>::template evaluate<3, 2>(
-                &vec[0], u_r3, inv_r3_dt_, &trans_accel_world);
+        &vec[0], u_r3, inv_r3_dt_, &trans_accel_world);
   }
   acceleration = rot.inverse() * (trans_accel_world + gravity_);
 
@@ -984,11 +996,11 @@ bool SplineTrajectoryEstimator<_T>::GetAcceleration(
 
 template <int _T>
 double SplineTrajectoryEstimator<_T>::GetMeanReprojectionError() {
-  //ConvertInvDepthPointsToHom();
+  // ConvertInvDepthPointsToHom();
   double sum_error = 0.0;
   int num_points = 0;
   for (const auto vid : image_data_.ViewIds()) {
-    const auto *view = image_data_.View(vid);
+    const auto* view = image_data_.View(vid);
     std::vector<theia::TrackId> tracks = view->TrackIds();
     const size_t nr_obs = tracks.size();
     if (nr_obs <= 0) {
@@ -1007,13 +1019,13 @@ double SplineTrajectoryEstimator<_T>::GetMeanReprojectionError() {
     }
 
     using FunctorT = RSReprojectionCostFunctorSplit<N_>;
-    FunctorT *functor = new FunctorT(view, &image_data_, u_so3, u_r3,
-                                     inv_so3_dt_, inv_r3_dt_, tracks);
+    FunctorT* functor = new FunctorT(
+        view, &image_data_, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, tracks);
 
-    ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
+    ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
         new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-    std::vector<double *> vec;
+    std::vector<double*> vec;
     for (int i = 0; i < N_; i++) {
       cost_function->AddParameterBlock(4);
       const int t = s_so3 + i;
@@ -1065,11 +1077,10 @@ double SplineTrajectoryEstimator<_T>::GetMeanReprojectionError() {
 
 template <int _T>
 void SplineTrajectoryEstimator<_T>::ConvertInvDepthPointsToHom() {
-
   const auto track_ids = image_data_.TrackIds();
   for (size_t p = 0; p < track_ids.size(); ++p) {
-    theia::Track *mutable_track = image_data_.MutableTrack(track_ids[p]);
-    const theia::View *v = image_data_.View(mutable_track->ReferenceViewId());
+    theia::Track* mutable_track = image_data_.MutableTrack(track_ids[p]);
+    const theia::View* v = image_data_.View(mutable_track->ReferenceViewId());
     Eigen::Vector3d bearing =
         v->Camera().PixelToUnitDepthRay((*v->GetFeature(track_ids[p])).point_);
 
@@ -1089,7 +1100,7 @@ void SplineTrajectoryEstimator<_T>::ConvertInvDepthPointsToHom() {
 
 template <int _T>
 void SplineTrajectoryEstimator<_T>::ConvertToTheiaRecon(
-    theia::Reconstruction *recon_out) {
+    theia::Reconstruction* recon_out) {
   // read camera calibration
   std::vector<theia::ViewId> view_ids = image_data_.ViewIds();
   for (size_t i = 0; i < view_ids.size(); ++i) {
@@ -1100,9 +1111,9 @@ void SplineTrajectoryEstimator<_T>::ConvertToTheiaRecon(
     Sophus::SE3d T_w_c = T_w_i * T_i_c_;
     theia::ViewId v_id_theia =
         recon_out->AddView(std::to_string(t_ns), 0, t_ns);
-    theia::View *view = recon_out->MutableView(v_id_theia);
+    theia::View* view = recon_out->MutableView(v_id_theia);
     view->SetEstimated(true);
-    theia::Camera *camera_ptr = view->MutableCamera();
+    theia::Camera* camera_ptr = view->MutableCamera();
     camera_ptr->SetOrientationFromRotationMatrix(
         T_w_c.rotationMatrix().transpose());
     camera_ptr->SetPosition(T_w_c.translation());
@@ -1119,66 +1130,72 @@ void SplineTrajectoryEstimator<_T>::ConvertToTheiaRecon(
 
 template <int _T>
 Eigen::Vector3d SplineTrajectoryEstimator<_T>::GetGravity() const {
-    return gravity_;
+  return gravity_;
 }
 
 template <int _T>
 Sophus::SE3d SplineTrajectoryEstimator<_T>::GetT_i_c() const {
-    return T_i_c_;
+  return T_i_c_;
 }
 
 template <int _T>
 double SplineTrajectoryEstimator<_T>::GetRSLineDelay() const {
-    return cam_line_delay_s_;
+  return cam_line_delay_s_;
 }
 
 template <int _T>
-ThreeAxisSensorCalibParams<double> SplineTrajectoryEstimator<_T>::GetAcclIntrinsics() const {
-    ThreeAxisSensorCalibParams<double> accel_calib_triad(
-        accl_intrinsics_[0],
-        accl_intrinsics_[1],
-        accl_intrinsics_[2],
-        0,0,0,
-        accl_intrinsics_[3],
-        accl_intrinsics_[4],
-        accl_intrinsics_[5],
-        accl_bias_[0],
-        accl_bias_[1],
-        accl_bias_[2]);
+ThreeAxisSensorCalibParams<double>
+SplineTrajectoryEstimator<_T>::GetAcclIntrinsics() const {
+  ThreeAxisSensorCalibParams<double> accel_calib_triad(accl_intrinsics_[0],
+                                                       accl_intrinsics_[1],
+                                                       accl_intrinsics_[2],
+                                                       0,
+                                                       0,
+                                                       0,
+                                                       accl_intrinsics_[3],
+                                                       accl_intrinsics_[4],
+                                                       accl_intrinsics_[5],
+                                                       accl_bias_[0],
+                                                       accl_bias_[1],
+                                                       accl_bias_[2]);
   return accel_calib_triad;
 }
 
 template <int _T>
-ThreeAxisSensorCalibParams<double> SplineTrajectoryEstimator<_T>::GetGyroIntrinsics() const {
-    ThreeAxisSensorCalibParams<double> gyro_calib_triad(
-        gyro_intrinsics_[0],
-        gyro_intrinsics_[1],
-        gyro_intrinsics_[2],
-        gyro_intrinsics_[3],
-        gyro_intrinsics_[4],
-        gyro_intrinsics_[5],
-        gyro_intrinsics_[6],
-        gyro_intrinsics_[7],
-        gyro_intrinsics_[8],
-        gyro_bias_[0],
-        gyro_bias_[1],
-        gyro_bias_[2]);
+ThreeAxisSensorCalibParams<double>
+SplineTrajectoryEstimator<_T>::GetGyroIntrinsics() const {
+  ThreeAxisSensorCalibParams<double> gyro_calib_triad(gyro_intrinsics_[0],
+                                                      gyro_intrinsics_[1],
+                                                      gyro_intrinsics_[2],
+                                                      gyro_intrinsics_[3],
+                                                      gyro_intrinsics_[4],
+                                                      gyro_intrinsics_[5],
+                                                      gyro_intrinsics_[6],
+                                                      gyro_intrinsics_[7],
+                                                      gyro_intrinsics_[8],
+                                                      gyro_bias_[0],
+                                                      gyro_bias_[1],
+                                                      gyro_bias_[2]);
   return gyro_calib_triad;
 }
 
 template <int _T>
-void SplineTrajectoryEstimator<_T>::SetIMUIntrinsics(const ThreeAxisSensorCalibParams<double>& accl_intrinsics,
-                                                     const ThreeAxisSensorCalibParams<double>& gyro_intrinsics) {
+void SplineTrajectoryEstimator<_T>::SetIMUIntrinsics(
+    const ThreeAxisSensorCalibParams<double>& accl_intrinsics,
+    const ThreeAxisSensorCalibParams<double>& gyro_intrinsics) {
+  accl_intrinsics_ << accl_intrinsics.misYZ(), accl_intrinsics.misZY(),
+      accl_intrinsics.misZX(), accl_intrinsics.scaleX(),
+      accl_intrinsics.scaleY(), accl_intrinsics.scaleZ();
 
-    accl_intrinsics_ << accl_intrinsics.misYZ(), accl_intrinsics.misZY(), accl_intrinsics.misZX(),
-            accl_intrinsics.scaleX(), accl_intrinsics.scaleY(), accl_intrinsics.scaleZ();
+  gyro_intrinsics_ << gyro_intrinsics.misYZ(), gyro_intrinsics.misZY(),
+      gyro_intrinsics.misZX(), gyro_intrinsics.misXZ(), gyro_intrinsics.misXY(),
+      gyro_intrinsics.misYX(), gyro_intrinsics.scaleX(),
+      gyro_intrinsics.scaleY(), gyro_intrinsics.scaleZ();
 
-    gyro_intrinsics_ << gyro_intrinsics.misYZ(), gyro_intrinsics.misZY(), gyro_intrinsics.misZX(),
-            gyro_intrinsics.misXZ(), gyro_intrinsics.misXY(), gyro_intrinsics.misYX(),
-            gyro_intrinsics.scaleX(), gyro_intrinsics.scaleY(), gyro_intrinsics.scaleZ();
-
-    accl_bias_ << accl_intrinsics.biasX(), accl_intrinsics.biasY(), accl_intrinsics.biasZ();
-    gyro_bias_ << gyro_intrinsics.biasX(), gyro_intrinsics.biasY(), gyro_intrinsics.biasZ();
+  accl_bias_ << accl_intrinsics.biasX(), accl_intrinsics.biasY(),
+      accl_intrinsics.biasZ();
+  gyro_bias_ << gyro_intrinsics.biasX(), gyro_intrinsics.biasY(),
+      gyro_intrinsics.biasZ();
 }
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

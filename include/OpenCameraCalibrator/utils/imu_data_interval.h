@@ -58,8 +58,9 @@ struct DataInterval {
    * @param start_ts Initial timestamp
    * @param end_ts Final timestamp
    */
-  static DataInterval FromTimestamps(const ImuReadings &samples,
-                                     double start_ts, double end_ts) {
+  static DataInterval FromTimestamps(const ImuReadings& samples,
+                                     double start_ts,
+                                     double end_ts) {
     if (start_ts < 0 || end_ts <= start_ts)
       throw std::invalid_argument("Invalid timestamps");
     if (samples.size() < 3)
@@ -85,7 +86,7 @@ struct DataInterval {
    * @param samples Input signal (data samples vector)
    * @param duration Interval duration
    */
-  static DataInterval InitialInterval(const ImuReadings &samples,
+  static DataInterval InitialInterval(const ImuReadings& samples,
                                       double duration_s) {
     if (duration_s <= 0)
       throw std::invalid_argument("Invalid interval duration");
@@ -108,10 +109,9 @@ struct DataInterval {
    * @param samples Input signal (data samples vector)
    * @param duration Interval duration
    */
-  static DataInterval FinalInterval(const ImuReadings &samples,
+  static DataInterval FinalInterval(const ImuReadings& samples,
                                     double duration) {
-    if (duration <= 0)
-      throw std::invalid_argument("Invalid interval duration");
+    if (duration <= 0) throw std::invalid_argument("Invalid interval duration");
     if (samples.size() < 3)
       throw std::invalid_argument("Invalid data samples vector");
 
@@ -127,8 +127,8 @@ struct DataInterval {
 
   int start_idx, end_idx;
 
-private:
-  static int TimeToIndex(const ImuReadings &samples, double ts) {
+ private:
+  static int TimeToIndex(const ImuReadings& samples, double ts) {
     int idx0 = 0, idx1 = samples.size() - 1, idxm;
     while (idx1 - idx0 > 1) {
       idxm = (idx1 + idx0) / 2;
@@ -155,11 +155,10 @@ private:
  * @returns The "corrected" interval
  */
 template <typename T>
-DataInterval CheckInterval(const std::vector<ImuReading<T>> &samples,
-                           const DataInterval &interval) {
+DataInterval CheckInterval(const std::vector<ImuReading<T>>& samples,
+                           const DataInterval& interval) {
   int start_idx = interval.start_idx, end_idx = interval.end_idx;
-  if (start_idx < 0)
-    start_idx = 0;
+  if (start_idx < 0) start_idx = 0;
   if (end_idx < start_idx || end_idx > samples.size() - 1)
     end_idx = samples.size() - 1;
 
@@ -177,8 +176,8 @@ DataInterval CheckInterval(const std::vector<ImuReading<T>> &samples,
  *
  * @returns A three dimensional vector representing the mean.
  */
-Eigen::Vector3d DataMean(const ImuReadings &samples,
-                         const DataInterval &interval = DataInterval());
+Eigen::Vector3d DataMean(const ImuReadings& samples,
+                         const DataInterval& interval = DataInterval());
 
 /** @brief Compute the variance of a sequence of TriadData_ objects. If a valid
  * data interval is provided, the variance is computed only inside this interval
@@ -190,8 +189,8 @@ Eigen::Vector3d DataMean(const ImuReadings &samples,
  *
  * @returns A three dimensional vector representing the variance.
  */
-Eigen::Vector3d DataVariance(const ImuReadings &samples,
-                             const DataInterval &interval = DataInterval());
+Eigen::Vector3d DataVariance(const ImuReadings& samples,
+                             const DataInterval& interval = DataInterval());
 
 /** @brief If the flag only_means is set to false, for each interval
  *        (input vector intervals) extract from the input signal
@@ -216,10 +215,10 @@ Eigen::Vector3d DataVariance(const ImuReadings &samples,
  *
  */
 
-void ExtractIntervalsSamples(const ImuReadings &samples,
-                             const std::vector<DataInterval> &intervals,
-                             ImuReadings &extracted_samples,
-                             std::vector<DataInterval> &extracted_intervals,
+void ExtractIntervalsSamples(const ImuReadings& samples,
+                             const std::vector<DataInterval>& intervals,
+                             ImuReadings& extracted_samples,
+                             std::vector<DataInterval>& extracted_intervals,
                              int interval_n_samps = 100,
                              bool only_means = false);
 
@@ -230,11 +229,12 @@ void ExtractIntervalsSamples(const ImuReadings &samples,
  *  @param[out] rpy_rot_vec Output roll, pitch, and yaw angular components
  */
 template <typename _T>
-void DecomposeRotation(const Eigen::Matrix<_T, 3, 3> &rot_mat,
-                       Eigen::Matrix<_T, 3, 1> &rpy_rot_vec) {
+void DecomposeRotation(const Eigen::Matrix<_T, 3, 3>& rot_mat,
+                       Eigen::Matrix<_T, 3, 1>& rpy_rot_vec) {
   rpy_rot_vec(0) = atan2(rot_mat(2, 1), rot_mat(2, 2));
-  rpy_rot_vec(1) = atan2(-rot_mat(2, 0), sqrt(rot_mat(2, 1) * rot_mat(2, 1) +
-                                              rot_mat(2, 2) * rot_mat(2, 2)));
+  rpy_rot_vec(1) = atan2(
+      -rot_mat(2, 0),
+      sqrt(rot_mat(2, 1) * rot_mat(2, 1) + rot_mat(2, 2) * rot_mat(2, 2)));
   rpy_rot_vec(2) = atan2(rot_mat(1, 0), rot_mat(0, 0));
 }
 
@@ -260,9 +260,10 @@ void DecomposeRotation(const Eigen::Matrix<_T, 3, 3> &rot_mat,
  * a general 1D signal in a interval of length \f$w_s\f$ samples
  * centered in \f$t\f$.
  */
-void StaticIntervalsDetector(const ImuReadings &samples, double threshold,
-                             std::vector<DataInterval> &intervals,
+void StaticIntervalsDetector(const ImuReadings& samples,
+                             double threshold,
+                             std::vector<DataInterval>& intervals,
                              int win_size = 101);
 
-} // namespace utils
-} // namespace OpenICC
+}  // namespace utils
+}  // namespace OpenICC

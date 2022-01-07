@@ -32,8 +32,7 @@ namespace utils {
 
 using Vector3d = Eigen::Vector3d;
 
-
-Vector3d DataMean(const ImuReadings &samples, const DataInterval &interval) {
+Vector3d DataMean(const ImuReadings& samples, const DataInterval& interval) {
   DataInterval rev_interval = CheckInterval(samples, interval);
   int n_samp = rev_interval.end_idx - rev_interval.start_idx + 1;
   Vector3d mean(0, 0, 0);
@@ -46,8 +45,8 @@ Vector3d DataMean(const ImuReadings &samples, const DataInterval &interval) {
   return mean;
 }
 
-Vector3d DataVariance(const ImuReadings &samples,
-                      const DataInterval &interval) {
+Vector3d DataVariance(const ImuReadings& samples,
+                      const DataInterval& interval) {
   DataInterval rev_interval = CheckInterval(samples, interval);
   int n_samp = rev_interval.end_idx - rev_interval.start_idx + 1;
   Vector3d mean = DataMean(samples, rev_interval);
@@ -62,11 +61,12 @@ Vector3d DataVariance(const ImuReadings &samples,
   return variance;
 }
 
-void ExtractIntervalsSamples(const ImuReadings &samples,
-                             const std::vector<DataInterval> &intervals,
-                             ImuReadings &extracted_samples,
-                             std::vector<DataInterval> &extracted_intervals,
-                             int interval_n_samps, bool only_means) {
+void ExtractIntervalsSamples(const ImuReadings& samples,
+                             const std::vector<DataInterval>& intervals,
+                             ImuReadings& extracted_samples,
+                             std::vector<DataInterval>& extracted_intervals,
+                             int interval_n_samps,
+                             bool only_means) {
   // Check for valid intervals  (i.e., intervals with at least interval_n_samps
   // samples)
   int n_valid_intervals = 0, n_static_samples;
@@ -100,25 +100,24 @@ void ExtractIntervalsSamples(const ImuReadings &samples,
         extracted_samples.push_back(ImuReading(timestamp, mean_val));
       } else {
         for (int j = intervals[i].start_idx;
-             j < intervals[i].start_idx + interval_n_samps; j++)
+             j < intervals[i].start_idx + interval_n_samps;
+             j++)
           extracted_samples.push_back(samples[j]);
       }
     }
   }
 }
 
-void StaticIntervalsDetector(const ImuReadings &samples, double threshold,
-                             std::vector<DataInterval> &intervals,
+void StaticIntervalsDetector(const ImuReadings& samples,
+                             double threshold,
+                             std::vector<DataInterval>& intervals,
                              int win_size) {
-  if (win_size < 11)
-    win_size = 11;
-  if (!(win_size % 2))
-    win_size++;
+  if (win_size < 11) win_size = 11;
+  if (!(win_size % 2)) win_size++;
 
   int h = win_size / 2;
 
-  if (win_size >= samples.size())
-    return;
+  if (win_size >= samples.size()) return;
 
   intervals.clear();
 
@@ -151,5 +150,5 @@ void StaticIntervalsDetector(const ImuReadings &samples, double threshold,
   }
 }
 
-} // namespace utils
-} // namespace OpenICC
+}  // namespace utils
+}  // namespace OpenICC

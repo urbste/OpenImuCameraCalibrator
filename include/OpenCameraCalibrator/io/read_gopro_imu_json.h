@@ -22,8 +22,8 @@
 namespace OpenICC {
 namespace io {
 
-bool ReadGoProTelemetry(const std::string &path_to_telemetry_file,
-                        CameraTelemetryData &telemetry);
+bool ReadGoProTelemetry(const std::string& path_to_telemetry_file,
+                        CameraTelemetryData& telemetry);
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

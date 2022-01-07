@@ -46,7 +46,7 @@ void AllanAcc::calc() {
   std::cout << m_name << " "
             << " end_t " << end_t << std::endl;
   std::cout << m_name << " "
-            << "dt " << std::endl //
+            << "dt " << std::endl  //
             << "-------------" << (end_t - start_t) << " s" << std::endl
             << "-------------" << (end_t - start_t) / 60 << " min" << std::endl
             << "-------------" << (end_t - start_t) / 3600 << " h" << std::endl;
@@ -78,7 +78,7 @@ std::vector<double> AllanAcc::getDeviation() {
   std::vector<double> sigma2 = calcVariance(period);
   std::vector<double> sigma;
 
-  for (auto &sig : sigma2) {
+  for (auto& sig : sigma2) {
     sigma.push_back(sqrt(sig));
   }
   return sigma;
@@ -129,7 +129,7 @@ std::vector<double> AllanAcc::calcThetas(const double freq) {
   std::vector<double> thetas;
 
   double sum = 0;
-  for (auto &acc : m_rawData) {
+  for (auto& acc : m_rawData) {
     sum += acc.a;
     thetas.push_back(sum / freq);
   }
@@ -137,7 +137,6 @@ std::vector<double> AllanAcc::calcThetas(const double freq) {
 }
 
 void AllanAcc::initStrides() {
-
   int mode = numData / 2;
   unsigned int maxStride = 1;
   int shft = 0;
@@ -201,14 +200,13 @@ double AllanAcc::getAvgDt() {
   double sum_dt = 0.0;
   double start_t = m_rawData[0].t;
   bool first = true;
-  for (auto &acc : m_rawData) {
-    if (!first)
-      sum_dt += (acc.t - start_t);
+  for (auto& acc : m_rawData) {
+    if (!first) sum_dt += (acc.t - start_t);
     start_t = acc.t;
     first = false;
   }
   return sum_dt / (numData - 1);
 }
 
-} // namespace allanvar
-} // namespace OpenICC
+}  // namespace allanvar
+}  // namespace OpenICC

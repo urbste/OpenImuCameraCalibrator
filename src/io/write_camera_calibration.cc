@@ -31,8 +31,9 @@
 namespace OpenICC {
 namespace io {
 
-bool write_camera_calibration(const std::string &output_file,
-                              const theia::Camera &camera, const double fps,
+bool write_camera_calibration(const std::string& output_file,
+                              const theia::Camera& camera,
+                              const double fps,
                               const int nr_calib_images,
                               const double total_reproj_error) {
   std::ofstream json_file(output_file);
@@ -54,7 +55,8 @@ bool write_camera_calibration(const std::string &output_file,
   json_obj["intrinsics"]["skew"] = 0.0;
   json_obj["intrinsics"]["principal_pt_x"] = camera.PrincipalPointX();
   json_obj["intrinsics"]["principal_pt_y"] = camera.PrincipalPointY();
-  json_obj["intrinsic_type"] = theia::CameraIntrinsicsModelTypeToString(intrinsics->Type());
+  json_obj["intrinsic_type"] =
+      theia::CameraIntrinsicsModelTypeToString(intrinsics->Type());
 
   if (camera.GetCameraIntrinsicsModelType() ==
       theia::CameraIntrinsicsModelType::PINHOLE) {
@@ -116,12 +118,14 @@ bool write_camera_calibration(const std::string &output_file,
     json_obj["intrinsics"]["radial_distortion_3"] = intrinsics->GetParameter(
         theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
             RADIAL_DISTORTION_3);
-    json_obj["intrinsics"]["tangential_distortion_1"] = intrinsics->GetParameter(
-        theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
-            TANGENTIAL_DISTORTION_1);
-    json_obj["intrinsics"]["tangential_distortion_2"] = intrinsics->GetParameter(
-        theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
-            TANGENTIAL_DISTORTION_2);
+    json_obj["intrinsics"]["tangential_distortion_1"] =
+        intrinsics->GetParameter(
+            theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+                TANGENTIAL_DISTORTION_1);
+    json_obj["intrinsics"]["tangential_distortion_2"] =
+        intrinsics->GetParameter(
+            theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+                TANGENTIAL_DISTORTION_2);
   } else {
     std::cerr << "Camera model type not supported\n";
   }
@@ -133,5 +137,5 @@ bool write_camera_calibration(const std::string &output_file,
   return true;
 }
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

@@ -1,10 +1,10 @@
-#include <dirent.h>
-#include <gflags/gflags.h>
-#include <time.h>
 #include <algorithm>
 #include <chrono>  // NOLINT
+#include <dirent.h>
+#include <gflags/gflags.h>
 #include <iostream>
 #include <string>
+#include <time.h>
 #include <vector>
 
 #include <opencv2/aruco.hpp>
@@ -41,14 +41,18 @@
 
 // Input/output files.
 DEFINE_string(
-    gopro_telemetry_json, "",
+    gopro_telemetry_json,
+    "",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
 DEFINE_string(input_video, "", "Path to corresponding video file.");
 DEFINE_string(detector_params, "", "Path detector yaml.");
-DEFINE_string(input_calibration_dataset, "",
+DEFINE_string(input_calibration_dataset,
+              "",
               "Path to input calibration dataset.");
 DEFINE_double(downsample_factor, 2.5, "Downsample factor for images.");
-DEFINE_string(save_path_spline_calib_dataset, "", "Where to save the recon dataset to.");
+DEFINE_string(save_path_spline_calib_dataset,
+              "",
+              "Where to save the recon dataset to.");
 
 namespace TT = kontiki::trajectories;
 namespace M = kontiki::measurements;
@@ -100,9 +104,8 @@ int main(int argc, char* argv[]) {
     timestamps.push_back(timestamp);
   }
 
-
-  const double dt_r3 = 1.0/30.0;
-  const double dt_so3 = 1.0/30.0;
+  const double dt_r3 = 1.0 / 30.0;
+  const double dt_so3 = 1.0 / 30.0;
 
   // find smallest timestamp
   auto result = std::minmax_element(timestamps.begin(), timestamps.end());
@@ -115,7 +118,9 @@ int main(int argc, char* argv[]) {
 
     const View& view = *reconstruction.View(view_id);
     double timestamp = std::stod(view.Name());
-    if (timestamp >= tend-std::max(dt_so3,dt_r3) || timestamp < t0+std::max(dt_so3,dt_r3)) continue;
+    if (timestamp >= tend - std::max(dt_so3, dt_r3) ||
+        timestamp < t0 + std::max(dt_so3, dt_r3))
+      continue;
     kontiki_views[view_id] = std::make_shared<ViewKontiki>(view_id, timestamp);
   }
 
@@ -139,8 +144,9 @@ int main(int argc, char* argv[]) {
     if (nr_views >= 2) {
       // we know our landmarks for calibration and lock them!
       kontiki_landmarks.push_back(std::make_shared<Landmark>());
-      kontiki_landmarks[kontiki_landmarks.size()-1]->set_point(track->Point());
-      kontiki_landmarks[kontiki_landmarks.size()-1]->Lock(true);
+      kontiki_landmarks[kontiki_landmarks.size() - 1]->set_point(
+          track->Point());
+      kontiki_landmarks[kontiki_landmarks.size() - 1]->Lock(true);
 
       nr_views = 0;
       for (const ViewId& view_id : views_observing_track) {
@@ -153,7 +159,7 @@ int main(int argc, char* argv[]) {
 
         auto cur_view_it = kontiki_views.find(view_id);
         if (cur_view_it == kontiki_views.end()) {
-            continue;
+          continue;
         }
         cur_view_it->second->CreateObservation(
             kontiki_landmarks[kontiki_landmarks.size() - 1], feature);
@@ -168,27 +174,21 @@ int main(int argc, char* argv[]) {
   }
 
   // set landmark references to first observation
-  for (auto l : kontiki_landmarks)
-      l->set_reference(l->observations()[0]);
+  for (auto l : kontiki_landmarks) l->set_reference(l->observations()[0]);
 
   const theia::View* view_1 = reconstruction.View(0);
   view_1->Camera().GetCalibrationMatrix(&K);
   std::shared_ptr<PinholeCameraClass> cam_kontiki =
-      std::make_shared<PinholeCameraClass>(img_width,
-                                           img_height,
-                                           0.00, K);
-
-
+      std::make_shared<PinholeCameraClass>(img_width, img_height, 0.00, K);
 
   Eigen::Quaterniond imu2cam;
   std::cout << imu2cam.w() << " " << imu2cam.x() << " " << imu2cam.y() << " "
             << imu2cam.z() << std::endl;
 
   // Eigen::Quaterniond imu2cam(-0.0602071, -0.715386, 0.695802, 0.0214116);
-  //cam_kontiki->set_relative_orientation(imu2cam);
+  // cam_kontiki->set_relative_orientation(imu2cam);
   cam_kontiki->LockRelativeOrientation(true);
   cam_kontiki->LockRelativePosition(true);
-
 
   std::cout << "Trajectory start time: " << t0 << " tend: " << tend
             << std::endl;
@@ -223,8 +223,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  r3_traj_spline->ExtendTo(std::max(t0, tend),
-                           Eigen::Vector3d(0.0, 0.0, 0.0));
+  r3_traj_spline->ExtendTo(std::max(t0, tend), Eigen::Vector3d(0.0, 0.0, 0.0));
   so3_traj_spline->ExtendTo(std::max(t0, tend),
                             Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0));
 
@@ -234,7 +233,6 @@ int main(int argc, char* argv[]) {
             << q_before.z() << std::endl;
 
   traj_spline_estimator.Solve(100);
-
 
   return 0;
 }

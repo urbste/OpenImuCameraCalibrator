@@ -23,8 +23,7 @@
 // Input/output files.
 DEFINE_string(save_charuco_image, "", "Path to save charuco board to.");
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char* argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
   int squaresX = 9;

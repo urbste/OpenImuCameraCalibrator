@@ -64,9 +64,9 @@ IN THE SOFTWARE.
 
 #pragma once
 
-#include <ceres/local_parameterization.h>
-#include "sophus/so3.hpp"
 #include "sophus/se3.hpp"
+#include "sophus/so3.hpp"
+#include <ceres/local_parameterization.h>
 
 /// @brief Local parametrization for ceres that can be used with Sophus Lie
 /// group implementations.
@@ -81,7 +81,8 @@ class LieLocalParameterization : public ceres::LocalParameterization {
   ///
   ///  T * exp(x)
   ///
-  virtual bool Plus(double const* T_raw, double const* delta_raw,
+  virtual bool Plus(double const* T_raw,
+                    double const* delta_raw,
                     double* T_plus_delta_raw) const {
     Eigen::Map<Groupd const> const T(T_raw);
     Eigen::Map<Tangentd const> const delta(delta_raw);
@@ -97,7 +98,9 @@ class LieLocalParameterization : public ceres::LocalParameterization {
   virtual bool ComputeJacobian(double const* T_raw,
                                double* jacobian_raw) const {
     Eigen::Map<Groupd const> T(T_raw);
-    Eigen::Map<Eigen::Matrix<double, Groupd::num_parameters, Groupd::DoF,
+    Eigen::Map<Eigen::Matrix<double,
+                             Groupd::num_parameters,
+                             Groupd::DoF,
                              Eigen::RowMajor>>
         jacobian(jacobian_raw);
     jacobian = T.Dx_this_mul_exp_x_at_0();
@@ -110,4 +113,3 @@ class LieLocalParameterization : public ceres::LocalParameterization {
   ///@brief Local size
   virtual int LocalSize() const { return Groupd::DoF; }
 };
-

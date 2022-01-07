@@ -15,30 +15,29 @@
 
 #include "OpenCameraCalibrator/core/imu_camera_calibrator.h"
 
-
 namespace OpenICC {
 namespace core {
 
-void ImuCameraCalibrator::BatchInitSpline(const theia::Reconstruction &vision_dataset,
-    const Sophus::SE3<double> &T_i_c_init,
-    const SplineWeightingData &spline_weight_data,
+void ImuCameraCalibrator::BatchInitSpline(
+    const theia::Reconstruction& vision_dataset,
+    const Sophus::SE3<double>& T_i_c_init,
+    const SplineWeightingData& spline_weight_data,
     const double time_offset_imu_to_cam,
-    const OpenICC::CameraTelemetryData &telemetry_data,
+    const OpenICC::CameraTelemetryData& telemetry_data,
     const double initial_line_delay,
     const ThreeAxisSensorCalibParams<double> accl_intrinsics,
     const ThreeAxisSensorCalibParams<double> gyro_intrinsics) {
-
   image_data_ = vision_dataset;
   spline_weight_data_ = spline_weight_data;
   T_i_c_init_ = T_i_c_init;
 
   trajectory_.SetT_i_c(T_i_c_init);
   trajectory_.SetImuToCameraTimeOffset(
-              -telemetry_data.accelerometer[0].timestamp_s());
+      -telemetry_data.accelerometer[0].timestamp_s());
   trajectory_.SetIMUIntrinsics(accl_intrinsics, gyro_intrinsics);
 
   // set camera timestamps and sort them
-  const auto &view_ids = vision_dataset.ViewIds();
+  const auto& view_ids = vision_dataset.ViewIds();
   for (const theia::ViewId view_id : view_ids) {
     cam_timestamps_.push_back(vision_dataset.View(view_id)->GetTimestamp());
   }
@@ -57,7 +56,8 @@ void ImuCameraCalibrator::BatchInitSpline(const theia::Reconstruction &vision_da
   t0_s_ = cam_timestamps_[result.first - cam_timestamps_.begin()];
   tend_s_ = cam_timestamps_[result.second - cam_timestamps_.begin()];
   const int64_t start_t_ns = t0_s_ * S_TO_NS;
-  const int64_t end_t_ns = tend_s_ * S_TO_NS + 0.01 * S_TO_NS + inital_cam_line_delay_s_;
+  const int64_t end_t_ns =
+      tend_s_ * S_TO_NS + 0.01 * S_TO_NS + inital_cam_line_delay_s_;
   const int64_t dt_so3_ns = spline_weight_data_.dt_so3 * S_TO_NS;
   const int64_t dt_r3_ns = spline_weight_data_.dt_r3 * S_TO_NS;
 
@@ -83,29 +83,33 @@ void ImuCameraCalibrator::BatchInitSpline(const theia::Reconstruction &vision_da
   // rolling shutter camera
   if (inital_cam_line_delay_s_ != 0.0) {
     for (const auto& vid : vision_dataset.ViewIds()) {
-       trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 3.0);
+      trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 3.0);
     }
   } else {
     for (const auto& vid : vision_dataset.ViewIds()) {
-       trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 3.0);
+      trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 3.0);
     }
   }
   LOG(INFO) << "Added all Vision measurements to the spline estimator";
 
   LOG(INFO) << "Adding IMU measurements to spline";
   for (size_t i = 0; i < telemetry_data.accelerometer.size(); ++i) {
-    const double t = telemetry_data.accelerometer[i].timestamp_s() - telemetry_data.accelerometer[0].timestamp_s();
-    if (t < t0_s_ || t >= tend_s_)
-      continue;
+    const double t = telemetry_data.accelerometer[i].timestamp_s() +
+                     time_offset_imu_to_cam;
+    if (t < t0_s_ || t >= tend_s_) continue;
     gyro_measurements_[t] = telemetry_data.gyroscope[i].data();
     accl_measurements_[t] = telemetry_data.accelerometer[i].data();
-    if (!trajectory_.AddAccelerometerMeasurement(telemetry_data.accelerometer[i].data(),
-                                t * S_TO_NS, 1./spline_weight_data.std_r3)) {
-        std::cerr<<"Failed to add accelerometer measurement at time: "<<t<<"\n";
+    if (!trajectory_.AddAccelerometerMeasurement(
+            telemetry_data.accelerometer[i].data(),
+            t * S_TO_NS,
+            1. / spline_weight_data.std_r3)) {
+      std::cerr << "Failed to add accelerometer measurement at time: " << t
+                << "\n";
     }
-    if(!trajectory_.AddGyroscopeMeasurement(telemetry_data.gyroscope[i].data(),
-                            t * S_TO_NS, 1./spline_weight_data.std_so3)) {
-        std::cerr<<"Failed to add gyroscope measurement at time: "<<t<<"\n";
+    if (!trajectory_.AddGyroscopeMeasurement(telemetry_data.gyroscope[i].data(),
+                                             t * S_TO_NS,
+                                             1. / spline_weight_data.std_so3)) {
+      std::cerr << "Failed to add gyroscope measurement at time: " << t << "\n";
     }
   }
   LOG(INFO) << "Added all IMU measurements to the spline estimator";
@@ -114,29 +118,27 @@ void ImuCameraCalibrator::BatchInitSpline(const theia::Reconstruction &vision_da
 }
 
 void ImuCameraCalibrator::SetKnownGravityDir(const Eigen::Vector3d& gravity) {
-    trajectory_.SetG(gravity);
+  trajectory_.SetG(gravity);
 }
 
 void ImuCameraCalibrator::InitializeGravity(
-    const OpenICC::CameraTelemetryData &telemetry_data) {
+    const OpenICC::CameraTelemetryData& telemetry_data) {
   for (size_t j = 0; j < cam_timestamps_.size(); ++j) {
-    const theia::View *v =
+    const theia::View* v =
         image_data_.View(image_data_.ViewIdFromTimestamp(cam_timestamps_[j]));
     if (!v) {
       continue;
     }
 
-    const auto q_w_c =
-        Eigen::Quaterniond(v->Camera().GetOrientationAsRotationMatrix().transpose());
+    const auto q_w_c = Eigen::Quaterniond(
+        v->Camera().GetOrientationAsRotationMatrix().transpose());
     const auto p_w_c = v->Camera().GetPosition();
     Sophus::SE3d T_a_i = Sophus::SE3d(q_w_c, p_w_c) * T_i_c_init_.inverse();
 
     if (!gravity_initialized_) {
-      for (size_t i = 0; i < telemetry_data.accelerometer.size();
-           i++) {
+      for (size_t i = 0; i < telemetry_data.accelerometer.size(); i++) {
         const Eigen::Vector3d ad = telemetry_data.accelerometer[i].data();
-        const int64_t accl_t =
-            telemetry_data.accelerometer[i].timestamp_s();
+        const int64_t accl_t = telemetry_data.accelerometer[i].timestamp_s();
         if (std::abs(accl_t - cam_timestamps_[j]) < 1. / 30.) {
           gravity_init_ = T_a_i.so3() * ad;
           gravity_initialized_ = true;
@@ -154,13 +156,13 @@ void ImuCameraCalibrator::InitializeGravity(
 
 double ImuCameraCalibrator::Optimize(const int iterations,
                                      const int optim_flags) {
-  ceres::Solver::Summary summary = trajectory_.Optimize(
-      iterations, optim_flags);
+  ceres::Solver::Summary summary =
+      trajectory_.Optimize(iterations, optim_flags);
   return trajectory_.GetMeanReprojectionError();
 }
 
 void ImuCameraCalibrator::ToTheiaReconDataset(
-        theia::Reconstruction &output_recon) {
+    theia::Reconstruction& output_recon) {
   // convert spline to theia output
   for (size_t i = 0; i < cam_timestamps_.size(); ++i) {
     const int64_t t_ns = cam_timestamps_[i] * S_TO_NS;
@@ -168,9 +170,9 @@ void ImuCameraCalibrator::ToTheiaReconDataset(
     trajectory_.GetPose(t_ns, spline_pose);
     theia::ViewId v_id_theia =
         output_recon.AddView(std::to_string(t_ns), 0, t_ns);
-    theia::View *view = output_recon.MutableView(v_id_theia);
+    theia::View* view = output_recon.MutableView(v_id_theia);
     view->SetEstimated(true);
-    theia::Camera *camera = view->MutableCamera();
+    theia::Camera* camera = view->MutableCamera();
     camera->SetOrientationFromRotationMatrix(
         spline_pose.rotationMatrix().transpose());
     camera->SetPosition(spline_pose.translation());
@@ -181,17 +183,14 @@ void ImuCameraCalibrator::ClearSpline() {
   cam_timestamps_.clear();
   gyro_measurements_.clear();
   accl_measurements_.clear();
-  calib_corners_.clear();
-  calib_init_poses_.clear();
-  spline_init_poses_.clear();
 }
 
 void ImuCameraCalibrator::GetIMUIntrinsics(
-        ThreeAxisSensorCalibParams<double> &acc_intrinsics,
-        ThreeAxisSensorCalibParams<double> &gyr_intrinsics) {
+    ThreeAxisSensorCalibParams<double>& acc_intrinsics,
+    ThreeAxisSensorCalibParams<double>& gyr_intrinsics) {
   acc_intrinsics = trajectory_.GetAcclIntrinsics();
   gyr_intrinsics = trajectory_.GetGyroIntrinsics();
 }
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

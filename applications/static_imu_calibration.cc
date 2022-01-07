@@ -24,20 +24,18 @@
 using namespace OpenICC;
 using namespace OpenICC::core;
 
-DEFINE_string(
-    telemetry_json,
-    "",
-    "Path to the telemetry json.");
+DEFINE_string(telemetry_json, "", "Path to the telemetry json.");
 
 DEFINE_double(gravity_magnitude, 9.811107, "Gravity magnitude.");
 
-DEFINE_double(initial_static_interval_s, 10.0,
+DEFINE_double(initial_static_interval_s,
+              10.0,
               "Length of the initial static interval for bias estimation.");
 
 DEFINE_string(output_calibration_path, "", "path to output calibration json");
 DEFINE_bool(verbose, false, "If more stuff should be printed");
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
 
@@ -69,8 +67,8 @@ int main(int argc, char *argv[]) {
   output["accelerometer"]["scale_matrix"] = {{acc_calib.scaleX(), 0.0, 0.0},
                                              {0.0, acc_calib.scaleY(), 0.0},
                                              {0.0, 0.0, acc_calib.scaleZ()}};
-  output["accelerometer"]["bias"] = {acc_calib.biasX(), acc_calib.biasY(),
-                                     acc_calib.biasZ()};
+  output["accelerometer"]["bias"] = {
+      acc_calib.biasX(), acc_calib.biasY(), acc_calib.biasZ()};
 
   Eigen::Matrix3d gyr_m_mat = gyr_calib.GetMisalignmentMatrix();
   output["gyroscope"]["misalignment_matrix"] = {
@@ -80,8 +78,8 @@ int main(int argc, char *argv[]) {
   output["gyroscope"]["scale_matrix"] = {{gyr_calib.scaleX(), 0.0, 0.0},
                                          {0.0, gyr_calib.scaleY(), 0.0},
                                          {0.0, 0.0, gyr_calib.scaleZ()}};
-  output["gyroscope"]["bias"] = {gyr_calib.biasX(), gyr_calib.biasY(),
-                                 gyr_calib.biasZ()};
+  output["gyroscope"]["bias"] = {
+      gyr_calib.biasX(), gyr_calib.biasY(), gyr_calib.biasZ()};
   std::ofstream output_json(FLAGS_output_calibration_path);
   output_json << std::setw(4) << output << std::endl;
   output_json.close();

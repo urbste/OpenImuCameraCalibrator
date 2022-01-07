@@ -22,7 +22,7 @@
 namespace OpenICC {
 namespace io {
 
-bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
-                       CameraTelemetryData &telemetry);
-} // namespace io
-} // namespace OpenICC
+bool ReadTelemetryJSON(const std::string& path_to_telemetry_file,
+                       CameraTelemetryData& telemetry);
+}  // namespace io
+}  // namespace OpenICC

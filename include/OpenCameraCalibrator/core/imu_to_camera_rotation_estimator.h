@@ -21,33 +21,40 @@ namespace OpenICC {
 namespace core {
 
 class ImuToCameraRotationEstimator {
-public:
+ public:
   ImuToCameraRotationEstimator() {}
-  ImuToCameraRotationEstimator(const quat_map &visual_rotations,
-                               const vec3_map &imu_angular_vel)
-      : visual_rotations_(visual_rotations), imu_angular_vel_(imu_angular_vel) {
+  ImuToCameraRotationEstimator(const quat_map& visual_rotations,
+                               const vec3_map& imu_angular_vel)
+      : visual_rotations_(visual_rotations),
+        imu_angular_vel_(imu_angular_vel) {}
+
+  void SetVisualRotations(const quat_map& visual_rotations) {
+    visual_rotations_ = visual_rotations;
   }
 
-  void SetVisualRotations(const quat_map &visual_rotations) { visual_rotations_ = visual_rotations; }
-
-  void SetAngularVelocities(const vec3_map &imu_angular_vel) { imu_angular_vel_ = imu_angular_vel; }
+  void SetAngularVelocities(const vec3_map& imu_angular_vel) {
+    imu_angular_vel_ = imu_angular_vel;
+  }
 
   bool EstimateCameraImuRotation(const double dt_vis,
                                  const double dt_imu,
-                                 Eigen::Matrix3d &R_imu_to_camera,
-                                 double &time_offset_imu_to_camera,
-                                 Eigen::Vector3d &gyro_bias,
-                                 vec3_vector &smoothed_ang_imu,
-                                 vec3_vector &smoothed_vis_vel);
+                                 Eigen::Matrix3d& R_imu_to_camera,
+                                 double& time_offset_imu_to_camera,
+                                 Eigen::Vector3d& gyro_bias,
+                                 vec3_vector& smoothed_ang_imu,
+                                 vec3_vector& smoothed_vis_vel);
 
-  double SolveClosedForm(const vec3_vector &angVis, const vec3_vector &angImu,
+  double SolveClosedForm(const vec3_vector& angVis,
+                         const vec3_vector& angImu,
                          const std::vector<double> timestamps_s,
-                         const double td, const double dt_imu,
-                         Eigen::Matrix3d &Rs, Eigen::Vector3d &bias);
+                         const double td,
+                         const double dt_imu,
+                         Eigen::Matrix3d& Rs,
+                         Eigen::Vector3d& bias);
 
   void EnableGyroBiasEstimation() { estimate_gyro_bias_ = true; }
 
-private:
+ private:
   //! visual rotations
   quat_map visual_rotations_;
 
@@ -58,5 +65,5 @@ private:
   bool estimate_gyro_bias_ = false;
 };
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

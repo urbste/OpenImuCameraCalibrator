@@ -20,8 +20,8 @@
 #include <opencv2/opencv.hpp>
 #include <third_party/apriltag/apriltag.h>
 
-#include "OpenCameraCalibrator/utils/types.h"
 #include "OpenCameraCalibrator/utils/json.h"
+#include "OpenCameraCalibrator/utils/types.h"
 
 #include <algorithm>
 #include <dirent.h>
@@ -32,50 +32,55 @@ namespace core {
 
 const int NUM_PTS_MARKER = 4;
 
-enum BoardType { CHARUCO = 0, RADON = 1, APRILTAG = 2};
+enum BoardType { CHARUCO = 0, RADON = 1, APRILTAG = 2 };
 
-inline BoardType StringToBoardType(const std::string &board_type) {
+inline BoardType StringToBoardType(const std::string& board_type) {
   if (board_type == "charuco") {
     return BoardType::CHARUCO;
   } else if (board_type == "radon") {
     return BoardType::RADON;
-  }else if (board_type == "apriltag") {
-      return BoardType::APRILTAG;
-    }
+  } else if (board_type == "apriltag") {
+    return BoardType::APRILTAG;
+  }
   return BoardType::CHARUCO;
 }
 
 class BoardExtractor {
-public:
+ public:
   BoardExtractor();
 
   //! Extracts an initialized board type from an image
-  bool ExtractBoard(const cv::Mat &image,
-                    aligned_vector<Eigen::Vector2d> &corners,
-                    std::vector<int> &object_pt_ids);
+  bool ExtractBoard(const cv::Mat& image,
+                    aligned_vector<Eigen::Vector2d>& corners,
+                    std::vector<int>& object_pt_ids);
 
   //! Extracts a board from a video file to a json file and saves it to disk
   bool ExtractVideoToJson(const std::string& video_path,
                           const std::string& save_path,
                           const double img_downsample_factor);
 
-  //! Extract the board from a folder full of images. The image names has to be time time in nanoseconds!
-  //! e.g. 1000000000000.png
-  bool ExtractImageFolderToJson(const std::string &image_folder,
-                                const std::string &save_path,
+  //! Extract the board from a folder full of images. The image names has to be
+  //! time time in nanoseconds! e.g. 1000000000000.png
+  bool ExtractImageFolderToJson(const std::string& image_folder,
+                                const std::string& save_path,
                                 const double img_downsample_factor);
 
   //! Initializes a Charuco board
   bool InitializeCharucoBoard(std::string path_to_detector_params,
-                              float marker_length, float square_length,
-                              int squaresX, int squaresY, int dictionaryId);
+                              float marker_length,
+                              float square_length,
+                              int squaresX,
+                              int squaresY,
+                              int dictionaryId);
 
   //! Initializes a Radon checkerboard
   bool InitializeRadonBoard(float square_length, int squaresX, int squaresY);
 
   //! Initialize a Apriltag board
-  bool InitializeAprilBoard(double marker_length, double tag_spacing,
-          int squaresX, int squaresY) ;
+  bool InitializeAprilBoard(double marker_length,
+                            double tag_spacing,
+                            int squaresX,
+                            int squaresY);
 
   bool DetectAprilBoard(const cv::Mat& image);
 
@@ -87,9 +92,8 @@ public:
   //! Set verbose plot
   void SetVerbosePlot() { verbose_plot_ = true; }
 
-private:
-
-  void BoardToJson(nlohmann::json &output_json);
+ private:
+  void BoardToJson(nlohmann::json& output_json);
 
   //! Board type
   BoardType board_type_;
@@ -126,6 +130,5 @@ private:
   bool verbose_plot_ = false;
 };
 
-
-}
-}
+}  // namespace core
+}  // namespace OpenICC

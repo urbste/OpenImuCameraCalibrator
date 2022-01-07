@@ -23,52 +23,54 @@
 
 #include <algorithm>
 #include <dirent.h>
-#include <vector>
 #include <sys/stat.h>
+#include <vector>
 
 #include "OpenCameraCalibrator/utils/types.h"
 
 namespace OpenICC {
 namespace utils {
 
-bool DoesFileExist(const std::string &path);
+bool DoesFileExist(const std::string& path);
 
 bool ReadDetectorParameters(std::string filename,
-                            cv::Ptr<cv::aruco::DetectorParameters> &params);
+                            cv::Ptr<cv::aruco::DetectorParameters>& params);
 
-double MedianOfDoubleVec(std::vector<double> &double_vec);
+double MedianOfDoubleVec(std::vector<double>& double_vec);
 
 void PrintResult(const std::string cam_type,
-                 const theia::Reconstruction &recon_calib_dataset);
+                 const theia::Reconstruction& recon_calib_dataset);
 
 std::string CameraIDToString(const int theia_enum);
 
 int GravDirStringToInt(const std::string& string);
 
-
-double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
+double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
                             const theia::ViewId v_id);
 
-std::vector<std::string> load_images(const std::string &img_dir_path);
+std::vector<std::string> load_images(const std::string& img_dir_path);
 
 int FindClosestTimestamp(const double t_imu,
-                         const std::vector<double> &vis_timestamps,
-                         double &distance_to_nearest_timestamp);
+                         const std::vector<double>& vis_timestamps,
+                         double& distance_to_nearest_timestamp);
 
-Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
+Eigen::Vector3d lerp3d(const Eigen::Vector3d& v0,
+                       const Eigen::Vector3d& v1,
                        double fraction);
 
 void InterpolateQuaternions(std::vector<double> t_old,
                             std::vector<double> t_new,
-                            const quat_vector &input_q,
-                            quat_vector &interpolated_q);
+                            const quat_vector& input_q,
+                            quat_vector& interpolated_q);
 
-void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
-                         const vec3_vector &input_vec,
-                         vec3_vector &interpolated_vec);
+void InterpolateVector3d(std::vector<double> t_old,
+                         std::vector<double> t_new,
+                         const vec3_vector& input_vec,
+                         vec3_vector& interpolated_vec);
 
 // average calculation
-template <class T> T average(const std::vector<T> datas) {
+template <class T>
+T average(const std::vector<T> datas) {
   T sum_data = T(0);
   for (auto data : datas) {
     sum_data += data;
@@ -76,7 +78,7 @@ template <class T> T average(const std::vector<T> datas) {
   return sum_data / datas.size();
 }
 
-bool IsPathAFile(const std::string &path);
+bool IsPathAFile(const std::string& path);
 
-} // namespace utils
-} // namespace OpenICC
+}  // namespace utils
+}  // namespace OpenICC

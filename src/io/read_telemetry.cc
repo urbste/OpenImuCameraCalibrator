@@ -26,8 +26,8 @@ namespace OpenICC {
 namespace io {
 using json = nlohmann::json;
 
-bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
-                       CameraTelemetryData &telemetry) {
+bool ReadTelemetryJSON(const std::string& path_to_telemetry_file,
+                       CameraTelemetryData& telemetry) {
   std::ifstream file;
   file.open(path_to_telemetry_file.c_str());
   if (!file.is_open()) {
@@ -46,17 +46,17 @@ bool ReadTelemetryJSON(const std::string &path_to_telemetry_file,
     return false;
   }
 
-  for (size_t i=0; i < timestamps_ns.size(); ++i) {
-      double t_s = (double)timestamps_ns[i] * NS_TO_S;
-      ImuReading<double> acc_reading(t_s, accl[i][0], accl[i][1],  accl[i][2]);
-      ImuReading<double> gyr_reading(t_s, gyro[i][0], gyro[i][1],  gyro[i][2]);
-      telemetry.accelerometer.push_back(acc_reading);
-      telemetry.gyroscope.push_back(gyr_reading);
+  for (size_t i = 0; i < timestamps_ns.size(); ++i) {
+    double t_s = (double)timestamps_ns[i] * NS_TO_S;
+    ImuReading<double> acc_reading(t_s, accl[i][0], accl[i][1], accl[i][2]);
+    ImuReading<double> gyr_reading(t_s, gyro[i][0], gyro[i][1], gyro[i][2]);
+    telemetry.accelerometer.push_back(acc_reading);
+    telemetry.gyroscope.push_back(gyr_reading);
   }
 
   file.close();
   return true;
 }
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

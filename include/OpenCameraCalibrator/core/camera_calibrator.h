@@ -24,29 +24,30 @@ namespace OpenICC {
 namespace core {
 
 class CameraCalibrator {
-public:
-  CameraCalibrator(const std::string &camera_model,
+ public:
+  CameraCalibrator(const std::string& camera_model,
                    const bool optimize_board_pts);
 
   bool RunCalibration();
 
-  bool CalibrateCameraFromJson(const nlohmann::json &scene_json,
-                               const std::string &output_path);
+  bool CalibrateCameraFromJson(const nlohmann::json& scene_json,
+                               const std::string& output_path);
 
-  bool WriteCalibration(const std::string &output_path);
+  bool WriteCalibration(const std::string& output_path);
 
   void RemoveViewsReprojError(const double max_reproj_error = 2.0);
 
-  bool AddObservation(const theia::ViewId &view_id,
-                      const theia::TrackId &object_point_id,
-                      const Eigen::Vector2d &corner);
+  bool AddObservation(const theia::ViewId& view_id,
+                      const theia::TrackId& object_point_id,
+                      const Eigen::Vector2d& corner);
 
-  theia::ViewId AddView(const Eigen::Matrix3d &initial_rotation,
-                        const Eigen::Vector3d &initial_position,
-                        const double &initial_focal_length,
-                        const double &initial_distortion,
-                        const int &image_width, const int &image_height,
-                        const double &timestamp_s,
+  theia::ViewId AddView(const Eigen::Matrix3d& initial_rotation,
+                        const Eigen::Vector3d& initial_position,
+                        const double& initial_focal_length,
+                        const double& initial_distortion,
+                        const int& image_width,
+                        const int& image_height,
+                        const double& timestamp_s,
                         theia::CameraIntrinsicsGroupId group_id = 0);
 
   void SetRansacErrorThresh(const double error_thresh = 0.1) {
@@ -61,7 +62,7 @@ public:
   //! Print result
   void PrintResult();
 
-private:
+ private:
   //! holds all calibration information like views and features
   theia::Reconstruction recon_calib_dataset_;
 
@@ -84,5 +85,5 @@ private:
   int min_num_view_ = 10;
 };
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

@@ -33,12 +33,14 @@ using namespace OpenICC::io;
 // Input/output files.
 DEFINE_string(input_corners, "", "Path to save charuco board to.");
 DEFINE_string(camera_calibration_json, "", "Path to camera calibration json.");
-DEFINE_string(output_pose_dataset, "",
+DEFINE_string(output_pose_dataset,
+              "",
               "Path to write the pose calibration dataset to.");
-DEFINE_bool(optimize_board_points, false,
+DEFINE_bool(optimize_board_points,
+            false,
             "If board points should be optimized.");
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
 
@@ -65,8 +67,10 @@ int main(int argc, char *argv[]) {
   theia::Reconstruction pose_dataset;
   pose_estimator.GetPoseDataset(pose_dataset);
   theia::WriteReconstruction(pose_dataset, FLAGS_output_pose_dataset);
-  theia::WritePlyFile(FLAGS_output_pose_dataset + ".ply", pose_dataset,
-                      Eigen::Vector3i(255, 0, 0), 2);
+  theia::WritePlyFile(FLAGS_output_pose_dataset + ".ply",
+                      pose_dataset,
+                      Eigen::Vector3i(255, 0, 0),
+                      2);
 
   return 0;
 }

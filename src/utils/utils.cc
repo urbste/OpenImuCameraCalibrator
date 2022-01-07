@@ -31,7 +31,7 @@ using namespace cv;
 namespace OpenICC {
 namespace utils {
 
-bool DoesFileExist(const std::string &path) {
+bool DoesFileExist(const std::string& path) {
   std::ifstream file(path);
   if (file.is_open()) {
     file.close();
@@ -41,10 +41,9 @@ bool DoesFileExist(const std::string &path) {
 }
 
 bool ReadDetectorParameters(std::string filename,
-                            Ptr<aruco::DetectorParameters> &params) {
+                            Ptr<aruco::DetectorParameters>& params) {
   FileStorage fs(filename, FileStorage::READ);
-  if (!fs.isOpened())
-    return false;
+  if (!fs.isOpened()) return false;
   fs["adaptiveThreshWinSizeMin"] >> params->adaptiveThreshWinSizeMin;
   fs["adaptiveThreshWinSizeMax"] >> params->adaptiveThreshWinSizeMax;
   fs["adaptiveThreshWinSizeStep"] >> params->adaptiveThreshWinSizeStep;
@@ -75,7 +74,7 @@ bool ReadDetectorParameters(std::string filename,
   return true;
 }
 
-double MedianOfDoubleVec(std::vector<double> &double_vec) {
+double MedianOfDoubleVec(std::vector<double>& double_vec) {
   assert(!double_vec.empty());
   if (double_vec.size() % 2 == 0) {
     const auto median_it1 = double_vec.begin() + double_vec.size() / 2 - 1;
@@ -97,7 +96,7 @@ double MedianOfDoubleVec(std::vector<double> &double_vec) {
 }
 
 void PrintResult(const std::string cam_type,
-                 const theia::Reconstruction &recon_calib_dataset) {
+                 const theia::Reconstruction& recon_calib_dataset) {
   for (int i = 0; i < recon_calib_dataset.NumViews(); ++i) {
     theia::ViewId id = recon_calib_dataset.ViewIds()[i];
     std::cout << "Viewid: " << id << "\n";
@@ -150,25 +149,25 @@ std::string CameraIDToString(const int theia_enum) {
 
 int GravDirStringToInt(const std::string& string) {
   if (string == "UNKNOWN") {
-      return (int)CalibBoardGravDir::UNKOWN;
+    return (int)CalibBoardGravDir::UNKOWN;
   } else if (string == "X") {
-      return (int)CalibBoardGravDir::X;
+    return (int)CalibBoardGravDir::X;
   } else if (string == "Y") {
-      return (int)CalibBoardGravDir::Y;
+    return (int)CalibBoardGravDir::Y;
   } else if (string == "Z") {
-      return (int)CalibBoardGravDir::Z;
+    return (int)CalibBoardGravDir::Z;
   }
   return -1;
 }
 
-double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
+double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
                             const theia::ViewId v_id) {
-  const theia::View *v = recon_dataset.View(v_id);
+  const theia::View* v = recon_dataset.View(v_id);
   std::vector<theia::TrackId> track_ids = v->TrackIds();
   double view_reproj_error = 0.0;
   for (size_t t = 0; t < track_ids.size(); ++t) {
-    const theia::Feature *feat = v->GetFeature(track_ids[t]);
-    const theia::Track *track = recon_dataset.Track(track_ids[t]);
+    const theia::Feature* feat = v->GetFeature(track_ids[t]);
+    const theia::Track* track = recon_dataset.Track(track_ids[t]);
     Eigen::Vector2d pt;
     v->Camera().ProjectPoint(track->Point(), &pt);
     view_reproj_error += (pt - (*feat).point_).norm();
@@ -177,12 +176,12 @@ double GetReprojErrorOfView(const theia::Reconstruction &recon_dataset,
   return view_reproj_error;
 }
 
-std::vector<std::string> load_images(const std::string &img_dir_path) {
-  DIR *dir;
+std::vector<std::string> load_images(const std::string& img_dir_path) {
+  DIR* dir;
   if ((dir = opendir(img_dir_path.c_str())) == nullptr) {
   }
   std::vector<std::string> img_paths;
-  dirent *dp;
+  dirent* dp;
   for (dp = readdir(dir); dp != nullptr; dp = readdir(dir)) {
     img_paths.push_back(img_dir_path + "/" + std::string(dp->d_name));
   }
@@ -193,8 +192,8 @@ std::vector<std::string> load_images(const std::string &img_dir_path) {
 }
 
 int FindClosestTimestamp(const double t_imu,
-                         const std::vector<double> &vis_timestamps,
-                         double &distance_to_nearest_timestamp) {
+                         const std::vector<double>& vis_timestamps,
+                         double& distance_to_nearest_timestamp) {
   double dist = std::numeric_limits<double>::max();
   int idx = 0;
   for (size_t i = 0; i < vis_timestamps.size(); ++i) {
@@ -204,7 +203,7 @@ int FindClosestTimestamp(const double t_imu,
       idx = i;
       dist = new_dist;
       if (distance_to_nearest_timestamp == 0.0) {
-          break;
+        break;
       }
     }
   }
@@ -212,15 +211,16 @@ int FindClosestTimestamp(const double t_imu,
   return idx;
 }
 
-Eigen::Vector3d lerp3d(const Eigen::Vector3d &v0, const Eigen::Vector3d &v1,
+Eigen::Vector3d lerp3d(const Eigen::Vector3d& v0,
+                       const Eigen::Vector3d& v1,
                        double fraction) {
   return (1.0 - fraction) * v0 + fraction * v1;
 }
 
 void InterpolateQuaternions(std::vector<double> t_old,
                             std::vector<double> t_new,
-                            const quat_vector &input_q,
-                            quat_vector &interpolated_q) {
+                            const quat_vector& input_q,
+                            quat_vector& interpolated_q) {
   for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
     int nearest_old_idx =
@@ -237,10 +237,10 @@ void InterpolateQuaternions(std::vector<double> t_old,
   }
 }
 
-void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
-                         const vec3_vector &input_vec,
-                         vec3_vector &interpolated_vec) {
-
+void InterpolateVector3d(std::vector<double> t_old,
+                         std::vector<double> t_new,
+                         const vec3_vector& input_vec,
+                         vec3_vector& interpolated_vec) {
   for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
     int nearest_old_idx =
@@ -258,7 +258,7 @@ void InterpolateVector3d(std::vector<double> t_old, std::vector<double> t_new,
   }
 }
 
-bool IsPathAFile(const std::string &path) {
+bool IsPathAFile(const std::string& path) {
   struct stat s;
   if (stat(path.c_str(), &s) == 0) {
     if (s.st_mode & S_IFREG) {
@@ -269,5 +269,5 @@ bool IsPathAFile(const std::string &path) {
   return false;
 }
 
-} // namespace utils
-} // namespace OpenICC
+}  // namespace utils
+}  // namespace OpenICC

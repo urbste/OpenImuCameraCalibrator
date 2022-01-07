@@ -24,11 +24,10 @@
 namespace OpenICC {
 namespace io {
 
-bool read_scene_bson(const std::string &input_bson,
-                     nlohmann::json &scene_json);
+bool read_scene_bson(const std::string& input_bson, nlohmann::json& scene_json);
 
+void scene_points_to_calib_dataset(const nlohmann::json& json,
+                                   theia::Reconstruction& reconstruction);
 
-void scene_points_to_calib_dataset(const nlohmann::json &json, theia::Reconstruction &reconstruction);
-
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC
