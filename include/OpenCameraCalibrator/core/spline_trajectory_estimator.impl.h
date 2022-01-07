@@ -1149,9 +1149,11 @@ void SplineTrajectoryEstimator<_T>::SetIMUIntrinsics(const ThreeAxisSensorCalibP
 
     accl_intrinsics_ << accl_intrinsics.misYZ(), accl_intrinsics.misZY(), accl_intrinsics.misZX(),
             accl_intrinsics.scaleX(), accl_intrinsics.scaleY(), accl_intrinsics.scaleZ();
+
     gyro_intrinsics_ << gyro_intrinsics.misYZ(), gyro_intrinsics.misZY(), gyro_intrinsics.misZX(),
             gyro_intrinsics.misXZ(), gyro_intrinsics.misXY(), gyro_intrinsics.misYX(),
-            accl_intrinsics.scaleX(), accl_intrinsics.scaleY(), accl_intrinsics.scaleZ();
+            gyro_intrinsics.scaleX(), gyro_intrinsics.scaleY(), gyro_intrinsics.scaleZ();
+
     accl_bias_ << accl_intrinsics.biasX(), accl_intrinsics.biasY(), accl_intrinsics.biasZ();
     gyro_bias_ << gyro_intrinsics.biasX(), gyro_intrinsics.biasY(), gyro_intrinsics.biasZ();
 }

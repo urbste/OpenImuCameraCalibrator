@@ -65,9 +65,10 @@ struct AccelerationCostFunctorSplit
 
     // Gravity
     Eigen::Map<Vector3 const> const g(sKnots[2 * N]);
-    Vector3 m;
-    m << T(measurement[0]), T(measurement[1]), T(measurement[2]);
-    residuals = T(inv_std) * (R_w_i.inverse() * (accel_w + g) - accel_calib_triad.UnbiasNormalize(m));
+    Vector3 accl_raw;
+    accl_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
+    residuals = T(inv_std) * (
+        R_w_i.inverse() * (accel_w + g) - accel_calib_triad.UnbiasNormalize(accl_raw));
     return true;
   }
 
@@ -119,9 +120,9 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
             gyr_intrs[6],gyr_intrs[7],gyr_intrs[8],
             gyr_bias[0],gyr_bias[1],gyr_bias[2]);
 
-    Vector3 m;
-    m << T(measurement[0]), T(measurement[1]), T(measurement[2]);
-    Tangent tang(gyro_calib_triad.UnbiasNormalize(m));
+    Vector3 gyro_raw;
+    gyro_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
+    Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
     residuals = T(inv_std) * (rot_vel - tang);
     return true;
   }
@@ -179,7 +180,6 @@ struct GSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
       Vector3 t_w_i;
       CeresSplineHelper<T, N>::template evaluate<3, 0>(sKnots + N, t_r3_row,
                                                        T(inv_r3_dt), &t_w_i);
-
 
       Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
       Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();

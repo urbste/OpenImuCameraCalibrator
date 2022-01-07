@@ -165,7 +165,10 @@ int main(int argc, char *argv[]) {
       const int board_pt3_id = std::stoi(img_pts.key());
       const Eigen::Vector2d corner(
           Eigen::Vector2d(img_pts.value()[0], img_pts.value()[1]));
-      recon_calib_dataset.AddObservation(view_id, board_pt3_id, corner);
+      Eigen::Matrix2d cov;
+      cov << 0.5, 0, 0, 0.5;
+      theia::Feature feat(corner, cov);
+      recon_calib_dataset.AddObservation(view_id, board_pt3_id, feat);
     }
   }
 
@@ -189,7 +192,7 @@ int main(int argc, char *argv[]) {
                             gyr_intr))
         << "Could not open " << FLAGS_imu_intrinsics;
   std::cout << "Loaded IMU intrinsics.\n";
-
+  std::cout<<"accel_calib_triad loaded: "<<acc_intr.GetMisalignmentMatrix()<<"\n";
   CHECK(FLAGS_spline_error_weighting_json != "")
       << "You need to provide spline error weighting factors. Create with "
          "get_sew_for_dataset.py.";
