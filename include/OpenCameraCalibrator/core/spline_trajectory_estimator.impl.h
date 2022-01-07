@@ -58,6 +58,10 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   options.minimizer_progress_to_stdout = true;
 
   // if IMU to Cam trafo should be optimized
+  ceres::LocalParameterization *local_parameterization =
+      new LieLocalParameterization<Sophus::SE3d>();
+  problem_.SetParameterization(T_i_c_.data(), local_parameterization);
+
   if (!(flags & SplineOptimFlags::T_I_C)) {
     problem_.SetParameterBlockConstant(T_i_c_.data());
     LOG(INFO) << "Keeping T_I_C constant.";
@@ -87,6 +91,12 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   }
 
   // if world points should be optimized
+  for (const auto& t : tracks_in_problem_) {
+    ceres::LocalParameterization* local_parameterization =
+        new ceres::HomogeneousVectorParameterization(4);
+    problem_.SetParameterization(image_data_.MutableTrack(t)->MutablePoint()->data(),
+                                 local_parameterization);
+  }
   if (!(flags & SplineOptimFlags::POINTS)) {
     LOG(INFO) << "Keeping object points constant.";
     for (const auto& t : tracks_in_problem_) {
@@ -120,6 +130,19 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
     problem_.SetParameterBlockVariable(gyro_bias_.data());
     LOG(INFO) << "Optimizing IMU biases and intrinsics.";
   }
+
+  // add local parametrization for SO(3)
+  for (size_t i = 0; i < so3_knot_in_problem_.size(); ++i) {
+    if (so3_knot_in_problem_[i]) {
+      ceres::LocalParameterization *local_parameterization =
+          new LieLocalParameterization<Sophus::SO3d>();
+
+      problem_.SetParameterization(so3_knots_[i].data(),
+                                   local_parameterization);
+      break;
+    }
+  }
+
   // set first knot constant to fix gauge freedom
 //  for (size_t i = 0; i < r3_knot_in_problem_.size(); ++i) {
 //    if (r3_knot_in_problem_[i]) {
@@ -127,12 +150,7 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
 //      break;
 //    }
 //  }
-//    for (size_t i = 0; i < so3_knot_in_problem_.size(); ++i) {
-//      if (so3_knot_in_problem_[i]) {
-//        problem_.SetParameterBlockConstant(so3_knots_[i].data());
-//        break;
-//      }
-//    }
+
 
   //  for (size_t i = so3_knot_in_problem_.size() - 1; i >= 0; --i) {
   //    if (r3_knot_in_problem_[i]) {
@@ -229,15 +247,11 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
     r3_knots_[i] = interpo_spline_trans[i];
   }
 
-  // Add local parametrization for SO(3) rotation
-  for (int i = 0; i < nr_knots_so3_; i++) {
-    ceres::LocalParameterization *local_parameterization =
-        new LieLocalParameterization<Sophus::SO3d>();
+//  ceres::LocalParameterization *local_parameterization =
+//      new LieLocalParameterization<Sophus::SE3d>();
 
-    problem_.AddParameterBlock(so3_knots_[i].data(),
-                               Sophus::SO3d::num_parameters,
-                               local_parameterization);
-  }
+//  problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
+//                             local_parameterization);
 }
 
 //template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {
@@ -279,28 +293,28 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
 //  LOG(INFO) << "Initialized the spline with GPS coordinates.";
 //}
 
-template <int _T> void SplineTrajectoryEstimator<_T>::InitR3Knots() {
-  r3_knots_ = vec3_vector(nr_knots_r3_);
-  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
-  for (auto i = 0; i < nr_knots_r3_; ++i) {
-    r3_knots_[i].setZero();
-  }
-}
+//template <int _T> void SplineTrajectoryEstimator<_T>::InitR3Knots() {
+//  r3_knots_ = vec3_vector(nr_knots_r3_);
+//  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
+//  for (auto i = 0; i < nr_knots_r3_; ++i) {
+//    r3_knots_[i].setZero();
+//  }
+//}
 
-template <int _T> void SplineTrajectoryEstimator<_T>::InitSO3Knots() {
-  so3_knots_ = so3_vector(nr_knots_so3_);
-  so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
+//template <int _T> void SplineTrajectoryEstimator<_T>::InitSO3Knots() {
+//  so3_knots_ = so3_vector(nr_knots_so3_);
+//  so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
 
-  // Add local parametrization for SO(3) rotation
-  for (size_t i = 0; i < nr_knots_so3_; ++i) {
-    ceres::LocalParameterization *local_parameterization =
-        new LieLocalParameterization<Sophus::SO3d>();
+//  // Add local parametrization for SO(3) rotation
+//  for (size_t i = 0; i < nr_knots_so3_; ++i) {
+//    ceres::LocalParameterization *local_parameterization =
+//        new LieLocalParameterization<Sophus::SO3d>();
 
-    problem_.AddParameterBlock(so3_knots_[i].data(),
-                               Sophus::SO3d::num_parameters,
-                               local_parameterization);
-  }
-}
+//    problem_.AddParameterBlock(so3_knots_[i].data(),
+//                               Sophus::SO3d::num_parameters,
+//                               local_parameterization);
+//  }
+//}
 
 //template <int _T>
 //bool SplineTrajectoryEstimator<_T>::AddGPSMeasurement(

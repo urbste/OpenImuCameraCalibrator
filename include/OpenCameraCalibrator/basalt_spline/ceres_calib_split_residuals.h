@@ -68,7 +68,7 @@ struct AccelerationCostFunctorSplit
     Vector3 accl_raw;
     accl_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
     residuals = T(inv_std) * (
-        R_w_i.inverse() * (accel_w + g) - accel_calib_triad.UnbiasNormalize(accl_raw));
+        R_w_i.inverse() * (accel_w + g) - accl_raw); //accel_calib_triad.UnbiasNormalize(accl_raw));
     return true;
   }
 
@@ -123,7 +123,7 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
     Vector3 gyro_raw;
     gyro_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
     Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
-    residuals = T(inv_std) * (rot_vel - tang);
+    residuals = T(inv_std) * (rot_vel - gyro_raw);
     return true;
   }
 
