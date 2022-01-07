@@ -11,6 +11,7 @@ SplineTrajectoryEstimator<_T>::SplineTrajectoryEstimator()
       gravity_(Eigen::Vector3d(0, 0, GRAVITY_MAGN)) {
   inv_so3_dt_ = S_TO_NS / dt_so3_ns_;
   inv_r3_dt_ = S_TO_NS / dt_r3_ns_;
+
   accl_intrinsics_ << 0, 0, 0, 1, 1, 1;
   gyro_intrinsics_ << 0, 0, 0, 0, 0, 0, 1, 1, 1;
   accl_bias_.setZero();
@@ -50,6 +51,135 @@ void SplineTrajectoryEstimator<_T>::SetTimes(int64_t time_interval_so3_ns,
 }
 
 template <int _T>
+void
+SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
+
+    // if IMU to Cam trafo should be optimized
+    if (problem_.HasParameterBlock(T_i_c_.data())) {
+    if (!(flags & SplineOptimFlags::T_I_C)) {
+          problem_.SetParameterBlockConstant(T_i_c_.data());
+      LOG(INFO) << "Keeping T_I_C constant.";
+    } else {
+        ceres::LocalParameterization *local_parameterization =
+          new LieLocalParameterization<Sophus::SE3d>();
+        problem_.SetParameterization(T_i_c_.data(), local_parameterization);
+        problem_.SetParameterBlockVariable(T_i_c_.data());
+      LOG(INFO) << "Optimizing T_I_C.";
+      }
+    }
+
+    // if IMU to Cam trafo should be optimized
+    if (problem_.HasParameterBlock(&cam_line_delay_s_) && cam_line_delay_s_ != 0.0) {
+      if (!(flags & SplineOptimFlags::CAM_LINE_DELAY)) {
+          problem_.SetParameterBlockConstant(&cam_line_delay_s_);
+        LOG(INFO) << "Keeping camera line delay constant at: "<<cam_line_delay_s_;
+      } else {
+          problem_.SetParameterBlockVariable(&cam_line_delay_s_);
+        LOG(INFO) << "Optimizing camera line delay.";
+      }
+    }
+
+    // if IMU to Cam trafo should be optimized
+    if (problem_.HasParameterBlock(gravity_.data())) {
+    if (!(flags & SplineOptimFlags::GRAVITY_DIR)) {
+      LOG(INFO) << "Keeping gravity direction constant at: "<<gravity_.transpose();
+
+        problem_.SetParameterBlockConstant(gravity_.data());
+    } else {
+      if (problem_.HasParameterBlock(gravity_.data()))
+        problem_.SetParameterBlockVariable(gravity_.data());
+      LOG(INFO) << "Optimizing gravity direction.";
+    }
+    }
+
+    // if world points should be optimized
+    if (!(flags & SplineOptimFlags::POINTS)) {
+      LOG(INFO) << "Keeping object points constant.";
+      for (const auto& tid : tracks_in_problem_) {
+        const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+        if (problem_.HasParameterBlock(track))
+            problem_.SetParameterBlockConstant(track);
+      }
+    } else {
+        for (const auto& tid : tracks_in_problem_) {
+          const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+          if (problem_.HasParameterBlock(track)) {
+            problem_.SetParameterBlockVariable(track);
+            ceres::LocalParameterization* local_parameterization =
+                new ceres::HomogeneousVectorParameterization(4);
+            problem_.SetParameterization(track, local_parameterization);
+          }
+        }
+      LOG(INFO) << "Optimizing object points.";
+    }
+
+    // if imu intrinics should be optimized
+    if (problem_.HasParameterBlock(accl_intrinsics_.data()) &&
+            problem_.HasParameterBlock(gyro_intrinsics_.data())) {
+    if (!(flags & SplineOptimFlags::IMU_INTRINSICS)) {
+      LOG(INFO) << "Keeping IMU intrinsics constant.";
+        problem_.SetParameterBlockConstant(accl_intrinsics_.data());
+        problem_.SetParameterBlockConstant(gyro_intrinsics_.data());
+    } else {
+        problem_.SetParameterBlockVariable(accl_intrinsics_.data());
+        problem_.SetParameterBlockVariable(gyro_intrinsics_.data());
+      LOG(INFO) << "Optimizing IMU intrinsics.";
+    }
+    }
+
+    // if imu intrinics should be optimized
+    if (problem_.HasParameterBlock(accl_bias_.data()) &&
+            problem_.HasParameterBlock(gyro_bias_.data())) {
+    if (!(flags & SplineOptimFlags::IMU_BIASES)) {
+      LOG(INFO) << "Keeping IMU biases constant.";
+        problem_.SetParameterBlockConstant(accl_bias_.data());
+        problem_.SetParameterBlockConstant(gyro_bias_.data());
+    } else {
+        problem_.SetParameterBlockVariable(accl_bias_.data());
+        problem_.SetParameterBlockVariable(gyro_bias_.data());
+      LOG(INFO) << "Optimizing IMU biases and intrinsics.";
+    }
+    }
+
+    // add local parametrization for SO(3)
+    for (size_t i = 0; i < so3_knots_.size(); ++i) {
+      if (problem_.HasParameterBlock(so3_knots_[i].data())) {
+        ceres::LocalParameterization *local_parameterization =
+            new LieLocalParameterization<Sophus::SO3d>();
+
+        problem_.SetParameterization(so3_knots_[i].data(),
+                                     local_parameterization);
+      }
+    }
+    if (!(flags & SplineOptimFlags::SPLINE)) {
+        // set knots constant if asked
+        for (size_t i = 0; i < r3_knots_.size(); ++i) {
+          if (problem_.HasParameterBlock(r3_knots_[i].data())) {
+            problem_.SetParameterBlockConstant(r3_knots_[i].data());
+          }
+        }
+          for (size_t i = 0; i < so3_knots_.size(); ++i) {
+            if (problem_.HasParameterBlock(so3_knots_[i].data())) {
+              problem_.SetParameterBlockConstant(so3_knots_[i].data());
+          }
+        }
+    } else {
+        // set knots constant if asked
+        for (size_t i = 0; i < r3_knots_.size(); ++i) {
+          if (problem_.HasParameterBlock(r3_knots_[i].data())) {
+            problem_.SetParameterBlockVariable(r3_knots_[i].data());
+          }
+        }
+          for (size_t i = 0; i < so3_knots_.size(); ++i) {
+            if (problem_.HasParameterBlock(so3_knots_[i].data())) {
+              problem_.SetParameterBlockVariable(so3_knots_[i].data());
+          }
+        }
+    }
+
+}
+
+template <int _T>
 ceres::Solver::Summary
 SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
                                         const int flags) {
@@ -59,140 +189,7 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   options.num_threads = std::thread::hardware_concurrency();
   options.minimizer_progress_to_stdout = true;
 
-  // if IMU to Cam trafo should be optimized
-  //ceres::LocalParameterization *local_parameterization =
-  //    new LieLocalParameterization<Sophus::SE3d>();
-  //problem_.SetParameterization(T_i_c_.data(), local_parameterization);
-
-  if (!(flags & SplineOptimFlags::T_I_C)) {
-    if (problem_.HasParameterBlock(T_i_c_.data()))
-        problem_.SetParameterBlockConstant(T_i_c_.data());
-    LOG(INFO) << "Keeping T_I_C constant.";
-  } else {
-    if (problem_.HasParameterBlock(T_i_c_.data()))
-        problem_.SetParameterBlockVariable(T_i_c_.data());
-    LOG(INFO) << "Optimizing T_I_C.";
-  }
-
-  // if IMU to Cam trafo should be optimized
-  if (cam_line_delay_s_ != 0.0) {
-    if (!(flags & SplineOptimFlags::CAM_LINE_DELAY)) {
-      if (problem_.HasParameterBlock(&cam_line_delay_s_))
-        problem_.SetParameterBlockConstant(&cam_line_delay_s_);
-      LOG(INFO) << "Keeping camera line delay constant at: "<<cam_line_delay_s_;
-    } else {
-      if (problem_.HasParameterBlock(&cam_line_delay_s_))
-        problem_.SetParameterBlockVariable(&cam_line_delay_s_);
-      LOG(INFO) << "Optimizing camera line delay.";
-    }
-  }
-
-  // if IMU to Cam trafo should be optimized
-  if (!(flags & SplineOptimFlags::GRAVITY_DIR)) {
-    LOG(INFO) << "Keeping gravity direction constant at: "<<gravity_.transpose();
-    if (problem_.HasParameterBlock(gravity_.data()))
-      problem_.SetParameterBlockConstant(gravity_.data());
-  } else {
-    if (problem_.HasParameterBlock(gravity_.data()))
-      problem_.SetParameterBlockVariable(gravity_.data());
-    LOG(INFO) << "Optimizing gravity direction.";
-  }
-
-  // if world points should be optimized
-  if (!(flags & SplineOptimFlags::POINTS)) {
-    LOG(INFO) << "Keeping object points constant.";
-    for (const auto& tid : tracks_in_problem_) {
-      const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
-      if (problem_.HasParameterBlock(track))
-          problem_.SetParameterBlockConstant(track);
-    }
-  } else {
-      for (const auto& tid : tracks_in_problem_) {
-        const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
-        if (problem_.HasParameterBlock(track)) {
-          problem_.SetParameterBlockVariable(track);
-          ceres::LocalParameterization* local_parameterization =
-              new ceres::HomogeneousVectorParameterization(4);
-          problem_.SetParameterization(track, local_parameterization);
-        }
-      }
-    LOG(INFO) << "Optimizing object points.";
-  }
-
-  // if imu intrinics should be optimized
-  if (!(flags & SplineOptimFlags::IMU_INTRINSICS)) {
-    LOG(INFO) << "Keeping IMU intrinsics constant.";
-    if (problem_.HasParameterBlock(accl_intrinsics_.data()))
-      problem_.SetParameterBlockConstant(accl_intrinsics_.data());
-    if (problem_.HasParameterBlock(gyro_intrinsics_.data()))
-      problem_.SetParameterBlockConstant(gyro_intrinsics_.data());
-  } else {
-    if (problem_.HasParameterBlock(accl_intrinsics_.data()))
-      problem_.SetParameterBlockVariable(accl_intrinsics_.data());
-    if (problem_.HasParameterBlock(gyro_intrinsics_.data()))
-      problem_.SetParameterBlockVariable(gyro_intrinsics_.data());
-    LOG(INFO) << "Optimizing IMU intrinsics.";
-  }
-
-  // if imu intrinics should be optimized
-  if (!(flags & SplineOptimFlags::IMU_BIASES)) {
-    LOG(INFO) << "Keeping IMU biases constant.";
-    if (problem_.HasParameterBlock(accl_bias_.data()))
-      problem_.SetParameterBlockConstant(accl_bias_.data());
-    if (problem_.HasParameterBlock(gyro_bias_.data()))
-      problem_.SetParameterBlockConstant(gyro_bias_.data());
-  } else {
-    if (problem_.HasParameterBlock(accl_bias_.data()))
-      problem_.SetParameterBlockVariable(accl_bias_.data());
-    if (problem_.HasParameterBlock(gyro_bias_.data()))
-      problem_.SetParameterBlockVariable(gyro_bias_.data());
-    LOG(INFO) << "Optimizing IMU biases and intrinsics.";
-  }
-
-  // add local parametrization for SO(3)
-//  for (size_t i = 0; i < so3_knot_in_problem_.size(); ++i) {
-//    if (so3_knot_in_problem_[i]) {
-//      ceres::LocalParameterization *local_parameterization =
-//          new LieLocalParameterization<Sophus::SO3d>();
-
-//      problem_.SetParameterization(so3_knots_[i].data(),
-//                                   local_parameterization);
-//      break;
-//    }
-//  }
-
-  // set first knot constant to fix gauge freedom
-//  for (size_t i = 0; i < r3_knot_in_problem_.size(); ++i) {
-//    if (r3_knot_in_problem_[i]) {
-//      problem_.SetParameterBlockConstant(r3_knots_[i].data());
-//      break;
-//    }
-//  }
-
-
-  //  for (size_t i = so3_knot_in_problem_.size() - 1; i >= 0; --i) {
-  //    if (r3_knot_in_problem_[i]) {
-  //      problem_.SetParameterBlockConstant(r3_knots_[i].data());
-  //      break;
-  //    }
-  //  }
-
-  // problem_.SetParameterBlockConstant(so3_knots_[0].data());
-
-  //    if (fix_so3_spline) {
-  //      for (int i = 0; i < so3_knots_.size(); ++i) {
-  //        if (so3_knot_in_problem_[i]) {
-  //          problem_.SetParameterBlockConstant(so3_knots_[i].data());
-  //        }
-  //      }
-  //    }
-  //  if (fix_r3_spline) {
-  //    for (int i = 0; i < r3_knots_.size(); ++i) {
-  //      if (r3_knot_in_problem_[i]) {
-  //        problem_.SetParameterBlockConstant(trans_knots_[i].data());
-  //      }
-  //    }
-  //  }
+  SetFixedParams(flags);
 
   // Solve
   ceres::Solver::Summary summary;
@@ -263,21 +260,6 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
     for (int i = 0; i < nr_knots_r3_; ++i) {
       r3_knots_[i] = interpo_spline_trans[i];
     }
-
-    // Add local parametrization for SO(3) rotation
-    for (int i = 0; i < nr_knots_so3_; i++) {
-      ceres::LocalParameterization *local_parameterization =
-          new LieLocalParameterization<Sophus::SO3d>();
-
-      problem_.AddParameterBlock(so3_knots_[i].data(),
-                                 Sophus::SO3d::num_parameters,
-                                 local_parameterization);
-    }
-    ceres::LocalParameterization *local_parameterization =
-        new LieLocalParameterization<Sophus::SE3d>();
-
-    problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
-                               local_parameterization);
 }
 
 //template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {

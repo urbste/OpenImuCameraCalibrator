@@ -44,15 +44,11 @@ public:
 
   void InitSpline(const int flags, const double end_time_s = 0.0);
 
-  void InitR3WithGPS();
-
   void BatchInitSO3R3VisPoses();
 
-  void InitSO3Knots();
-
-  void InitR3Knots();
-
   void InitScenePoints();
+
+  void SetFixedParams(const int flags);
 
   ceres::Solver::Summary Optimize(
           const int max_iters,
