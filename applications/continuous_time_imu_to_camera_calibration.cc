@@ -172,11 +172,11 @@ int main(int argc, char *argv[]) {
     init_line_delay_us = 0.0;
   }
   ImuCameraCalibrator imu_cam_calibrator(FLAGS_reestimate_biases);
+  imu_cam_calibrator.SetIMUIntrinsics(acc_intr, gyr_intr);
   imu_cam_calibrator.InitSpline(recon_calib_dataset, T_i_c_init, weight_data,
                                 time_offset_imu_to_cam, telemetry_data,
                                 init_line_delay_us);
   imu_cam_calibrator.InitializeGravity(telemetry_data);
-  imu_cam_calibrator.SetIMUIntrinsics(acc_intr, gyr_intr);
   double reproj_error =
       imu_cam_calibrator.Optimize(20, false, false, false, true);
   double reproj_error_after_ld = reproj_error;
