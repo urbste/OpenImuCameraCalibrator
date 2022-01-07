@@ -310,7 +310,7 @@ public:
                          "s " << s << " N " << N << " knots.size() "
                               << so3_knots_.size());
 
-    using FunctorT = GyroCostFunctorSplit<N>;
+    using FunctorT = GyroCostFunctorSplit<N, Sophus::SO3, false>;
 
     FunctorT *functor =
         new FunctorT(meas, u, inv_so3_dt_, weight_so3, calib_bias);

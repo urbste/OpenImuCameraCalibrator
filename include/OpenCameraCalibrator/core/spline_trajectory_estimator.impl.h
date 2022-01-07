@@ -38,13 +38,15 @@ void SplineTrajectoryEstimator<_T>::SetTimes(int64_t time_interval_so3_ns,
                                              int64_t time_interval_r3_ns,
                                              int64_t start_time_ns,
                                              int64_t end_time_ns) {
-    dt_so3_ns_ = time_interval_so3_ns;
-    dt_r3_ns_ = time_interval_r3_ns;
-    start_t_ns_ = start_time_ns;
-    end_t_ns_ = end_time_ns;
-    const int64_t duration = end_t_ns_ - start_t_ns_;
-    nr_knots_so3_ = duration / dt_so3_ns_ + _T;
-    nr_knots_r3_ = duration / dt_r3_ns_ + _T;
+  dt_so3_ns_ = time_interval_so3_ns;
+  dt_r3_ns_ = time_interval_r3_ns;
+  start_t_ns_ = start_time_ns;
+  end_t_ns_ = end_time_ns;
+  const int64_t duration = end_t_ns_ - start_t_ns_;
+  nr_knots_so3_ = duration / dt_so3_ns_ + _T;
+  nr_knots_r3_ = duration / dt_r3_ns_ + _T;
+  inv_so3_dt_ = S_TO_NS / dt_so3_ns_;
+  inv_r3_dt_ = S_TO_NS / dt_r3_ns_;
 }
 
 template <int _T>
@@ -100,19 +102,19 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   if (!(flags & SplineOptimFlags::POINTS)) {
     LOG(INFO) << "Keeping object points constant.";
     for (const auto& tid : tracks_in_problem_) {
-        const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
-        if (problem_.HasParameterBlock(track))
-            problem_.SetParameterBlockConstant(track);
+      const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+      if (problem_.HasParameterBlock(track))
+          problem_.SetParameterBlockConstant(track);
     }
   } else {
       for (const auto& tid : tracks_in_problem_) {
-          const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
-          if (problem_.HasParameterBlock(track)) {
-              problem_.SetParameterBlockVariable(track);
-              ceres::LocalParameterization* local_parameterization =
-                  new ceres::HomogeneousVectorParameterization(4);
-              problem_.SetParameterization(track, local_parameterization);
-          }
+        const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
+        if (problem_.HasParameterBlock(track)) {
+          problem_.SetParameterBlockVariable(track);
+          ceres::LocalParameterization* local_parameterization =
+              new ceres::HomogeneousVectorParameterization(4);
+          problem_.SetParameterization(track, local_parameterization);
+        }
       }
     LOG(INFO) << "Optimizing object points.";
   }
@@ -428,10 +430,10 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
 
   problem_.AddResidualBlock(cost_function, NULL, vec);
 
-//  for (int i = 0; i < 3; ++i) {
-//    problem_.SetParameterLowerBound(accl_bias_.data(), i, -0.5);
-//    problem_.SetParameterUpperBound(accl_bias_.data(), i, 0.5);
-//  }
+  for (int i = 0; i < 3; ++i) {
+    problem_.SetParameterLowerBound(accl_bias_.data(), i, -0.5);
+    problem_.SetParameterUpperBound(accl_bias_.data(), i, 0.5);
+  }
   return true;
 }
 
@@ -448,8 +450,9 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
     return false;
   }
 
-  using FunctorT = GyroCostFunctorSplit<N_>;
-  FunctorT *functor = new FunctorT(meas, u_so3, inv_so3_dt_, weight_so3);
+  using FunctorT = GyroCostFunctorSplit<N_, Sophus::SO3, false>;
+  FunctorT *functor =
+    new FunctorT(meas, u_so3, inv_so3_dt_, weight_so3);
 
   ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -461,10 +464,10 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
     vec.emplace_back(so3_knots_[t].data());
     so3_knot_in_problem_[t] = true;
   }
+
   // bias and intrinsics
   cost_function->AddParameterBlock(9);
   vec.emplace_back(gyro_intrinsics_.data());
-
   cost_function->AddParameterBlock(3);
   vec.emplace_back(gyro_bias_.data());
 
@@ -473,10 +476,10 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
   problem_.AddResidualBlock(cost_function, NULL, vec);
 
   // gyro biases are usually very small numbers < 1e-2
-//  for (int i = 0; i < 3; ++i) {
-//    problem_.SetParameterLowerBound(gyro_bias_.data(), i, -1e-2);
-//    problem_.SetParameterUpperBound(gyro_bias_.data(), i, 1e-2);
-//  }
+  for (int i = 0; i < 3; ++i) {
+    problem_.SetParameterLowerBound(gyro_bias_.data(), i, -1e-2);
+    problem_.SetParameterUpperBound(gyro_bias_.data(), i, 1e-2);
+  }
 
   return true;
 }

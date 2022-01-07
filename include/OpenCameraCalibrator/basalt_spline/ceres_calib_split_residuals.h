@@ -67,7 +67,7 @@ struct AccelerationCostFunctorSplit
     Vector3 accl_raw;
     accl_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
     residuals = T(inv_std) * (
-        R_w_i.inverse() * (accel_w + gravity) - accl_raw); //accel_calib_triad.UnbiasNormalize(accl_raw));
+        R_w_i.inverse() * (accel_w + gravity) - accel_calib_triad.UnbiasNormalize(accl_raw));
     return true;
   }
 
@@ -79,7 +79,7 @@ struct AccelerationCostFunctorSplit
   double inv_std;
 };
 
-template <int _N, template <class> class GroupT = Sophus::SO3>
+template <int _N, template <class> class GroupT, bool OLD_TIME_DERIV>
 struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
   static constexpr int N = _N;       // Order of the spline.
   static constexpr int DEG = _N - 1; // Degree of the spline.
@@ -121,8 +121,8 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
 
     Vector3 gyro_raw;
     gyro_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
-    //Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
-    residuals = T(inv_std) * (rot_vel - measurement);
+    Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
+    residuals = T(inv_std) * (rot_vel - tang);
     return true;
   }
 
@@ -335,10 +335,10 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
           sResiduals[2 * i + 0] = T(1e10);
           sResiduals[2 * i + 1] = T(1e10);
         } else {
-          //const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
-          //const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
-          sResiduals[2 * i + 0] =  (reprojection[0] - T(feature.x()));
-          sResiduals[2 * i + 1] =  (reprojection[1] - T(feature.y()));
+          const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
+          const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
+          sResiduals[2 * i + 0] = inv_info_x * (reprojection[0] - T(feature.x()));
+          sResiduals[2 * i + 1] = inv_info_y * (reprojection[1] - T(feature.y()));
         }
       }
       return true;

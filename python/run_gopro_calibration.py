@@ -17,7 +17,7 @@ def main():
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='/media/Data/builds/openicc_release/applications') 
+                        default='/media/Data/builds/openicc_release_new/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
                         default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 

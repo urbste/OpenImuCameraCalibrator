@@ -109,8 +109,8 @@ struct SplineWeightingData {
   // create this with get_sew_for_dataset.py
   double dt_r3;
   double dt_so3;
-  double var_r3;
-  double var_so3;
+  double std_r3;
+  double std_so3;
   double cam_fps;
 };
 

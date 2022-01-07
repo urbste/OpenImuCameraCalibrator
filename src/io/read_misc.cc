@@ -40,8 +40,8 @@ bool ReadSplineErrorWeighting(
   spline_weighting.cam_fps = j["camera_fps"];
   spline_weighting.dt_r3 = j["r3"]["knot_spacing"];
   spline_weighting.dt_so3 = j["so3"]["knot_spacing"];
-  spline_weighting.var_r3 = j["r3"]["weighting_factor"];
-  spline_weighting.var_so3 = j["so3"]["weighting_factor"];
+  spline_weighting.std_r3 = j["r3"]["weighting_factor"];
+  spline_weighting.std_so3 = j["so3"]["weighting_factor"];
 
   return true;
 }
