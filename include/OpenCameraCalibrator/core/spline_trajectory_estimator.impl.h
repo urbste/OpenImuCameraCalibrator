@@ -204,81 +204,80 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
 
 template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
 
-  so3_knots_ = so3_vector(nr_knots_so3_);
-  r3_knots_ = vec3_vector(nr_knots_r3_);
-  so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
-  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
+    so3_knots_ = OpenICC::so3_vector(nr_knots_so3_);
+    r3_knots_ = vec3_vector(nr_knots_r3_);
+    so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
+    r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
+    // first interpolate spline poses for imu update rate
+    // create zero-based maps
+    OpenICC::quat_map quat_vis_map;
+    OpenICC::vec3_map translations_map;
 
-  // first interpolate spline poses for imu update rate
-  // create zero-based maps
-  quat_map quat_vis_map;
-  vec3_map translations_map;
+    // get sorted poses
+    const auto view_ids = image_data_.ViewIds();
+    for (const auto &vid : view_ids) {
+      const auto *v = image_data_.View(vid);
+      const double t_s = v->GetTimestamp();
+      const auto q_w_c = Eigen::Quaterniond(
+          v->Camera().GetOrientationAsRotationMatrix().transpose());
+      const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
+      const Sophus::SE3d T_w_i = T_w_c * T_i_c_.inverse();
+      quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
+      translations_map[t_s] = T_w_i.translation();
+    }
 
-  // get sorted poses
-  const auto view_ids = image_data_.ViewIds();
-  for (const auto &vid : view_ids) {
-    const auto *v = image_data_.View(vid);
-    const double t_s = v->GetTimestamp();
-    const auto q_w_c = Eigen::Quaterniond(
-        v->Camera().GetOrientationAsRotationMatrix().transpose());
-    const Sophus::SE3d T_w_c(q_w_c, v->Camera().GetPosition());
-    const Sophus::SE3d T_w_i = T_w_c * T_i_c_.inverse();
-    quat_vis_map[t_s] = T_w_i.so3().unit_quaternion();
-    translations_map[t_s] = T_w_i.translation();
-  }
+    OpenICC::quat_vector quat_vis;
+    OpenICC::vec3_vector translations;
+    std::vector<double> t_vis;
+    for (auto const &q : quat_vis_map) {
+      quat_vis.push_back(q.second);
+      t_vis.push_back(q.first);
+    }
 
-  quat_vector quat_vis;
-  vec3_vector translations;
-  std::vector<double> t_vis;
-  for (auto const &q : quat_vis_map) {
-    quat_vis.push_back(q.second);
-    t_vis.push_back(q.first);
-  }
+    for (auto const &t : translations_map) {
+      translations.push_back(t.second);
+    }
 
-  for (auto const &t : translations_map) {
-    translations.push_back(t.second);
-  }
+    // get time at which we want to interpolate
+    std::vector<double> t_so3_spline, t_r3_spline;
+    for (int i = 0; i < nr_knots_so3_; ++i) {
+      const double t = i * dt_so3_ns_ * NS_TO_S;
+      t_so3_spline.push_back(t);
+    }
 
-  // get time at which we want to interpolate
-  std::vector<double> t_so3_spline, t_r3_spline;
-  for (int i = 0; i < nr_knots_so3_; ++i) {
-    const double t = i * dt_so3_ns_ * NS_TO_S;
-    t_so3_spline.push_back(t);
-  }
+    for (int i = 0; i < nr_knots_r3_; ++i) {
+      const double t = i * dt_r3_ns_ * NS_TO_S;
+      t_r3_spline.push_back(t);
+    }
 
-  for (int i = 0; i < nr_knots_r3_; ++i) {
-    const double t = i * dt_r3_ns_ * NS_TO_S;
-    t_r3_spline.push_back(t);
-  }
+    OpenICC::quat_vector interp_spline_quats;
+    OpenICC::vec3_vector interpo_spline_trans;
+    OpenICC::utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis,
+                                           interp_spline_quats);
+    OpenICC::utils::InterpolateVector3d(t_vis, t_r3_spline, translations,
+                                        interpo_spline_trans);
 
-  quat_vector interp_spline_quats;
-  vec3_vector interpo_spline_trans;
-  utils::InterpolateQuaternions(t_vis, t_so3_spline, quat_vis,
-                                interp_spline_quats);
-  utils::InterpolateVector3d(t_vis, t_r3_spline, translations,
-                             interpo_spline_trans);
+    for (int i = 0; i < nr_knots_so3_; ++i) {
+      so3_knots_[i] = Sophus::SO3d(interp_spline_quats[i]);
+    }
+    for (int i = 0; i < nr_knots_r3_; ++i) {
+      r3_knots_[i] = interpo_spline_trans[i];
+    }
 
-  for (int i = 0; i < nr_knots_so3_; ++i) {
-    so3_knots_[i] = Sophus::SO3d(interp_spline_quats[i]);
-  }
-  for (int i = 0; i < nr_knots_r3_; ++i) {
-    r3_knots_[i] = interpo_spline_trans[i];
-  }
+    // Add local parametrization for SO(3) rotation
+    for (int i = 0; i < nr_knots_so3_; i++) {
+      ceres::LocalParameterization *local_parameterization =
+          new LieLocalParameterization<Sophus::SO3d>();
 
-  // Add local parametrization for SO(3) rotation
-  for (int i = 0; i < nr_knots_so3_; i++) {
+      problem_.AddParameterBlock(so3_knots_[i].data(),
+                                 Sophus::SO3d::num_parameters,
+                                 local_parameterization);
+    }
     ceres::LocalParameterization *local_parameterization =
-        new LieLocalParameterization<Sophus::SO3d>();
+        new LieLocalParameterization<Sophus::SE3d>();
 
-    problem_.AddParameterBlock(so3_knots_[i].data(),
-                               Sophus::SO3d::num_parameters,
+    problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
                                local_parameterization);
-  }
-  ceres::LocalParameterization *local_parameterization =
-      new LieLocalParameterization<Sophus::SE3d>();
-
-  problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
-                             local_parameterization);
 }
 
 //template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {
