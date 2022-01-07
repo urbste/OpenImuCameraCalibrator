@@ -58,9 +58,9 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   options.minimizer_progress_to_stdout = true;
 
   // if IMU to Cam trafo should be optimized
-  ceres::LocalParameterization *local_parameterization =
-      new LieLocalParameterization<Sophus::SE3d>();
-  problem_.SetParameterization(T_i_c_.data(), local_parameterization);
+  //ceres::LocalParameterization *local_parameterization =
+  //    new LieLocalParameterization<Sophus::SE3d>();
+  //problem_.SetParameterization(T_i_c_.data(), local_parameterization);
 
   if (!(flags & SplineOptimFlags::T_I_C)) {
     problem_.SetParameterBlockConstant(T_i_c_.data());
@@ -132,16 +132,16 @@ SplineTrajectoryEstimator<_T>::Optimize(const int max_iters,
   }
 
   // add local parametrization for SO(3)
-  for (size_t i = 0; i < so3_knot_in_problem_.size(); ++i) {
-    if (so3_knot_in_problem_[i]) {
-      ceres::LocalParameterization *local_parameterization =
-          new LieLocalParameterization<Sophus::SO3d>();
+//  for (size_t i = 0; i < so3_knot_in_problem_.size(); ++i) {
+//    if (so3_knot_in_problem_[i]) {
+//      ceres::LocalParameterization *local_parameterization =
+//          new LieLocalParameterization<Sophus::SO3d>();
 
-      problem_.SetParameterization(so3_knots_[i].data(),
-                                   local_parameterization);
-      break;
-    }
-  }
+//      problem_.SetParameterization(so3_knots_[i].data(),
+//                                   local_parameterization);
+//      break;
+//    }
+//  }
 
   // set first knot constant to fix gauge freedom
 //  for (size_t i = 0; i < r3_knot_in_problem_.size(); ++i) {
@@ -247,11 +247,20 @@ template <int _T> void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
     r3_knots_[i] = interpo_spline_trans[i];
   }
 
-//  ceres::LocalParameterization *local_parameterization =
-//      new LieLocalParameterization<Sophus::SE3d>();
+  // Add local parametrization for SO(3) rotation
+  for (int i = 0; i < nr_knots_so3_; i++) {
+    ceres::LocalParameterization *local_parameterization =
+        new LieLocalParameterization<Sophus::SO3d>();
 
-//  problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
-//                             local_parameterization);
+    problem_.AddParameterBlock(so3_knots_[i].data(),
+                               Sophus::SO3d::num_parameters,
+                               local_parameterization);
+  }
+  ceres::LocalParameterization *local_parameterization =
+      new LieLocalParameterization<Sophus::SE3d>();
+
+  problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
+                             local_parameterization);
 }
 
 //template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {
@@ -403,10 +412,10 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
 
   problem_.AddResidualBlock(cost_function, NULL, vec);
 
-  for (int i = 0; i < 3; ++i) {
-    problem_.SetParameterLowerBound(accl_bias_.data(), i, -0.5);
-    problem_.SetParameterUpperBound(accl_bias_.data(), i, 0.5);
-  }
+//  for (int i = 0; i < 3; ++i) {
+//    problem_.SetParameterLowerBound(accl_bias_.data(), i, -0.5);
+//    problem_.SetParameterUpperBound(accl_bias_.data(), i, 0.5);
+//  }
   return true;
 }
 
@@ -424,14 +433,12 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
   }
 
   using FunctorT = GyroCostFunctorSplit<N_>;
-
   FunctorT *functor = new FunctorT(meas, u_so3, inv_so3_dt_, weight_so3);
 
   ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
   std::vector<double *> vec;
-
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
     const int t = s_so3 + i;
@@ -450,10 +457,10 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
   problem_.AddResidualBlock(cost_function, NULL, vec);
 
   // gyro biases are usually very small numbers < 1e-2
-  for (int i = 0; i < 3; ++i) {
-    problem_.SetParameterLowerBound(gyro_bias_.data(), i, -1e-2);
-    problem_.SetParameterUpperBound(gyro_bias_.data(), i, 1e-2);
-  }
+//  for (int i = 0; i < 3; ++i) {
+//    problem_.SetParameterLowerBound(gyro_bias_.data(), i, -1e-2);
+//    problem_.SetParameterUpperBound(gyro_bias_.data(), i, 1e-2);
+//  }
 
   return true;
 }
@@ -749,15 +756,17 @@ bool SplineTrajectoryEstimator<_T>::CalcTimes(const int64_t sensor_time,
     u = 0.0;
     return false;
   }
-  s = st_ns / dt_ns;
-  u = double(st_ns % dt_ns) / double(dt_ns);
 
+  s = st_ns / dt_ns;
   if (s < 0) {
     return false;
   }
+
   if (size_t(s + N_) > nr_knots) {
     return false;
   }
+
+  u = double(st_ns % dt_ns) / double(dt_ns);
   return true;
 }
 

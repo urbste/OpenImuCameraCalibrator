@@ -165,8 +165,7 @@ int main(int argc, char *argv[]) {
       const int board_pt3_id = std::stoi(img_pts.key());
       const Eigen::Vector2d corner(
           Eigen::Vector2d(img_pts.value()[0], img_pts.value()[1]));
-      Eigen::Matrix2d cov;
-      cov << 0.5, 0, 0, 0.5;
+      Eigen::Matrix2d cov = Eigen::Matrix2d::Identity();
       theia::Feature feat(corner, cov);
       recon_calib_dataset.AddObservation(view_id, board_pt3_id, feat);
     }
@@ -210,7 +209,7 @@ int main(int argc, char *argv[]) {
                                 time_offset_imu_to_cam, telemetry_data,
                                 init_line_delay_us, acc_intr, gyr_intr);
   const int grav_dir_axis = GravDirStringToInt(FLAGS_known_grav_dir_axis);
-  int flags = SplineOptimFlags::T_I_C;
+  int flags = SplineOptimFlags::SPLINE;//SplineOptimFlags::T_I_C;
 
   if (grav_dir_axis != -1) {
       Eigen::Vector3d grav_dir(0,0,0);

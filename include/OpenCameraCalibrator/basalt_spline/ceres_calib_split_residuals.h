@@ -54,21 +54,20 @@ struct AccelerationCostFunctorSplit
     Vector3 accel_w;
     CeresSplineHelper<T, N>::template evaluate<3, 2>(sKnots + N, T(u_r3),
                                                      T(inv_r3_dt), &accel_w);
-
+    Eigen::Map<Vector3 const> const gravity(sKnots[2 * N]);
     Eigen::Map<Vector6 const> const acl_intrs(sKnots[2 * N + 1]);
-    Eigen::Map<Vector6 const> const acl_bias(sKnots[2 * N + 2]);
+    Eigen::Map<Vector3 const> const acl_bias(sKnots[2 * N + 2]);
+
     OpenICC::ThreeAxisSensorCalibParams<T> accel_calib_triad(
         acl_intrs[0], acl_intrs[1], acl_intrs[2],
         T(0), T(0), T(0),
         acl_intrs[3], acl_intrs[4], acl_intrs[5],
         acl_bias[0], acl_bias[1], acl_bias[2]);
 
-    // Gravity
-    Eigen::Map<Vector3 const> const g(sKnots[2 * N]);
     Vector3 accl_raw;
     accl_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
     residuals = T(inv_std) * (
-        R_w_i.inverse() * (accel_w + g) - accl_raw); //accel_calib_triad.UnbiasNormalize(accl_raw));
+        R_w_i.inverse() * (accel_w + gravity) - accl_raw); //accel_calib_triad.UnbiasNormalize(accl_raw));
     return true;
   }
 
@@ -122,7 +121,7 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
 
     Vector3 gyro_raw;
     gyro_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
-    Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
+    //Tangent tang(gyro_calib_triad.UnbiasNormalize(gyro_raw));
     residuals = T(inv_std) * (rot_vel - gyro_raw);
     return true;
   }
@@ -336,10 +335,10 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
           sResiduals[2 * i + 0] = T(1e10);
           sResiduals[2 * i + 1] = T(1e10);
         } else {
-          const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
-          const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
-          sResiduals[2 * i + 0] = inv_info_x * (reprojection[0] - T(feature.x()));
-          sResiduals[2 * i + 1] = inv_info_y * (reprojection[1] - T(feature.y()));
+          //const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
+          //const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
+          sResiduals[2 * i + 0] =  (reprojection[0] - T(feature.x()));
+          sResiduals[2 * i + 1] =  (reprojection[1] - T(feature.y()));
         }
       }
       return true;

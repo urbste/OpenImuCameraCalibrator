@@ -20,7 +20,8 @@ enum SplineOptimFlags {
   IMU_BIASES = 1 << 2,
   IMU_INTRINSICS = 1 << 3,
   GRAVITY_DIR = 1 << 4,
-  CAM_LINE_DELAY = 1 << 5
+  CAM_LINE_DELAY = 1 << 5,
+  SPLINE = 1 << 6
 };
 
 const double GRAVITY_MAGN = 9.81;
