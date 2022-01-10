@@ -22,19 +22,23 @@
 
 // Input/output files.
 DEFINE_string(save_charuco_image, "", "Path to save charuco board to.");
+DEFINE_int32(squaresX, 9, "squares in X.");
+DEFINE_int32(squaresY, 7, "squares in Y.");
+DEFINE_int32(squareLength, 300, "squareLength.");
+DEFINE_int32(markerLength, 150, "markerLength.");
 
 int main(int argc, char *argv[]) {
 
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
-  int squaresX = 9;
-  int squaresY = 7;
-  int squareLength = 300;
-  int markerLength = 100;
+  int squaresX = FLAGS_squaresX;
+  int squaresY = FLAGS_squaresY;
+  int squareLength = FLAGS_squareLength;
+  int markerLength = FLAGS_markerLength;
   int dictionaryId = cv::aruco::DICT_ARUCO_ORIGINAL;
   int margins = squareLength - markerLength;
   int borderBits = 1;
-  bool showImage = true;
+  bool showImage = false;
 
   cv::Ptr<cv::aruco::Dictionary> dictionary =
       cv::aruco::getPredefinedDictionary(
