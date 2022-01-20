@@ -41,7 +41,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <Eigen/Dense>
 #include <cstdint>
 
-
 /// @brief Compute binomial coefficient.
 ///
 /// Computes number of combinations that include k objects out of n.
@@ -132,4 +131,3 @@ Eigen::Matrix<_Scalar, _N, _N> computeBaseCoefficients() {
   }
   return base_coefficients.template cast<_Scalar>();
 }
-

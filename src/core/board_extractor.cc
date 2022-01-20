@@ -41,8 +41,10 @@ BoardExtractor::BoardExtractor() {}
 
 bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
                                             float marker_length,
-                                            float square_length, int squaresX,
-                                            int squaresY, int dictionaryId) {
+                                            float square_length,
+                                            int squaresX,
+                                            int squaresY,
+                                            int dictionaryId) {
   // load images from folder
   detector_params_ = aruco::DetectorParameters::create();
 
@@ -55,8 +57,8 @@ bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
   dictionary_ = aruco::getPredefinedDictionary(
       aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
   // create charuco board object
-  charucoboard_ = aruco::CharucoBoard::create(squaresX, squaresY, square_length,
-                                              marker_length, dictionary_);
+  charucoboard_ = aruco::CharucoBoard::create(
+      squaresX, squaresY, square_length, marker_length, dictionary_);
   board_ = charucoboard_.staticCast<aruco::Board>();
 
   board_pts3d_.push_back(charucoboard_->chessboardCorners);
@@ -68,7 +70,8 @@ bool BoardExtractor::InitializeCharucoBoard(std::string path_to_detector_params,
   return true;
 }
 
-bool BoardExtractor::InitializeRadonBoard(float square_length, int squaresX,
+bool BoardExtractor::InitializeRadonBoard(float square_length,
+                                          int squaresX,
                                           int squaresY) {
   radon_pattern_size_ = cv::Size(squaresX, squaresY);
   radon_flags_ =
@@ -90,10 +93,10 @@ bool BoardExtractor::InitializeRadonBoard(float square_length, int squaresX,
   return true;
 }
 
-bool BoardExtractor::InitializeAprilBoard(
-        double marker_length, double tag_spacing,
-        int squaresX, int squaresY) {
-
+bool BoardExtractor::InitializeAprilBoard(double marker_length,
+                                          double tag_spacing,
+                                          int squaresX,
+                                          int squaresY) {
   double x_corner_offsets[4] = {0, marker_length, marker_length, 0};
   double y_corner_offsets[4] = {0, 0, marker_length, marker_length};
 
@@ -121,41 +124,76 @@ bool BoardExtractor::InitializeAprilBoard(
   return true;
 }
 
-
-bool BoardExtractor::ExtractBoard(const Mat &image,
-                                  aligned_vector<Eigen::Vector2d> &corners,
-                                  std::vector<int> &object_pt_ids) {
-
+bool BoardExtractor::ExtractBoard(const Mat& image,
+                                  aligned_vector<Eigen::Vector2d>& corners,
+                                  std::vector<int>& object_pt_ids) {
   if (board_type_ == BoardType::CHARUCO) {
     std::vector<int> marker_ids, charuco_ids;
     std::vector<std::vector<Point2f>> marker_corners, rejected_markers;
     std::vector<Point2f> charuco_corners;
 
-    aruco::detectMarkers(image, dictionary_, marker_corners, marker_ids,
-                         detector_params_, rejected_markers);
+    aruco::detectMarkers(image,
+                         dictionary_,
+                         marker_corners,
+                         marker_ids,
+                         detector_params_,
+                         rejected_markers);
 
     // refind strategy to detect more markers
-    aruco::refineDetectedMarkers(image, board_, marker_corners, marker_ids,
-                                 rejected_markers);
+    aruco::refineDetectedMarkers(image,
+                                 board_,
+                                 marker_corners,
+                                 marker_ids,
+                                 rejected_markers,
+                                 cv::noArray(),
+                                 cv::noArray(),
+                                 10);
 
     // interpolate charuco corners
     int interpolatedCorners = 0;
     if (marker_ids.size() > 0) {
-      interpolatedCorners = aruco::interpolateCornersCharuco(
-          marker_corners, marker_ids, image, charucoboard_, charuco_corners,
-          charuco_ids);
+      interpolatedCorners = aruco::interpolateCornersCharuco(marker_corners,
+                                                             marker_ids,
+                                                             image,
+                                                             charucoboard_,
+                                                             charuco_corners,
+                                                             charuco_ids,
+                                                             cv::noArray(),
+                                                             cv::noArray(),
+                                                             1);
 
       if (charuco_corners.size() > 0) {
-          cv::cornerSubPix(image, charuco_corners, cv::Size(5, 5), cv::Size(-1, -1),
-                           TermCriteria());
+        cv::cornerSubPix(
+            image,
+            charuco_corners,
+            cv::Size(detector_params_->cornerRefinementWinSize,
+                     detector_params_->cornerRefinementWinSize),
+            cv::Size(-1, -1),
+            cv::TermCriteria(
+                cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 20, 0.01));
 
-          object_pt_ids = charuco_ids;
-          for (const auto& c : charuco_corners) {
-            corners.push_back(Eigen::Vector2d(c.x, c.y));
-          }
-          return true;
+        //          if (marker_ids.size() > 0) {
+        //              cv::Mat imageCopy;
+        //              image.copyTo(imageCopy);
+        //              cv::cvtColor(imageCopy,imageCopy, cv::COLOR_GRAY2BGR);
+        //              cv::aruco::drawDetectedMarkers(imageCopy,
+        //              marker_corners, marker_ids);
+        //              // if at least one charuco corner detected
+        //              if (charuco_ids.size() > 0)
+        //                  cv::aruco::drawDetectedCornersCharuco(imageCopy,
+        //                  charuco_corners, charuco_ids, cv::Scalar(255, 0,
+        //                  0));
+        //              cv::imshow("out", imageCopy);
+        //              cv::waitKey(0);
+        //          }
+
+        object_pt_ids = charuco_ids;
+        for (const auto& c : charuco_corners) {
+          corners.push_back(Eigen::Vector2d(c.x, c.y));
+        }
+        return true;
       } else {
-          return false;
+        return false;
       }
     } else {
       return false;
@@ -182,15 +220,20 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
       corners.push_back(Eigen::Vector2d(c.x, c.y));
     }
   } else if (board_type_ == BoardType::APRILTAG) {
-      std::vector<int> marker_ids, rejected_ids;
-      std::vector<double> radii, rejected_radii;
-      std::vector<Point2f> marker_corners, rejected_markers;
-      april_detector_.detectTags(image, marker_corners,
-        marker_ids, radii, rejected_markers, rejected_ids, rejected_radii);
-      object_pt_ids = marker_ids;
-      for (const auto& c : marker_corners) {
-        corners.push_back(Eigen::Vector2d(c.x, c.y));
-      }
+    std::vector<int> marker_ids, rejected_ids;
+    std::vector<double> radii, rejected_radii;
+    std::vector<Point2f> marker_corners, rejected_markers;
+    april_detector_.detectTags(image,
+                               marker_corners,
+                               marker_ids,
+                               radii,
+                               rejected_markers,
+                               rejected_ids,
+                               rejected_radii);
+    object_pt_ids = marker_ids;
+    for (const auto& c : marker_corners) {
+      corners.push_back(Eigen::Vector2d(c.x, c.y));
+    }
   } else {
     LOG(WARNING) << "Board type does not exist.";
     return false;
@@ -199,7 +242,7 @@ bool BoardExtractor::ExtractBoard(const Mat &image,
   return true;
 }
 
-void BoardExtractor::BoardToJson(nlohmann::json &output_json) {
+void BoardExtractor::BoardToJson(nlohmann::json& output_json) {
   std::vector<cv::Point3f> board_pts = GetBoardPts()[0];
   if (board_type_ == BoardType::CHARUCO) {
     for (size_t i = 0; i < board_pts.size(); ++i) {
@@ -209,8 +252,8 @@ void BoardExtractor::BoardToJson(nlohmann::json &output_json) {
   } else if (board_type_ == BoardType::RADON) {
     std::vector<int> board_ids = GetRadonBoardIDs();
     for (size_t i = 0; i < board_ids.size(); ++i) {
-      output_json["scene_pts"][board_ids[i]] = {board_pts[i].x, board_pts[i].y,
-                                                board_pts[i].z};
+      output_json["scene_pts"][board_ids[i]] = {
+          board_pts[i].x, board_pts[i].y, board_pts[i].z};
     }
   } else if (board_type_ == BoardType::APRILTAG) {
     for (size_t i = 0; i < board_pts.size(); ++i) {
@@ -223,9 +266,9 @@ void BoardExtractor::BoardToJson(nlohmann::json &output_json) {
 }
 
 bool BoardExtractor::ExtractImageFolderToJson(
-    const std::string &image_folder, const std::string &save_path,
+    const std::string& image_folder,
+    const std::string& save_path,
     const double img_downsample_factor) {
-
   if (!board_initialized_) {
     LOG(ERROR) << "No board initialized.\n";
     return false;
@@ -264,7 +307,7 @@ bool BoardExtractor::ExtractImageFolderToJson(
     std::size_t slash = image_path.find_last_of("/\\");
     std::size_t ending = image_path.find_last_of(".");
 
-    int64_t timestamp_ns = std::stoul(image_path.substr(slash+1,ending));
+    int64_t timestamp_ns = std::stoul(image_path.substr(slash + 1, ending));
     Mat image = cv::imread(image_path);
     const double timestamp_s = timestamp_ns * NS_TO_S;
     timestamps_s.insert(timestamp_s);
@@ -294,18 +337,28 @@ bool BoardExtractor::ExtractImageFolderToJson(
         << total_nr_frames << "\n";
 
     if (verbose_plot_) {
-      cv::cvtColor(image,image,cv::COLOR_GRAY2BGR);
+      cv::cvtColor(image, image, cv::COLOR_GRAY2BGR);
       for (size_t i = 0; i < corners.size(); ++i) {
         cv::drawMarker(
-            image, cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
-            cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 3);
+            image,
+            cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
+            cv::Scalar(0, 0, 255),
+            cv::MARKER_CROSS,
+            10,
+            3);
 
-        cv::putText(image, std::to_string(ids[i]),
+        cv::putText(image,
+                    std::to_string(ids[i]),
                     cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
-                    cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 255));
+                    cv::FONT_HERSHEY_PLAIN,
+                    1,
+                    cv::Scalar(0, 0, 255));
       }
-      cv::putText(image, "Number corners: " + std::to_string(corners.size()),
-                  cv::Point(10, 20), cv::FONT_HERSHEY_COMPLEX_SMALL, 2,
+      cv::putText(image,
+                  "Number corners: " + std::to_string(corners.size()),
+                  cv::Point(10, 20),
+                  cv::FONT_HERSHEY_COMPLEX_SMALL,
+                  2,
                   cv::Scalar(0, 0, 255));
       cv::imshow("corners", image);
       cv::waitKey(1);
@@ -313,24 +366,24 @@ bool BoardExtractor::ExtractImageFolderToJson(
   }
   std::vector<double> times, delta_ts;
   for (const auto& t : timestamps_s) {
-      times.push_back(t);
+    times.push_back(t);
   }
-  for (size_t i=0; i < times.size()-2; ++i) {
-      delta_ts.push_back(times[i+1] - times[i]);
+  for (size_t i = 0; i < times.size() - 2; ++i) {
+    delta_ts.push_back(times[i + 1] - times[i]);
   }
 
-  output_json["camera_fps"] =  1. / utils::MedianOfDoubleVec(delta_ts);
+  output_json["camera_fps"] = 1. / utils::MedianOfDoubleVec(delta_ts);
 
   std::vector<std::uint8_t> v_bson = nlohmann::json::to_ubjson(output_json);
   std::ofstream calib_txt_output(save_path, std::ios::out | std::ios::binary);
-  calib_txt_output.write(reinterpret_cast<const char *>(&v_bson[0]),
+  calib_txt_output.write(reinterpret_cast<const char*>(&v_bson[0]),
                          v_bson.size() * sizeof(std::uint8_t));
 
   return true;
 }
 
-bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
-                                        const std::string &save_path,
+bool BoardExtractor::ExtractVideoToJson(const std::string& video_path,
+                                        const std::string& save_path,
                                         const double img_downsample_factor) {
   if (!board_initialized_) {
     LOG(ERROR) << "No board initialized.\n";
@@ -361,8 +414,7 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
     Mat image;
     if (!input_video.read(image)) {
       cnt_wrong++;
-      if (cnt_wrong > 500)
-        break;
+      if (cnt_wrong > 500) break;
       continue;
     }
 
@@ -395,15 +447,25 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
     if (verbose_plot_) {
       for (size_t i = 0; i < corners.size(); ++i) {
         cv::drawMarker(
-            image, cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
-            cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 10, 3);
+            image,
+            cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
+            cv::Scalar(0, 0, 255),
+            cv::MARKER_CROSS,
+            10,
+            3);
 
-        cv::putText(image, std::to_string(ids[i]),
+        cv::putText(image,
+                    std::to_string(ids[i]),
                     cv::Point(cvRound(corners[i][0]), cvRound(corners[i][1])),
-                    cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 255));
+                    cv::FONT_HERSHEY_PLAIN,
+                    1,
+                    cv::Scalar(0, 0, 255));
       }
-      cv::putText(image, "Number corners: " + std::to_string(corners.size()),
-                  cv::Point(10, 20), cv::FONT_HERSHEY_COMPLEX_SMALL, 2,
+      cv::putText(image,
+                  "Number corners: " + std::to_string(corners.size()),
+                  cv::Point(10, 20),
+                  cv::FONT_HERSHEY_COMPLEX_SMALL,
+                  2,
                   cv::Scalar(0, 0, 255));
       cv::imshow("corners", image);
       cv::waitKey(1);
@@ -413,11 +475,11 @@ bool BoardExtractor::ExtractVideoToJson(const std::string &video_path,
   std::vector<std::uint8_t> v_bson = nlohmann::json::to_ubjson(output_json);
 
   std::ofstream calib_txt_output(save_path, std::ios::out | std::ios::binary);
-  calib_txt_output.write(reinterpret_cast<const char *>(&v_bson[0]),
+  calib_txt_output.write(reinterpret_cast<const char*>(&v_bson[0]),
                          v_bson.size() * sizeof(std::uint8_t));
 
   return true;
 }
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

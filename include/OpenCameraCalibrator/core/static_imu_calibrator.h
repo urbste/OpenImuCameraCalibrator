@@ -16,26 +16,35 @@ namespace core {
 using Vector3d = Eigen::Vector3d;
 
 struct MultiPosAccResidual {
-  MultiPosAccResidual(const double &g_mag, const Eigen::Vector3d &sample)
+  MultiPosAccResidual(const double& g_mag, const Eigen::Vector3d& sample)
       : g_mag_(g_mag), sample_(sample) {}
 
   template <typename T>
-  bool operator()(const T *const params, T *residuals) const {
-    Eigen::Matrix<T, 3, 1> raw_samp(T(sample_(0)), T(sample_(1)),
-                                    T(sample_(2)));
+  bool operator()(const T* const params, T* residuals) const {
+    Eigen::Matrix<T, 3, 1> raw_samp(
+        T(sample_(0)), T(sample_(1)), T(sample_(2)));
     /* Assume body frame same as accelerometer frame,
      * so bottom left params in the misalignment matris are set to zero */
-    ThreeAxisSensorCalibParams<T> calib_triad(
-        params[0], params[1], params[2], T(0), T(0), T(0), params[3], params[4],
-        params[5], params[6], params[7], params[8]);
+    ThreeAxisSensorCalibParams<T> calib_triad(params[0],
+                                              params[1],
+                                              params[2],
+                                              T(0),
+                                              T(0),
+                                              T(0),
+                                              params[3],
+                                              params[4],
+                                              params[5],
+                                              params[6],
+                                              params[7],
+                                              params[8]);
 
     Eigen::Matrix<T, 3, 1> calib_samp = calib_triad.UnbiasNormalize(raw_samp);
     residuals[0] = T(g_mag_) - calib_samp.norm();
     return true;
   }
 
-  static ceres::CostFunction *Create(const double &g_mag,
-                                     const  Vector3d &sample) {
+  static ceres::CostFunction* Create(const double& g_mag,
+                                     const Vector3d& sample) {
     return (new ceres::AutoDiffCostFunction<MultiPosAccResidual, 1, 9>(
         new MultiPosAccResidual(g_mag, sample)));
   }
@@ -45,32 +54,48 @@ struct MultiPosAccResidual {
 };
 
 struct MultiPosGyroResidual {
-  MultiPosGyroResidual(const Vector3d &g_versor_pos0,
-                       const Vector3d &g_versor_pos1,
-                       const ImuReadings &gyro_samples,
-                       const DataInterval &gyro_interval_pos01, double dt,
+  MultiPosGyroResidual(const Vector3d& g_versor_pos0,
+                       const Vector3d& g_versor_pos1,
+                       const ImuReadings& gyro_samples,
+                       const DataInterval& gyro_interval_pos01,
+                       double dt,
                        bool optimize_bias)
       :
 
-        g_versor_pos0_(g_versor_pos0), g_versor_pos1_(g_versor_pos1),
-        gyro_samples_(gyro_samples), interval_pos01_(gyro_interval_pos01),
-        dt_(dt), optimize_bias_(optimize_bias) {}
+        g_versor_pos0_(g_versor_pos0),
+        g_versor_pos1_(g_versor_pos1),
+        gyro_samples_(gyro_samples),
+        interval_pos01_(gyro_interval_pos01),
+        dt_(dt),
+        optimize_bias_(optimize_bias) {}
 
   template <typename T>
-  bool operator()(const T *const params, T *residuals) const {
+  bool operator()(const T* const params, T* residuals) const {
     ThreeAxisSensorCalibParams<T> calib_triad(
-        params[0], params[1], params[2], params[3], params[4], params[5],
-        params[6], params[7], params[8], optimize_bias_ ? params[9] : T(0),
-        optimize_bias_ ? params[10] : T(0), optimize_bias_ ? params[11] : T(0));
+        params[0],
+        params[1],
+        params[2],
+        params[3],
+        params[4],
+        params[5],
+        params[6],
+        params[7],
+        params[8],
+        optimize_bias_ ? params[9] : T(0),
+        optimize_bias_ ? params[10] : T(0),
+        optimize_bias_ ? params[11] : T(0));
 
     std::vector<ImuReading<T>> calib_gyro_samples;
     calib_gyro_samples.reserve(interval_pos01_.end_idx -
                                interval_pos01_.start_idx + 1);
 
     for (int i = interval_pos01_.start_idx; i <= interval_pos01_.end_idx; i++) {
-      Eigen::Matrix<T, 3, 1> gyro(T(gyro_samples_[i].x()), T(gyro_samples_[i].y()), T(gyro_samples_[i].z()));
+      Eigen::Matrix<T, 3, 1> gyro(T(gyro_samples_[i].x()),
+                                  T(gyro_samples_[i].y()),
+                                  T(gyro_samples_[i].z()));
       calib_gyro_samples.push_back(
-          ImuReading<T>(T(gyro_samples_[i].timestamp_s()), calib_triad.UnbiasNormalize(gyro)));
+          ImuReading<T>(T(gyro_samples_[i].timestamp_s()),
+                        calib_triad.UnbiasNormalize(gyro)));
     }
     Eigen::Matrix<T, 3, 3> rot_mat;
     IntegrateGyroInterval(calib_gyro_samples, rot_mat, T(dt_));
@@ -86,20 +111,28 @@ struct MultiPosGyroResidual {
     return true;
   }
 
-  static ceres::CostFunction *
-  Create(const Vector3d &g_versor_pos0,
-         const Vector3d &g_versor_pos1,
-         const ImuReadings &gyro_samples,
-         const DataInterval &gyro_interval_pos01, double dt,
-         bool optimize_bias) {
+  static ceres::CostFunction* Create(const Vector3d& g_versor_pos0,
+                                     const Vector3d& g_versor_pos1,
+                                     const ImuReadings& gyro_samples,
+                                     const DataInterval& gyro_interval_pos01,
+                                     double dt,
+                                     bool optimize_bias) {
     if (optimize_bias)
       return (new ceres::AutoDiffCostFunction<MultiPosGyroResidual, 3, 12>(
-          new MultiPosGyroResidual(g_versor_pos0, g_versor_pos1, gyro_samples,
-                                   gyro_interval_pos01, dt, optimize_bias)));
+          new MultiPosGyroResidual(g_versor_pos0,
+                                   g_versor_pos1,
+                                   gyro_samples,
+                                   gyro_interval_pos01,
+                                   dt,
+                                   optimize_bias)));
     else
       return (new ceres::AutoDiffCostFunction<MultiPosGyroResidual, 3, 9>(
-          new MultiPosGyroResidual(g_versor_pos0, g_versor_pos1, gyro_samples,
-                                   gyro_interval_pos01, dt, optimize_bias)));
+          new MultiPosGyroResidual(g_versor_pos0,
+                                   g_versor_pos1,
+                                   gyro_samples,
+                                   gyro_interval_pos01,
+                                   dt,
+                                   optimize_bias)));
   }
 
   const Vector3d g_versor_pos0_, g_versor_pos1_;
@@ -123,7 +156,7 @@ struct MultiPosGyroResidual {
  * 3042 - 3049
  */
 class StaticImuCalibrator {
-public:
+ public:
   /** @brief Default constructor: initilizes all the internal members with
    * default values */
   StaticImuCalibrator();
@@ -142,12 +175,12 @@ public:
   int IntarvalsNumSamples() const { return interval_n_samples_; }
 
   /** @brief Provides the accelerometers initial guess calibration parameters */
-  const ThreeAxisSensorCalibParams<double> &initAccCalibration() {
+  const ThreeAxisSensorCalibParams<double>& initAccCalibration() {
     return init_acc_calib_;
   }
 
   /** @brief Provides the gyroscopes initial guess calibration parameters */
-  const ThreeAxisSensorCalibParams<double> &initGyroCalibration() {
+  const ThreeAxisSensorCalibParams<double>& initGyroCalibration() {
     return init_gyro_calib_;
   }
 
@@ -188,12 +221,12 @@ public:
   void SetIntarvalsNumSamples(int num) { interval_n_samples_ = num; }
 
   /** @brief Set the accelerometers initial guess calibration parameters */
-  void SetInitAccCalibration(ThreeAxisSensorCalibParams<double> &init_calib) {
+  void SetInitAccCalibration(ThreeAxisSensorCalibParams<double>& init_calib) {
     init_acc_calib_ = init_calib;
   }
 
   /** @brief Set the gyroscopes initial guess calibration parameters */
-  void SetInitGyroCalibration(ThreeAxisSensorCalibParams<double> &init_calib) {
+  void SetInitGyroCalibration(ThreeAxisSensorCalibParams<double>& init_calib) {
     init_gyro_calib_ = init_calib;
   }
 
@@ -225,7 +258,7 @@ public:
    * @param acc_samples Acceleremoters data vector, ordered by increasing
    * timestamps, collected at the sensor data rate.
    */
-  bool CalibrateAcc(const CameraAccData &acc_samples);
+  bool CalibrateAcc(const CameraAccData& acc_samples);
 
   /** @brief Estimate the calibration parameters for both the acceleremoters
    *         and the gyroscopes triads (see CalibratedTriad_) using the
@@ -237,27 +270,31 @@ public:
    * timestamps, collected in parallel with the acceleations at the sensor data
    * rate.
    */
-  bool CalibrateAccGyro(const CameraAccData &acc_samples,
-                        const CameraGyroData &gyro_samples);
+  bool CalibrateAccGyro(const CameraAccData& acc_samples,
+                        const CameraGyroData& gyro_samples);
 
   /** @brief Provide the calibration parameters for the acceleremoters triad (it
    * should be called after calibrateAcc() or calibrateAccGyro() ) */
-  const ThreeAxisSensorCalibParams<double> &getAccCalib() const { return acc_calib_; }
+  const ThreeAxisSensorCalibParams<double>& getAccCalib() const {
+    return acc_calib_;
+  }
   /** @brief Provide the calibration parameters for the gyroscopes triad (it
    * should be called after calibrateAccGyro() ). */
-  const ThreeAxisSensorCalibParams<double> &getGyroCalib() const { return gyro_calib_; }
+  const ThreeAxisSensorCalibParams<double>& getGyroCalib() const {
+    return gyro_calib_;
+  }
 
   /** @brief Provide the calibrated acceleremoters data vector (it should be
    * called after calibrateAcc() or calibrateAccGyro() ) */
-  const CameraAccData &getCalibAccSamples() const { return calib_acc_samples_; }
+  const CameraAccData& getCalibAccSamples() const { return calib_acc_samples_; }
 
   /** @brief Provide the calibrated gyroscopes data vector (it should be called
    * after calibrateAccGyro() ) */
-  const CameraGyroData &getCalibGyroSamples() const {
+  const CameraGyroData& getCalibGyroSamples() const {
     return calib_gyro_samples_;
   }
 
-private:
+ private:
   double g_mag_;
   const int min_num_intervals_;
   double init_interval_duration_;
@@ -274,5 +311,5 @@ private:
   bool verbose_output_;
 };
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

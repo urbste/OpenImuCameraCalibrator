@@ -35,17 +35,25 @@ using namespace OpenICC::core;
 using namespace OpenICC::io;
 
 // Input/output files.
-DEFINE_string(input_pose_calibration_dataset, "",
+DEFINE_string(input_pose_calibration_dataset,
+              "",
               "Path to input calibration dataset.");
 DEFINE_string(
-    telemetry_json, "",
+    telemetry_json,
+    "",
     "Path to gopro telemetry json extracted with Sparsnet extractor.");
-DEFINE_string(imu_bias_estimate, "",
+DEFINE_string(imu_bias_estimate,
+              "",
               "Estimate to imu bias values. If empty, we will estimate this.");
-DEFINE_string(imu_rotation_init_output, "gyro_to_cam_calibration.json",
+DEFINE_string(imu_rotation_init_output,
+              "gyro_to_cam_calibration.json",
               "Gyroscope to camera calibration output path.");
+DEFINE_double(delta_t_imu_to_cam,
+              0.0,
+              "You can supply a time offset guess if you have one available. "
+              "t_cam=t_imu+delta_t.");
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   ::google::InitGoogleLogging(argv[0]);
 
@@ -70,16 +78,20 @@ int main(int argc, char *argv[]) {
 
   // read gopro telemetry
   OpenICC::CameraTelemetryData telemetry_data;
-  if (!OpenICC::io::ReadTelemetryJSON(FLAGS_telemetry_json,
-                                        telemetry_data)) {
+  if (!OpenICC::io::ReadTelemetryJSON(FLAGS_telemetry_json, telemetry_data)) {
     std::cout << "Could not read: " << FLAGS_telemetry_json << std::endl;
   }
 
+  const double t_imu_to_cam_0 = FLAGS_delta_t_imu_to_cam;
+  if (t_imu_to_cam_0 != 0.0) {
+    LOG(INFO) << "Using supplied initial imu 2 camera time offset: "
+              << t_imu_to_cam_0 << std::endl;
+  }
   // fill measurementes
   vec3_map angular_velocities;
-  for (size_t i = 0; i < telemetry_data.gyroscope.size();
-       ++i) {
-    angular_velocities[telemetry_data.gyroscope[i].timestamp_s()] =
+  for (size_t i = 0; i < telemetry_data.gyroscope.size(); ++i) {
+    angular_velocities[telemetry_data.gyroscope[i].timestamp_s() +
+                       t_imu_to_cam_0] =
         telemetry_data.gyroscope[i].data() - gyro_bias;
   }
 
@@ -87,14 +99,13 @@ int main(int argc, char *argv[]) {
   double imu_dt_s = 0.0;
   for (size_t i = 1; i < telemetry_data.gyroscope.size(); ++i) {
     imu_dt_s += telemetry_data.gyroscope[i].timestamp_s() -
-                telemetry_data.gyroscope[i-1].timestamp_s();
+                telemetry_data.gyroscope[i - 1].timestamp_s();
   }
-  imu_dt_s /=
-      static_cast<double>(telemetry_data.gyroscope.size() - 1);
+  imu_dt_s /= static_cast<double>(telemetry_data.gyroscope.size() - 1);
 
   quat_map visual_rotations;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {
-    const theia::View *view = pose_dataset.View(pose_dataset.ViewIds()[i]);
+    const theia::View* view = pose_dataset.View(pose_dataset.ViewIds()[i]);
     const double timestamp_s = view->GetTimestamp();
     // cam to world trafo, so transposed rotation matrix
     Eigen::Quaterniond vis_quat(
@@ -102,7 +113,7 @@ int main(int argc, char *argv[]) {
     visual_rotations[timestamp_s] = vis_quat;
   }
   std::vector<double> timestamps_images;
-  for (const auto &vis_rot : visual_rotations) {
+  for (const auto& vis_rot : visual_rotations) {
     timestamps_images.push_back(vis_rot.first);
   }
 
@@ -116,21 +127,23 @@ int main(int argc, char *argv[]) {
 
   std::vector<double> tVis_all_frames, tVis_missing_frames;
   for (double t = visual_rotations.begin()->first;
-       t < visual_rotations.rbegin()->first; t += cam_dt_s) {
+       t < visual_rotations.rbegin()->first;
+       t += cam_dt_s) {
     tVis_all_frames.push_back(t);
   }
   quat_vector visual_rotations_missing_frames;
-  for (auto const &vis : visual_rotations) {
+  for (auto const& vis : visual_rotations) {
     tVis_missing_frames.push_back(vis.first);
     visual_rotations_missing_frames.push_back(vis.second);
   }
   // interpolate visual rotations as some views might be missing
   quat_vector visual_rotations_interpolated_vec;
-  OpenICC::utils::InterpolateQuaternions(
-      tVis_missing_frames, tVis_all_frames, visual_rotations_missing_frames,
-      visual_rotations_interpolated_vec);
+  OpenICC::utils::InterpolateQuaternions(tVis_missing_frames,
+                                         tVis_all_frames,
+                                         visual_rotations_missing_frames,
+                                         visual_rotations_interpolated_vec);
   quat_map visual_rotations_interpolated;
-  for (int i = 0; i < visual_rotations_interpolated_vec.size(); ++i) {
+  for (size_t i = 0; i < visual_rotations_interpolated_vec.size(); ++i) {
     visual_rotations_interpolated[tVis_all_frames[i]] =
         visual_rotations_interpolated_vec[i];
   }
@@ -141,9 +154,13 @@ int main(int argc, char *argv[]) {
 
   rotation_estimator.SetAngularVelocities(angular_velocities);
   rotation_estimator.SetVisualRotations(visual_rotations_interpolated);
-  rotation_estimator.EstimateCameraImuRotation(
-      cam_dt_s, imu_dt_s, R_gyro_to_camera, time_offset_gyro_to_camera,
-      gyro_bias, imu_vel, ang_vel);
+  rotation_estimator.EstimateCameraImuRotation(cam_dt_s,
+                                               imu_dt_s,
+                                               R_gyro_to_camera,
+                                               time_offset_gyro_to_camera,
+                                               gyro_bias,
+                                               imu_vel,
+                                               ang_vel);
 
   json output_json;
   output_json["gyro_bias"] = {gyro_bias[0], gyro_bias[1], gyro_bias[2]};
@@ -152,7 +169,8 @@ int main(int argc, char *argv[]) {
   output_json["gyro_to_camera_rotation"]["x"] = q_gyro_to_cam.x();
   output_json["gyro_to_camera_rotation"]["y"] = q_gyro_to_cam.y();
   output_json["gyro_to_camera_rotation"]["z"] = q_gyro_to_cam.z();
-  output_json["time_offset_gyro_to_cam"] = time_offset_gyro_to_camera;
+  output_json["time_offset_gyro_to_cam"] =
+      t_imu_to_cam_0;  // + time_offset_gyro_to_camera;
 
   // write prettified JSON to another file
   std::ofstream out_file(FLAGS_imu_rotation_init_output);
@@ -165,12 +183,15 @@ int main(int argc, char *argv[]) {
   // acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/accelerometer.txt");
   // std::ofstream
   // gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope_original.txt");
-  std::ofstream gyr_out_trafo("/media/steffen/0F78151A1CEDE4A2/Sparsenet/"
-                              "SparsnetTests2020/gyroscope_transformed.txt");
-  std::ofstream vis_interp_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/"
-                               "SparsnetTests2020/visual_gyroscope.txt");
-  std::ofstream vis_interp_all_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/"
-                               "SparsnetTests2020/visual_gyroscope_all.txt");
+  std::ofstream gyr_out_trafo(
+      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
+      "BatchCalib/dataset2/cam_imu/gyroscope_transformed.txt");
+  std::ofstream vis_interp_out(
+      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
+      "BatchCalib/dataset2/cam_imu/visual_gyroscope.txt");
+  std::ofstream vis_interp_all_out(
+      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
+      "BatchCalib/dataset2/cam_imu/visual_gyroscope_all.txt");
   //  for (auto v : visual_rotations) {
   //    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
   //    vis_out << v.first * 1e9 << " " << pos[0] <<" "<<pos[1]<<" "<<
@@ -203,7 +224,8 @@ int main(int argc, char *argv[]) {
   }
   vis_interp_out.close();
   for (auto q : visual_rotations) {
-    vis_interp_all_out << 1 << " " << q.second.w() << " " << q.second.x() << " " << q.second.y() << " " <<q.second.z()<< "\n";
+    vis_interp_all_out << 1 << " " << q.second.w() << " " << q.second.x() << " "
+                       << q.second.y() << " " << q.second.z() << "\n";
   }
   vis_interp_all_out.close();
   return 0;

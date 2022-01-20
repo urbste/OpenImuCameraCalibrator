@@ -11,11 +11,12 @@ namespace allanvar {
 
 class FitAllanGyr {
   class AllanSigmaError {
-  public:
-    AllanSigmaError(const double &_sigma2, const double &_tau)
+   public:
+    AllanSigmaError(const double& _sigma2, const double& _tau)
         : sigma2(_sigma2), tau(_tau) {}
 
-    template <typename T> T calcLog10(T src) const {
+    template <typename T>
+    T calcLog10(T src) const {
       return (log(src)) / (log(10));
     }
 
@@ -31,7 +32,7 @@ class FitAllanGyr {
     }
 
     template <typename T>
-    bool operator()(const T *const _paramt, T *residuals) const {
+    bool operator()(const T* const _paramt, T* residuals) const {
       T _Q = T(_paramt[0]);
       T _N = T(_paramt[1]);
       T _B = T(_paramt[2]);
@@ -51,22 +52,23 @@ class FitAllanGyr {
     double tau;
   };
 
-public:
-  FitAllanGyr(std::vector<double> sigma2s, std::vector<double> taus,
+ public:
+  FitAllanGyr(std::vector<double> sigma2s,
+              std::vector<double> taus,
               double _freq);
   std::vector<double> calcSimDeviation(const std::vector<double> taus) const;
   double getBiasInstability() const;
   double getWhiteNoise() const;
 
-private:
+ private:
   std::vector<double> initValue(std::vector<double> sigma2s,
                                 std::vector<double> taus);
   double findMinNum(const std::vector<double> num) const;
   int findMinIndex(std::vector<double> num);
-  double calcSigma2(double _Q, double _N, double _B, double _K, double _R,
-                    double _tau) const;
+  double calcSigma2(
+      double _Q, double _N, double _B, double _K, double _R, double _tau) const;
 
-public:
+ public:
   /**
    * @brief getQ
    *          Quantization Noise
@@ -109,10 +111,10 @@ public:
   double K;
   double R;
 
-private:
+ private:
   std::vector<double> m_taus;
   double freq;
 };
 
-} // namespace allanvar
-} // namespace OpenICC
+}  // namespace allanvar
+}  // namespace OpenICC

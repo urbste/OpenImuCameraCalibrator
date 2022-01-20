@@ -34,20 +34,25 @@ namespace OpenICC {
 namespace utils {
 
 bool initialize_pinhole_camera(
-    const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
-    const theia::RansacParameters &ransac_params,
-    theia::RansacSummary &ransac_summary, Eigen::Matrix3d &rotation,
-    Eigen::Vector3d &position, double &focal_length, const bool verbose) {
-
+    const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+    const theia::RansacParameters& ransac_params,
+    theia::RansacSummary& ransac_summary,
+    Eigen::Matrix3d& rotation,
+    Eigen::Vector3d& position,
+    double& focal_length,
+    const bool verbose) {
   if (correspondences.size() <= MIN_NUM_POINTS) {
     return false;
   }
 
   theia::UncalibratedAbsolutePose pose_linear;
   // use -> cv::initCameraMatrix2D()
-  const bool success = theia::EstimateUncalibratedAbsolutePose(
-      ransac_params, theia::RansacType::RANSAC, correspondences, &pose_linear,
-      &ransac_summary);
+  const bool success =
+      theia::EstimateUncalibratedAbsolutePose(ransac_params,
+                                              theia::RansacType::RANSAC,
+                                              correspondences,
+                                              &pose_linear,
+                                              &ransac_summary);
   if (verbose) {
     std::cout << "Estimated focal length: " << pose_linear.focal_length
               << std::endl;
@@ -57,18 +62,20 @@ bool initialize_pinhole_camera(
   rotation = pose_linear.rotation;
   position = pose_linear.position;
   focal_length = pose_linear.focal_length;
-  if (ransac_summary.inliers.size() < MIN_NUM_POINTS)
-    return false;
+  if (ransac_summary.inliers.size() < MIN_NUM_POINTS) return false;
   return success;
 }
 
 bool initialize_radial_undistortion_camera(
-    const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
-    const theia::RansacParameters &ransac_params,
-    theia::RansacSummary &ransac_summary, const cv::Size &img_size,
-    Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
-    double &radial_distortion, const bool verbose) {
-
+    const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+    const theia::RansacParameters& ransac_params,
+    theia::RansacSummary& ransac_summary,
+    const cv::Size& img_size,
+    Eigen::Matrix3d& rotation,
+    Eigen::Vector3d& position,
+    double& focal_length,
+    double& radial_distortion,
+    const bool verbose) {
   if (correspondences.size() <= MIN_NUM_POINTS) {
     return false;
   }
@@ -78,8 +85,12 @@ bool initialize_radial_undistortion_camera(
   meta_data.min_focal_length = 0.75 * img_size.width - 0.5 * img_size.width;
 
   const bool success = theia::EstimateRadialDistUncalibratedAbsolutePose(
-      ransac_params, theia::RansacType::RANSAC, correspondences, meta_data,
-      &pose_division_undist, &ransac_summary);
+      ransac_params,
+      theia::RansacType::RANSAC,
+      correspondences,
+      meta_data,
+      &pose_division_undist,
+      &ransac_summary);
 
   rotation = pose_division_undist.rotation;
   position = -pose_division_undist.rotation.transpose() *
@@ -93,31 +104,29 @@ bool initialize_radial_undistortion_camera(
   std::shared_ptr<theia::CameraIntrinsicsModel> intrinsics =
       cam.MutableCameraIntrinsics();
   intrinsics->SetFocalLength(focal_length);
-  intrinsics->SetPrincipalPoint(0.0,0.0);
-  intrinsics->SetParameter(
-      theia::DivisionUndistortionCameraModel::InternalParametersIndex::RADIAL_DISTORTION_1,
-      radial_distortion);
+  intrinsics->SetPrincipalPoint(0.0, 0.0);
+  intrinsics->SetParameter(theia::DivisionUndistortionCameraModel::
+                               InternalParametersIndex::RADIAL_DISTORTION_1,
+                           radial_distortion);
   cam.SetPosition(position);
   cam.SetOrientationFromRotationMatrix(rotation);
   // calculate reprojection error
   double repro_error = 0.0;
-  for (int i = 0; i < correspondences.size(); ++i) {
+  for (size_t i = 0; i < correspondences.size(); ++i) {
     Eigen::Vector2d pixel;
-    cam.ProjectPoint(correspondences[i].world_point.homogeneous(),
-                     &pixel);
-      repro_error += (pixel - correspondences[i].feature).norm();
+    cam.ProjectPoint(correspondences[i].world_point.homogeneous(), &pixel);
+    repro_error += (pixel - correspondences[i].feature).norm();
   }
   repro_error /= (double)correspondences.size();
   if (verbose) {
     std::cout << "Estimated focal length: " << pose_division_undist.focal_length
               << std::endl;
     std::cout << "Estimated radial distortion: "
-              << pose_division_undist.radial_distortion
-              << std::endl;
+              << pose_division_undist.radial_distortion << std::endl;
     std::cout << "Number of Ransac inliers: " << ransac_summary.inliers.size()
               << std::endl;
-    std::cout << "Reprojection error: " << repro_error
-              << std::endl<< std::endl;
+    std::cout << "Reprojection error: " << repro_error << std::endl
+              << std::endl;
   }
   if (ransac_summary.inliers.size() < MIN_NUM_POINTS || repro_error > 4.0)
     return false;
@@ -127,11 +136,16 @@ bool initialize_radial_undistortion_camera(
 // took that initialization from basalt
 // https://gitlab.com/VladyslavUsenko/basalt/-/blob/master/src/calibration/calibraiton_helper.cpp
 bool initialize_doublesphere_model(
-    const std::vector<theia::FeatureCorrespondence2D3D> &correspondences,
-    const std::vector<int> board_ids, const cv::Size &board_size,
-    const theia::RansacParameters &ransac_params, const int img_cols,
-    const int img_rows, theia::RansacSummary &ransac_summary,
-    Eigen::Matrix3d &rotation, Eigen::Vector3d &position, double &focal_length,
+    const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+    const std::vector<int> board_ids,
+    const cv::Size& board_size,
+    const theia::RansacParameters& ransac_params,
+    const int img_cols,
+    const int img_rows,
+    theia::RansacSummary& ransac_summary,
+    Eigen::Matrix3d& rotation,
+    Eigen::Vector3d& position,
+    double& focal_length,
     const bool verbose) {
   // First, initialize the image center at the center of the image.
 
@@ -151,15 +165,17 @@ bool initialize_doublesphere_model(
   const size_t target_cols = board_size.width;
   const size_t target_rows = board_size.height;
 
-  for (int r = 0; r < target_rows; ++r) {
+  for (size_t r = 0; r < target_rows; ++r) {
     aligned_vector<Eigen::Vector4d> P;
 
-    for (int c = 0; c < target_cols; ++c) {
+    for (size_t c = 0; c < target_cols; ++c) {
       int corner_id = (r * target_cols + c);
 
       if (id_to_corner.find(corner_id) != id_to_corner.end()) {
         const Eigen::Vector2d imagePoint = id_to_corner[corner_id];
-        P.emplace_back(imagePoint[0], imagePoint[1], 0.5,
+        P.emplace_back(imagePoint[0],
+                       imagePoint[1],
+                       0.5,
                        -0.5 * (imagePoint[0] * imagePoint[0] +
                                imagePoint[1] * imagePoint[1]));
       }
@@ -169,14 +185,14 @@ bool initialize_doublesphere_model(
     if (P.size() > MIN_CORNERS) {
       // Resize P to fit with the count of valid points.
 
-      Eigen::Map<Eigen::Matrix4Xd> P_mat((double *)P.data(), 4, P.size());
+      Eigen::Map<Eigen::Matrix4Xd> P_mat((double*)P.data(), 4, P.size());
 
       // std::cerr << "P_mat\n" << P_mat.transpose() << std::endl;
 
       Eigen::MatrixXd P_mat_t = P_mat.transpose();
 
-      Eigen::JacobiSVD<Eigen::MatrixXd> svd(P_mat_t, Eigen::ComputeThinU |
-                                                         Eigen::ComputeThinV);
+      Eigen::JacobiSVD<Eigen::MatrixXd> svd(
+          P_mat_t, Eigen::ComputeThinU | Eigen::ComputeThinV);
 
       // std::cerr << "U\n" << svd.matrixU() << std::endl;
       // std::cerr << "V\n" << svd.matrixV() << std::endl;
@@ -222,7 +238,7 @@ bool initialize_doublesphere_model(
       std::vector<theia::FeatureCorrespondence2D3D> correspondences_new =
           correspondences;
 
-      for (auto &cor : correspondences_new) {
+      for (auto& cor : correspondences_new) {
         cor.feature =
             cam.PixelToNormalizedCoordinates(cor.feature).hnormalized();
       }
@@ -230,33 +246,37 @@ bool initialize_doublesphere_model(
       theia::CalibratedAbsolutePose pose;
       theia::RansacParameters params = ransac_params;
       params.error_thresh = 0.5 / img_cols;
-      theia::PnPType pnpr = theia::PnPType::DLS;
-      theia::EstimateCalibratedAbsolutePose(
-          params, theia::RansacType::RANSAC, pnpr, correspondences_new, &pose,
-          &ransac_summary);
+      theia::PnPType type = theia::PnPType::DLS;
+      theia::EstimateCalibratedAbsolutePose(params,
+                                            theia::RansacType::RANSAC,
+                                            type,
+                                            correspondences_new,
+                                            &pose,
+                                            &ransac_summary);
+
       cam.SetPosition(pose.position);
       cam.SetOrientationFromRotationMatrix(pose.rotation);
 
       double repro_error = 0.0;
       int in_image = 0;
-      for (int i = 0; i < correspondences.size(); ++i) {
+      for (size_t i = 0; i < correspondences.size(); ++i) {
         Eigen::Vector2d pixel;
-        cam.ProjectPoint(correspondences[i].world_point.homogeneous(),
-                         &pixel);
+        cam.ProjectPoint(correspondences[i].world_point.homogeneous(), &pixel);
         if (pixel(0) >= 0.0 && pixel(1) >= 0.0 && pixel(0) < img_cols &&
             pixel(1) < img_rows) {
           repro_error += (pixel - correspondences[i].feature).norm();
           in_image++;
         }
       }
-//      if (verbose) {
-//        std::cout << "numReprojected " << in_image << " reprojErr "
-//                  << repro_error / in_image << std::endl;
-//      }
+      //      if (verbose) {
+      //        std::cout << "numReprojected " << in_image << " reprojErr "
+      //                  << repro_error / in_image << std::endl;
+      //      }
       if (in_image > MIN_CORNERS) {
         double avg_reproj_error = repro_error / in_image;
 
-        if (avg_reproj_error < min_reproj_error && avg_reproj_error < 5.0 && ransac_summary.inliers.size() > 10) {
+        if (avg_reproj_error < min_reproj_error && avg_reproj_error < 5.0 &&
+            ransac_summary.inliers.size() > 10) {
           min_reproj_error = avg_reproj_error;
           gamma0 = gamma;
           success = true;
@@ -268,12 +288,12 @@ bool initialize_doublesphere_model(
                       << std::endl;
           }
           return success;
-        } // if clause
-      }   // if in_image
-    }     // if P.size()
-  }       // for target cols
+        }  // if clause
+      }    // if in_image
+    }      // if P.size()
+  }        // for target cols
   return success;
-} // for target rows
+}  // for target rows
 
-} // namespace utils
-} // namespace OpenICC
+}  // namespace utils
+}  // namespace OpenICC

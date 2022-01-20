@@ -42,8 +42,8 @@ namespace OpenICC {
 namespace utils {
 
 template <typename _T>
-static inline void ComputeOmegaSkew(const Eigen::Matrix<_T, 3, 1> &omega,
-                                    Eigen::Matrix<_T, 4, 4> &skew) {
+static inline void ComputeOmegaSkew(const Eigen::Matrix<_T, 3, 1>& omega,
+                                    Eigen::Matrix<_T, 4, 4>& skew) {
   skew << _T(0), -omega(0), -omega(1), -omega(2), omega(0), _T(0), omega(2),
       -omega(1), omega(1), -omega(2), _T(0), omega(0), omega(2), omega(1),
       -omega(0), _T(0);
@@ -55,7 +55,7 @@ static inline void ComputeOmegaSkew(const Eigen::Matrix<_T, 3, 1> &omega,
  * normlized
  */
 template <typename _T>
-inline void NormalizeQuaternion(Eigen::Matrix<_T, 4, 1> &quat) {
+inline void NormalizeQuaternion(Eigen::Matrix<_T, 4, 1>& quat) {
   _T quat_norm = quat.norm();
   quat /= quat_norm;
 }
@@ -64,7 +64,8 @@ inline void NormalizeQuaternion(Eigen::Matrix<_T, 4, 1> &quat) {
  *
  * @param[in,out] quat The 4D array representing the quaternion to be normlized
  */
-template <typename _T> inline void NormalizeQuaternion(_T quat[4]) {
+template <typename _T>
+inline void NormalizeQuaternion(_T quat[4]) {
   Eigen::Matrix<_T, 4, 1> tmp_q = Eigen::Map<Eigen::Matrix<_T, 4, 1>>(quat);
   NormalizeQuaternion(tmp_q);
 }
@@ -78,11 +79,11 @@ template <typename _T> inline void NormalizeQuaternion(_T quat[4]) {
  * @param[out] quat_res Resulting final rotation
  */
 template <typename _T>
-inline void QuatIntegrationStepRK4(const Eigen::Matrix<_T, 4, 1> &quat,
-                                   const Eigen::Matrix<_T, 3, 1> &omega0,
-                                   const Eigen::Matrix<_T, 3, 1> &omega1,
-                                   const _T &dt,
-                                   Eigen::Matrix<_T, 4, 1> &quat_res) {
+inline void QuatIntegrationStepRK4(const Eigen::Matrix<_T, 4, 1>& quat,
+                                   const Eigen::Matrix<_T, 3, 1>& omega0,
+                                   const Eigen::Matrix<_T, 3, 1>& omega1,
+                                   const _T& dt,
+                                   Eigen::Matrix<_T, 4, 1>& quat_res) {
   Eigen::Matrix<_T, 3, 1> omega01 = _T(0.5) * (omega0 + omega1);
   Eigen::Matrix<_T, 4, 1> k1, k2, k3, k4, tmp_q;
   Eigen::Matrix<_T, 4, 4> omega_skew;
@@ -115,8 +116,10 @@ inline void QuatIntegrationStepRK4(const Eigen::Matrix<_T, 4, 1> &quat,
  * @param[out] quat_res Resulting final rotation
  */
 template <typename _T>
-inline void QuatIntegrationStepRK4(const _T quat[4], const _T omega0[3],
-                                   const _T omega1[3], const _T &dt,
+inline void QuatIntegrationStepRK4(const _T quat[4],
+                                   const _T omega0[3],
+                                   const _T omega1[3],
+                                   const _T& dt,
                                    _T quat_res[4]) {
   const Eigen::Matrix<_T, 4, 1> m_quat =
       Eigen::Map<const Eigen::Matrix<_T, 4, 1>>(quat);
@@ -150,21 +153,27 @@ inline void QuatIntegrationStepRK4(const _T quat[4], const _T omega0[3],
  * computed for the whole data sequence.
  */
 template <typename _T>
-void IntegrateGyroInterval(const std::vector<ImuReading<_T>> &gyro_samples,
-                           Eigen::Matrix<_T, 4, 1> &quat_res,
+void IntegrateGyroInterval(const std::vector<ImuReading<_T>>& gyro_samples,
+                           Eigen::Matrix<_T, 4, 1>& quat_res,
                            _T data_dt = _T(-1),
-                           const DataInterval &interval = DataInterval()) {
+                           const DataInterval& interval = DataInterval()) {
   DataInterval rev_interval = CheckInterval(gyro_samples, interval);
 
-  quat_res = Eigen::Matrix<_T, 4, 1>(_T(1.0), _T(0), _T(0),
-                                     _T(0)); // Identity quaternion
+  quat_res = Eigen::Matrix<_T, 4, 1>(_T(1.0),
+                                     _T(0),
+                                     _T(0),
+                                     _T(0));  // Identity quaternion
 
   for (int i = rev_interval.start_idx; i < rev_interval.end_idx; i++) {
     _T dt = (data_dt > _T(0)) ? data_dt
                               : _T(gyro_samples[i + 1].timestamp_s()) -
                                     _T(gyro_samples[i].timestamp_s());
 
-    QuatIntegrationStepRK4(quat_res, gyro_samples[i].data(), gyro_samples[i+1].data(), dt, quat_res);
+    QuatIntegrationStepRK4(quat_res,
+                           gyro_samples[i].data(),
+                           gyro_samples[i + 1].data(),
+                           dt,
+                           quat_res);
   }
 }
 
@@ -182,10 +191,10 @@ void IntegrateGyroInterval(const std::vector<ImuReading<_T>> &gyro_samples,
  * computed for the whole data sequence.
  */
 template <typename _T>
-void IntegrateGyroInterval(const std::vector<ImuReading<_T>> &gyro_samples,
-                           Eigen::Matrix<_T, 3, 3> &rot_res,
+void IntegrateGyroInterval(const std::vector<ImuReading<_T>>& gyro_samples,
+                           Eigen::Matrix<_T, 3, 3>& rot_res,
                            _T data_dt = _T(-1),
-                           const DataInterval &interval = DataInterval()) {
+                           const DataInterval& interval = DataInterval()) {
   Eigen::Matrix<_T, 4, 1> quat_res;
   IntegrateGyroInterval(gyro_samples, quat_res, data_dt, interval);
   ceres::MatrixAdapter<_T, 1, 3> rot_mat =
@@ -193,5 +202,5 @@ void IntegrateGyroInterval(const std::vector<ImuReading<_T>> &gyro_samples,
   ceres::QuaternionToRotation(quat_res.data(), rot_mat);
 }
 
-} // namespace utils
-} // namespace OpenICC
+}  // namespace utils
+}  // namespace OpenICC

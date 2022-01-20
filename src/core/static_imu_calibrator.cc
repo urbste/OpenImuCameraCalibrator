@@ -42,11 +42,16 @@ namespace core {
  */
 
 StaticImuCalibrator::StaticImuCalibrator()
-    : g_mag_(9.81), min_num_intervals_(12), init_interval_duration_(30.0),
-      interval_n_samples_(100), acc_use_means_(false), gyro_dt_(-1.0),
-      optimize_gyro_bias_(false), verbose_output_(true) {}
+    : g_mag_(9.81),
+      min_num_intervals_(12),
+      init_interval_duration_(30.0),
+      interval_n_samples_(100),
+      acc_use_means_(false),
+      gyro_dt_(-1.0),
+      optimize_gyro_bias_(false),
+      verbose_output_(true) {}
 
-bool StaticImuCalibrator::CalibrateAcc(const ImuReadings &acc_samples) {
+bool StaticImuCalibrator::CalibrateAcc(const ImuReadings& acc_samples) {
   std::cout << "Accelerometers calibration: calibrating...";
 
   min_cost_static_intervals_.clear();
@@ -62,8 +67,9 @@ bool StaticImuCalibrator::CalibrateAcc(const ImuReadings &acc_samples) {
   acc_mean.maxCoeff(&max_index);
   acc_mean[max_index] -= g_mag_;
   init_acc_calib_.SetBias(acc_mean);
-  std::cout << "Setting initial accelerometer bias: "<<init_acc_calib_.GetBiasVector().transpose()<<"\n";
-      Vector3d acc_variance = DataVariance(acc_samples, init_static_interval);
+  std::cout << "Setting initial accelerometer bias: "
+            << init_acc_calib_.GetBiasVector().transpose() << "\n";
+  Vector3d acc_variance = DataVariance(acc_samples, init_static_interval);
   double norm_th = acc_variance.norm();
 
   double min_cost = std::numeric_limits<double>::max();
@@ -89,8 +95,11 @@ bool StaticImuCalibrator::CalibrateAcc(const ImuReadings &acc_samples) {
 
     std::vector<DataInterval> extracted_intervals;
     StaticIntervalsDetector(acc_samples, th_mult * norm_th, static_intervals);
-    ExtractIntervalsSamples(acc_samples, static_intervals, static_samples,
-                            extracted_intervals, interval_n_samples_,
+    ExtractIntervalsSamples(acc_samples,
+                            static_intervals,
+                            static_samples,
+                            extracted_intervals,
+                            interval_n_samples_,
                             acc_use_means_);
 
     if (verbose_output_) {
@@ -108,11 +117,11 @@ bool StaticImuCalibrator::CalibrateAcc(const ImuReadings &acc_samples) {
 
     ceres::Problem problem;
     for (int i = 0; i < static_samples.size(); i++) {
-      ceres::CostFunction *cost_function =
+      ceres::CostFunction* cost_function =
           MultiPosAccResidual::Create(g_mag_, static_samples[i].data());
 
-      problem.AddResidualBlock(cost_function, NULL /* squared loss */,
-                               acc_calib_params.data());
+      problem.AddResidualBlock(
+          cost_function, NULL /* squared loss */, acc_calib_params.data());
     }
 
     ceres::Solver::Options options;
@@ -138,12 +147,18 @@ bool StaticImuCalibrator::CalibrateAcc(const ImuReadings &acc_samples) {
     return false;
   }
 
-  acc_calib_ = ThreeAxisSensorCalibParams<double>(
-      min_cost_calib_params[0], min_cost_calib_params[1],
-      min_cost_calib_params[2], 0, 0, 0, min_cost_calib_params[3],
-      min_cost_calib_params[4], min_cost_calib_params[5],
-      min_cost_calib_params[6], min_cost_calib_params[7],
-      min_cost_calib_params[8]);
+  acc_calib_ = ThreeAxisSensorCalibParams<double>(min_cost_calib_params[0],
+                                                  min_cost_calib_params[1],
+                                                  min_cost_calib_params[2],
+                                                  0,
+                                                  0,
+                                                  0,
+                                                  min_cost_calib_params[3],
+                                                  min_cost_calib_params[4],
+                                                  min_cost_calib_params[5],
+                                                  min_cost_calib_params[6],
+                                                  min_cost_calib_params[7],
+                                                  min_cost_calib_params[8]);
 
   calib_acc_samples_.reserve(n_samps);
 
@@ -170,8 +185,8 @@ bool StaticImuCalibrator::CalibrateAcc(const ImuReadings &acc_samples) {
   return true;
 }
 
-bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
-                                           const ImuReadings &gyro_samples) {
+bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings& acc_samples,
+                                           const ImuReadings& gyro_samples) {
   if (!CalibrateAcc(acc_samples)) {
     std::cerr << "Failed to calibra accelerometer\n";
     return false;
@@ -181,9 +196,12 @@ bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
 
   ImuReadings static_acc_means;
   std::vector<DataInterval> extracted_intervals;
-  ExtractIntervalsSamples(calib_acc_samples_, min_cost_static_intervals_,
-                          static_acc_means, extracted_intervals,
-                          interval_n_samples_, true);
+  ExtractIntervalsSamples(calib_acc_samples_,
+                          min_cost_static_intervals_,
+                          static_acc_means,
+                          extracted_intervals,
+                          interval_n_samples_,
+                          true);
 
   int n_static_pos = static_acc_means.size(), n_samps = gyro_samples.size();
 
@@ -192,9 +210,18 @@ bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
       DataInterval::InitialInterval(gyro_samples, init_interval_duration_);
   Vector3d gyro_bias = DataMean(gyro_samples, init_static_interval);
 
-  gyro_calib_ = ThreeAxisSensorCalibParams<double>(0, 0, 0, 0, 0, 0, 1.0, 1.0,
-                                                   1.0, gyro_bias(0),
-                                                   gyro_bias(1), gyro_bias(2));
+  gyro_calib_ = ThreeAxisSensorCalibParams<double>(0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   1.0,
+                                                   1.0,
+                                                   1.0,
+                                                   gyro_bias(0),
+                                                   gyro_bias(1),
+                                                   gyro_bias(2));
 
   // calib_gyro_samples_ already cleared in calibrateAcc()
   calib_gyro_samples_.reserve(n_samps);
@@ -240,8 +267,7 @@ bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
     // Assume monotone signal time
     for (; t_idx < n_samps; t_idx++) {
       if (gyro_idx0 < 0) {
-        if (calib_gyro_samples_[t_idx].timestamp_s() >= ts0)
-          gyro_idx0 = t_idx;
+        if (calib_gyro_samples_[t_idx].timestamp_s() >= ts0) gyro_idx0 = t_idx;
       } else {
         if (calib_gyro_samples_[t_idx].timestamp_s() >= ts1) {
           gyro_idx1 = t_idx - 1;
@@ -252,12 +278,16 @@ bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
 
     DataInterval gyro_interval(gyro_idx0, gyro_idx1);
 
-    ceres::CostFunction *cost_function = MultiPosGyroResidual::Create(
-        g_versor_pos0, g_versor_pos1, calib_gyro_samples_, gyro_interval,
-        gyro_dt_, optimize_gyro_bias_);
+    ceres::CostFunction* cost_function =
+        MultiPosGyroResidual::Create(g_versor_pos0,
+                                     g_versor_pos1,
+                                     calib_gyro_samples_,
+                                     gyro_interval,
+                                     gyro_dt_,
+                                     optimize_gyro_bias_);
 
-    problem.AddResidualBlock(cost_function, NULL /* squared loss */,
-                             gyro_calib_params.data());
+    problem.AddResidualBlock(
+        cost_function, NULL /* squared loss */, gyro_calib_params.data());
   }
 
   ceres::Solver::Options options;
@@ -267,12 +297,19 @@ bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
   ceres::Solver::Summary summary;
 
   ceres::Solve(options, &problem, &summary);
-  gyro_calib_ = ThreeAxisSensorCalibParams<double>(
-      gyro_calib_params[0], gyro_calib_params[1], gyro_calib_params[2],
-      gyro_calib_params[3], gyro_calib_params[4], gyro_calib_params[5],
-      gyro_calib_params[6], gyro_calib_params[7], gyro_calib_params[8],
-      gyro_bias(0) + gyro_calib_params[9], gyro_bias(1) + gyro_calib_params[10],
-      gyro_bias(2) + gyro_calib_params[11]);
+  gyro_calib_ =
+      ThreeAxisSensorCalibParams<double>(gyro_calib_params[0],
+                                         gyro_calib_params[1],
+                                         gyro_calib_params[2],
+                                         gyro_calib_params[3],
+                                         gyro_calib_params[4],
+                                         gyro_calib_params[5],
+                                         gyro_calib_params[6],
+                                         gyro_calib_params[7],
+                                         gyro_calib_params[8],
+                                         gyro_bias(0) + gyro_calib_params[9],
+                                         gyro_bias(1) + gyro_calib_params[10],
+                                         gyro_bias(2) + gyro_calib_params[11]);
 
   // Calibrate the input gyroscopes data with the obtained calibration
   for (int i = 0; i < n_samps; i++) {
@@ -299,5 +336,5 @@ bool StaticImuCalibrator::CalibrateAccGyro(const ImuReadings &acc_samples,
   return true;
 }
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

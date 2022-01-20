@@ -28,8 +28,8 @@ namespace io {
 using json = nlohmann::json;
 
 bool ReadSplineErrorWeighting(
-    const std::string &path_to_spline_error_weighting_json,
-    SplineWeightingData &spline_weighting) {
+    const std::string& path_to_spline_error_weighting_json,
+    SplineWeightingData& spline_weighting) {
   std::ifstream file;
   file.open(path_to_spline_error_weighting_json.c_str());
   if (!file.is_open()) {
@@ -40,14 +40,15 @@ bool ReadSplineErrorWeighting(
   spline_weighting.cam_fps = j["camera_fps"];
   spline_weighting.dt_r3 = j["r3"]["knot_spacing"];
   spline_weighting.dt_so3 = j["so3"]["knot_spacing"];
-  spline_weighting.var_r3 = j["r3"]["weighting_factor"];
-  spline_weighting.var_so3 = j["so3"]["weighting_factor"];
+  spline_weighting.std_r3 = j["r3"]["weighting_factor"];
+  spline_weighting.std_so3 = j["so3"]["weighting_factor"];
 
   return true;
 }
 
-bool ReadIMUBias(const std::string &path_to_imu_bias,
-                 Eigen::Vector3d &gyro_bias, Eigen::Vector3d &accl_bias) {
+bool ReadIMUBias(const std::string& path_to_imu_bias,
+                 Eigen::Vector3d& gyro_bias,
+                 Eigen::Vector3d& accl_bias) {
   std::ifstream file;
   file.open(path_to_imu_bias.c_str());
   if (!file.is_open()) {
@@ -61,9 +62,9 @@ bool ReadIMUBias(const std::string &path_to_imu_bias,
   return true;
 }
 
-bool ReadIMU2CamInit(const std::string &path_to_file,
-                     Eigen::Quaterniond &imu_to_cam_rotation,
-                     double &time_offset_imu_to_cam) {
+bool ReadIMU2CamInit(const std::string& path_to_file,
+                     Eigen::Quaterniond& imu_to_cam_rotation,
+                     double& time_offset_imu_to_cam) {
   std::ifstream file;
   file.open(path_to_file.c_str());
   if (!file.is_open()) {
@@ -71,24 +72,27 @@ bool ReadIMU2CamInit(const std::string &path_to_file,
   }
   json j;
   file >> j;
-  imu_to_cam_rotation = Eigen::Quaterniond(
-      j["gyro_to_camera_rotation"]["w"], j["gyro_to_camera_rotation"]["x"],
-      j["gyro_to_camera_rotation"]["y"], j["gyro_to_camera_rotation"]["z"]);
+  imu_to_cam_rotation = Eigen::Quaterniond(j["gyro_to_camera_rotation"]["w"],
+                                           j["gyro_to_camera_rotation"]["x"],
+                                           j["gyro_to_camera_rotation"]["y"],
+                                           j["gyro_to_camera_rotation"]["z"]);
   time_offset_imu_to_cam = j["time_offset_gyro_to_cam"];
 
   return true;
 }
 
-bool ReadIMUIntrinsics(const std::string &path_to_imu_intrinsics,
-                       const std::string &path_to_initial_imu_bias,
-                       ThreeAxisSensorCalibParamsd &acc_params,
-                       ThreeAxisSensorCalibParamsd &gyro_params) {
+bool ReadIMUIntrinsics(const std::string& path_to_imu_intrinsics,
+                       const std::string& path_to_initial_imu_bias,
+                       ThreeAxisSensorCalibParamsd& acc_params,
+                       ThreeAxisSensorCalibParamsd& gyro_params) {
   if (path_to_initial_imu_bias != "") {
     LOG(INFO) << "Initial IMU biases supplied.";
     Eigen::Vector3d gyr_bias, acc_bias;
     if (ReadIMUBias(path_to_initial_imu_bias, gyr_bias, acc_bias)) {
       acc_params.SetBias(acc_bias);
       gyro_params.SetBias(gyr_bias);
+    } else {
+      LOG(INFO) << "Error loading IMU bias file: " << path_to_initial_imu_bias;
     }
   } else {
     LOG(INFO) << "No initial IMU biases supplied. Setting bias to zero.";
@@ -145,5 +149,5 @@ bool ReadIMUIntrinsics(const std::string &path_to_imu_intrinsics,
   return true;
 }
 
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

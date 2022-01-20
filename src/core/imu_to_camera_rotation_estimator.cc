@@ -37,18 +37,21 @@ constexpr double HUBER_K = 1.345;
 constexpr double HUBER_K2 = HUBER_K * HUBER_K;
 
 double ImuToCameraRotationEstimator::SolveClosedForm(
-    const vec3_vector &angVis, const vec3_vector &angImu,
-    const std::vector<double> timestamps_s, const double td,
-    const double dt_imu, Matrix3d &Rs, Vector3d &bias) {
-
+    const vec3_vector& angVis,
+    const vec3_vector& angImu,
+    const std::vector<double> timestamps_s,
+    const double td,
+    const double dt_imu,
+    Matrix3d& Rs,
+    Vector3d& bias) {
   // offset the angular velocities with td
   std::vector<double> time_with_offset(timestamps_s.size());
   for (size_t i = 0; i < timestamps_s.size(); ++i) {
     time_with_offset[i] = timestamps_s[i] - td;
   }
   vec3_vector interpolated_angVis;
-  OpenICC::utils::InterpolateVector3d(time_with_offset, timestamps_s,
-                                           angVis, interpolated_angVis);
+  OpenICC::utils::InterpolateVector3d(
+      time_with_offset, timestamps_s, angVis, interpolated_angVis);
 
   // compute mean vectors
   Vector3d mean_vis(0.0, 0.0, 0.0);
@@ -95,7 +98,7 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
     errors[i] = D.squaredNorm();
   }
   // get median error
-  //const double med_error = utils::MedianOfDoubleVec(errors);
+  // const double med_error = utils::MedianOfDoubleVec(errors);
   double error = 0.0;
   for (size_t i = 0; i < angVis.size(); ++i) {
     const Vector3d D = interpolated_angVis[i] - (Rs * angImu[i] + bias_est);
@@ -111,10 +114,13 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
 }
 
 bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
-    const double dt_vis, const double dt_imu, Matrix3d &R_imu_to_camera,
-    double &time_offset_imu_to_camera, Vector3d &gyro_bias,
-    vec3_vector &smoothed_ang_imu, vec3_vector &smoothed_vis_vel) {
-
+    const double dt_vis,
+    const double dt_imu,
+    Matrix3d& R_imu_to_camera,
+    double& time_offset_imu_to_camera,
+    Vector3d& gyro_bias,
+    vec3_vector& smoothed_ang_imu,
+    vec3_vector& smoothed_vis_vel) {
   // find start and end points of camera and imu
   const double start_time_cam = visual_rotations_.begin()->first;
   const double end_time_cam = visual_rotations_.rbegin()->first;
@@ -129,18 +135,18 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   quat_map visual_rotations_clamped;
   vec3_map imu_angular_vel_clamped;
 
-  for (auto const &imu_rot : imu_angular_vel_) {
+  for (auto const& imu_rot : imu_angular_vel_) {
     if (imu_rot.first >= t0 && imu_rot.first <= tend) {
       imu_angular_vel_clamped[imu_rot.first - t0] = imu_rot.second;
     }
   }
   vec3_vector angImu;
-  for (const auto &imu : imu_angular_vel_clamped) {
+  for (const auto& imu : imu_angular_vel_clamped) {
     angImu.push_back(imu.second);
   }
 
   // interpolate visual rotations
-  for (auto const &v_rot : visual_rotations_) {
+  for (auto const& v_rot : visual_rotations_) {
     if (v_rot.first >= t0 && v_rot.first <= tend) {
       visual_rotations_clamped[v_rot.first - t0] = v_rot.second;
     }
@@ -148,14 +154,14 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
 
   // get vectors of clamped imu angular velocities
   std::vector<double> tIMU;
-  for (auto const &imu : imu_angular_vel_clamped) {
+  for (auto const& imu : imu_angular_vel_clamped) {
     tIMU.push_back(imu.first);
   }
 
   std::vector<double> tVis;
   quat_vector qtVis;
 
-  for (auto const &vis : visual_rotations_clamped) {
+  for (auto const& vis : visual_rotations_clamped) {
     tVis.push_back(vis.first);
     qtVis.push_back(vis.second);
   }
@@ -179,8 +185,18 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   for (size_t i = 0; i < qtDiffs.size(); ++i) {
     Quaterniond angVisQ = qtDiffs[i] * qtVis_interp[i].inverse();
     const double diff_dt = -2.0 / dt_imu;
-    Vector3d angVisVec(diff_dt * angVisQ.x(), diff_dt * angVisQ.y(),
-                       diff_dt * angVisQ.z());
+    Vector3d angVisVec(
+        diff_dt * angVisQ.x(), diff_dt * angVisQ.y(), diff_dt * angVisQ.z());
+    // suppress extremely large velocities 6.28 rad/s ~ >360deg/s
+    if (std::abs(angVisVec[0]) > 2 * M_PI ||
+        std::abs(angVisVec[1]) > 2 * M_PI ||
+        std::abs(angVisVec[2]) > 2 * M_PI) {
+      if (i > 1) {
+        angVis[i] = angVis[i - 1];
+      } else {
+        angVisVec.setZero();
+      }
+    }
     angVis.push_back(angVisVec);
   }
 
@@ -189,7 +205,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   SimpleMovingAverage x_vis(15), y_vis(15), z_vis(15);
 
   // vec3_vector smoothed_ang_imu, smoothed_vis_vel;
-  for (int i = 0; i < angImu.size(); ++i) {
+  for (size_t i = 0; i < angImu.size(); ++i) {
     x_imu.add(angImu[i][0]);
     y_imu.add(angImu[i][1]);
     z_imu.add(angImu[i][2]);
@@ -216,13 +232,12 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   double error = 0.0;
 
   while (std::abs(c - d) > tolerance) {
-
     Eigen::Matrix3d Rsc, Rsd;
     Eigen::Vector3d biasc, biasd;
-    const double fc = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU,
-                                      c, dt_imu, Rsc, biasc);
-    const double fd = SolveClosedForm(smoothed_vis_vel, smoothed_ang_imu, tIMU,
-                                      d, dt_imu, Rsd, biasd);
+    const double fc = SolveClosedForm(
+        smoothed_vis_vel, smoothed_ang_imu, tIMU, c, dt_imu, Rsc, biasc);
+    const double fd = SolveClosedForm(
+        smoothed_vis_vel, smoothed_ang_imu, tIMU, d, dt_imu, Rsd, biasd);
 
     if (fc < fd) {
       b = d;
@@ -259,5 +274,5 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   return true;
 }
 
-} // namespace core
-} // namespace OpenICC
+}  // namespace core
+}  // namespace OpenICC

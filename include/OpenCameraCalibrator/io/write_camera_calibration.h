@@ -24,9 +24,10 @@
 namespace OpenICC {
 namespace io {
 
-bool write_camera_calibration(const std::string &output_file,
-                              const theia::Camera &camera, const double fps,
+bool write_camera_calibration(const std::string& output_file,
+                              const theia::Camera& camera,
+                              const double fps,
                               const int nr_calib_images,
                               const double total_reproj_error);
-} // namespace io
-} // namespace OpenICC
+}  // namespace io
+}  // namespace OpenICC

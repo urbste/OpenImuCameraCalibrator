@@ -38,8 +38,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "sophus_utils.h"
 #include "assert.h"
+#include "sophus_utils.h"
 #include "spline_common.h"
 
 #include <Eigen/Dense>
@@ -243,16 +243,17 @@ class RdSpline {
   VecD evaluate(int64_t time_ns, JacobianStruct* J = nullptr) const {
     int64_t st_ns = (time_ns - start_t_ns);
 
-    BASALT_ASSERT_STREAM(st_ns >= 0, "st_ns " << st_ns << " time_ns " << time_ns
-                                              << " start_t_ns " << start_t_ns);
+    BASALT_ASSERT_STREAM(st_ns >= 0,
+                         "st_ns " << st_ns << " time_ns " << time_ns
+                                  << " start_t_ns " << start_t_ns);
 
     int64_t s = st_ns / dt_ns;
     double u = double(st_ns % dt_ns) / double(dt_ns);
 
     BASALT_ASSERT_STREAM(s >= 0, "s " << s);
-    BASALT_ASSERT_STREAM(size_t(s + N) <= knots.size(), "s " << s << " N " << N
-                                                             << " knots.size() "
-                                                             << knots.size());
+    BASALT_ASSERT_STREAM(
+        size_t(s + N) <= knots.size(),
+        "s " << s << " N " << N << " knots.size() " << knots.size());
 
     VecN p;
     baseCoeffsWithTime<Derivative>(p, u);
@@ -342,4 +343,3 @@ template <int _DIM, int _N, typename _Scalar>
 const typename RdSpline<_DIM, _N, _Scalar>::MatN
     RdSpline<_DIM, _N, _Scalar>::blending_matrix_ =
         computeBlendingMatrix<_N, _Scalar, false>();
-

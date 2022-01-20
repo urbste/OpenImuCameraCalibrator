@@ -6,14 +6,14 @@ from os.path import join as pjoin
 import glob
 import time
 from utils import get_abbr_from_cam_model
-from telemetry_converter import TelemetryConverter
+from telemetry_converter import TelemetryConverter, TelemetryImporter
 
 def main():
 
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/Data/Sparsenet/GoProEvaluation/EvaluateCoriAndIori/gopro_9_linear_200', 
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -26,11 +26,11 @@ def main():
                         default='/media/Data/projects/OpenImuCameraCalibrator')   
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
-                        default=1, type=float)
+                        default=2, type=float)
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'PINHOLE_RADIAL_TANGENTIAL', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="PINHOLE", type=str)
+                        default="DIVISION_UNDISTORTION", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, 
@@ -46,13 +46,25 @@ def main():
                         default=0.03)
     parser.add_argument("--calib_cam_line_delay",
                         help="If camera line delay should be calibrated (EXPERIMENTAL)", default=0)
-    parser.add_argument("--board_type", help="Board type (radon or charuco)", default="charuco", type=str)
-    parser.add_argument("--gravity_const", help="gravity constant", default=9.811104, type=float)
-    parser.add_argument("--recompute_corners", help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
-    parser.add_argument("--bias_calib_remove_s", help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
-    parser.add_argument("--reestimate_bias_spline_opt", help="If biases should be also estimated during spline optimization", default=0, type=int)
-    parser.add_argument("--optimize_board_points", help="if board points should be optimized during camera calibration and after pose estimation.", default=1, type=int)
-    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
+    parser.add_argument("--board_type", 
+                        help="Board type (radon or charuco)", default="charuco", type=str)
+    parser.add_argument("--gravity_const", 
+                        help="gravity constant", default=9.811104, type=float)
+    parser.add_argument("--recompute_corners", 
+                        help="If the corners should be extracted again when running a dataset multiple times.", default=1, type=int)
+    parser.add_argument("--bias_calib_remove_s", 
+                        help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
+    parser.add_argument("--reestimate_bias_spline_opt", 
+                        help="If biases should be also estimated during spline optimization", default=1, type=int)
+    parser.add_argument("--optimize_board_points", 
+                        help="if board points should be optimized during camera calibration and after pose estimation.", default=0, type=int)
+    parser.add_argument("--known_gravity_axis", 
+                        help="If the gravity direction in the calibration board is exactly known.", 
+                        choices=["X","Y","Z","UNKOWN"], default="UNKOWN", type=str)
+    parser.add_argument("--global_shutter", 
+                        help="If the camera is a global shutter cam.", default=0, type=int)
+    parser.add_argument("--verbose", 
+                        help="If calibration steps should output more information.", default=0, type=int)
 
     args = parser.parse_args()
 
@@ -261,11 +273,17 @@ def main():
     print("Initializing IMU to camera rotation.")
     print("==================================================================")
     start = time.time()
+    # in the case of GoPro's we can actually take the first IMU timestamp as an initial guess
+    # for the time offset IMU->CAM
+    importer = TelemetryImporter()
+    importer.read_generic_json(gopro_telemetry_gen)
+    t_imu_2_cam = -importer.telemetry["timestamps_ns"][0]*1e-9
     spline_init = Popen([pjoin(bin_path,"estimate_imu_to_camera_rotation"),
                        "--telemetry_json=" + gopro_telemetry_gen,
                        "--input_pose_calibration_dataset=" + pose_calib_dataset,
                        "--imu_bias_estimate=" + imu_bias_json,
                        "--imu_rotation_init_output=" + imu_cam_calibration_json,
+                       "--delta_t_imu_to_cam=" + str(t_imu_2_cam),
                        "--logtostderr=1"])
     error_spline_init = spline_init.wait()  
     print("==================================================================")
@@ -292,6 +310,9 @@ def main():
                        "--result_output_json=" + cam_imu_result_json,
                        "--reestimate_biases="+str(args.reestimate_bias_spline_opt),
                        "--logtostderr=1",
+                       "--global_shutter="+str(args.global_shutter),
+                       "--gravity_const="+str(args.gravity_const),
+                       "--known_grav_dir_axis="+args.known_gravity_axis,
                        "--calibrate_cam_line_delay="+str(args.calib_cam_line_delay),
                        "--debug_video_path="+cam_imu_video[0]])
     error_spline_init = spline_init.wait()  

@@ -11,7 +11,7 @@ namespace OpenICC {
 namespace allanvar {
 
 class AllanGyr {
-public:
+ public:
   AllanGyr(std::string name, int maxCluster = 10000);
   ~AllanGyr();
   void pushRadPerSec(double data, double time);
@@ -26,7 +26,7 @@ public:
   double getAvgValue();
   double getFreq() const;
 
-private:
+ private:
   std::vector<double> calcVariance(double period);
 
   std::vector<double> calcThetas(const double freq);
@@ -49,5 +49,5 @@ private:
   std::vector<double> mVariance;
 };
 
-} // namespace allanvar
-} // namespace OpenICC
+}  // namespace allanvar
+}  // namespace OpenICC

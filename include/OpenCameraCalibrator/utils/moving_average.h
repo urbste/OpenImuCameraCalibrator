@@ -3,9 +3,12 @@ namespace OpenICC {
 
 // from https://rosettacode.org/wiki/Averages/Simple_moving_average#C.2B.2B
 class SimpleMovingAverage {
-public:
+ public:
   SimpleMovingAverage(unsigned int period)
-      : period(period), window(new double[period]), head(NULL), tail(NULL),
+      : period(period),
+        window(new double[period]),
+        head(NULL),
+        tail(NULL),
         total(0) {
     assert(period >= 1);
   }
@@ -44,24 +47,25 @@ public:
   double avg() const {
     ptrdiff_t size = this->size();
     if (size == 0) {
-      return 0; // No entries => 0 average
+      return 0;  // No entries => 0 average
     }
-    return total / (double)size; // Cast to double for floating point arithmetic
+    return total /
+           (double)size;  // Cast to double for floating point arithmetic
   }
 
-private:
+ private:
   unsigned int period;
-  double *window; // Holds the values to calculate the average of.
+  double* window;  // Holds the values to calculate the average of.
 
   // Logically, head is before tail
-  double *head; // Points at the oldest element we've stored.
-  double *tail; // Points at the newest element we've stored.
+  double* head;  // Points at the oldest element we've stored.
+  double* tail;  // Points at the newest element we've stored.
 
-  double total; // Cache the total so we don't sum everything each time.
+  double total;  // Cache the total so we don't sum everything each time.
 
   // Bumps the given pointer up by one.
   // Wraps to the start of the array if needed.
-  void inc(double *&p) {
+  void inc(double*& p) {
     if (++p >= window + period) {
       p = window;
     }
@@ -69,12 +73,10 @@ private:
 
   // Returns how many numbers we have stored.
   ptrdiff_t size() const {
-    if (head == NULL)
-      return 0;
-    if (head == tail)
-      return period;
+    if (head == NULL) return 0;
+    if (head == tail) return period;
     return (period + tail - head) % period;
   }
 };
 
-} // namespace OpenICC
+}  // namespace OpenICC

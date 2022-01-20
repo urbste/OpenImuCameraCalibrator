@@ -15,7 +15,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_static_calib_dataset', 
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset3', 
+                        default='/media/Data/work_projects/ImageStabelization/GoPro10Calibration/ImuIntrinsics/dataset1', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -25,7 +25,7 @@ def main():
                         default='/media/Data/projects/OpenImuCameraCalibrator')   
     parser.add_argument("--gravity_const", help="gravity constant", default=9.811104, type=float)
     parser.add_argument("--initial_static_duration_s", 
-    help="duration of the initial static phase for bias estimation", default=10, type=float)
+    help="duration of the initial static phase for bias estimation", default=15, type=float)
 
     parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
 

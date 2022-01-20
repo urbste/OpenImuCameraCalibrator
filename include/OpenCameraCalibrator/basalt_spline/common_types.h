@@ -38,10 +38,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unordered_map>
 #include <vector>
 
-#include <Eigen/Core>
-#include <Eigen/StdVector>
 #include "sophus/se3.hpp"
 #include "sophus_utils.h"
+#include <Eigen/Core>
+#include <Eigen/StdVector>
 
 #include "OpenCameraCalibrator/utils/types.h"
 
@@ -105,7 +105,6 @@ struct KeypointsData {
   HashBowVector bow_vector;
 };
 
-
 /// feature matches for an image pair
 struct MatchData {
   /// estimated transformation (based on inliers or calibration) from the second
@@ -158,7 +157,9 @@ struct Landmark {
 
 /// collection {imageId => Camera} for all cameras in the map
 using Cameras =
-    std::map<TimeCamId, Camera, std::less<TimeCamId>,
+    std::map<TimeCamId,
+             Camera,
+             std::less<TimeCamId>,
              Eigen::aligned_allocator<std::pair<const TimeCamId, Camera>>>;
 
 /// collection {trackId => Landmark} for all landmarks in the map.
@@ -256,8 +257,7 @@ struct hash<TimeCamId> {
 
 template <>
 struct hash<std::pair<TimeCamId, TimeCamId>> {
-  size_t operator()(
-      const std::pair<TimeCamId, TimeCamId>& x) const {
+  size_t operator()(const std::pair<TimeCamId, TimeCamId>& x) const {
     size_t seed = 0;
     hash_combine(seed, std::hash<int>()(x.first.frame_id));
     hash_combine(seed, std::hash<int>()(x.first.cam_id));
@@ -267,5 +267,3 @@ struct hash<std::pair<TimeCamId, TimeCamId>> {
   }
 };
 }  // namespace std
-
-

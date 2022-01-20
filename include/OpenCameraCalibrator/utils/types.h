@@ -26,14 +26,16 @@
 
 namespace OpenICC {
 
-const double NS_TO_S = 1e-9; ///< Nanosecond to second conversion
-const double S_TO_NS = 1e9;  ///< Second to nanosecond conversion
+const double NS_TO_S = 1e-9;  ///< Nanosecond to second conversion
+const double S_TO_NS = 1e9;   ///< Second to nanosecond conversion
 
-const double US_TO_S = 1e-6; ///< Museconds to second conversion
-const double S_TO_US = 1e6;  ///< Second to museconds conversion
+const double US_TO_S = 1e-6;  ///< Museconds to second conversion
+const double S_TO_US = 1e6;   ///< Second to museconds conversion
 
-const double MS_TO_S = 1e-3; ///< Milliseconds to second conversion
-const double S_TO_MS = 1e3;  ///< Second to milliseconds conversion
+const double MS_TO_S = 1e-3;  ///< Milliseconds to second conversion
+const double S_TO_MS = 1e3;   ///< Second to milliseconds conversion
+
+enum class CalibBoardGravDir { UNKOWN = -1, X = 0, Y = 1, Z = 2 };
 
 // alignment stuff
 template <typename T>
@@ -43,12 +45,15 @@ template <typename T>
 using aligned_deque = std::deque<T, Eigen::aligned_allocator<T>>;
 
 template <typename K, typename V>
-using aligned_map = std::map<K, V, std::less<K>,
-                             Eigen::aligned_allocator<std::pair<K const, V>>>;
+using aligned_map = std::
+    map<K, V, std::less<K>, Eigen::aligned_allocator<std::pair<K const, V>>>;
 
 template <typename K, typename V>
 using aligned_unordered_map =
-    std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
+    std::unordered_map<K,
+                       V,
+                       std::hash<K>,
+                       std::equal_to<K>,
                        Eigen::aligned_allocator<std::pair<K const, V>>>;
 
 using quat_vector = aligned_vector<Eigen::Quaterniond>;
@@ -67,33 +72,34 @@ struct GPXData {
   std::vector<double> geoid_height;
   vec2_vector vel2d_vel3d;
 
-public:
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 template <typename T>
 class ImuReading {
-public:
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   ImuReading() {}
 
   ImuReading(T timestamp_s, T x, T y, T z)
       : timestamp_s_(timestamp_s), xyz_(x, y, z) {}
 
-  ImuReading(T timestamp_s, const  Eigen::Matrix<T, 3, 1> &data)
+  ImuReading(T timestamp_s, const Eigen::Matrix<T, 3, 1>& data)
       : timestamp_s_(timestamp_s), xyz_(data) {}
 
-  ImuReading(T timestamp_s, const T *data)
+  ImuReading(T timestamp_s, const T* data)
       : timestamp_s_(timestamp_s), xyz_(data[0], data[1], data[2]) {}
 
-  inline const T &timestamp_s() const { return timestamp_s_; }
-  inline const Eigen::Matrix<T, 3, 1> &data() const { return xyz_; }
-  inline const T &operator()(int index) const { return xyz_[index]; }
-  inline const T &x() const { return xyz_[0]; }
-  inline const T &y() const { return xyz_[1]; }
-  inline const T &z() const { return xyz_[2]; }
-  inline const T *data_ptr() const { return xyz_.data(); }
-private:
+  inline const T& timestamp_s() const { return timestamp_s_; }
+  inline const Eigen::Matrix<T, 3, 1>& data() const { return xyz_; }
+  inline const T& operator()(int index) const { return xyz_[index]; }
+  inline const T& x() const { return xyz_[0]; }
+  inline const T& y() const { return xyz_[1]; }
+  inline const T& z() const { return xyz_[2]; }
+  inline const T* data_ptr() const { return xyz_.data(); }
+
+ private:
   //! imu reading
   Eigen::Matrix<T, 3, 1> xyz_;
   //! timestamp in seconds
@@ -107,13 +113,12 @@ struct SplineWeightingData {
   // create this with get_sew_for_dataset.py
   double dt_r3;
   double dt_so3;
-  double var_r3;
-  double var_so3;
+  double std_r3;
+  double std_so3;
   double cam_fps;
 };
 
 using ImuReadings = std::vector<ImuReading<double>>;
-
 
 struct CameraTelemetryData {
   // IMU
@@ -129,12 +134,12 @@ struct IMUCalibData {
   double rate;
   Eigen::Matrix3d R_imu_to_camera;
 
-public:
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 class Data {
-public:
+ public:
   Data() : v(0.0), t(0.0) {}
   Data(double data, double time) : v(data), t(time) {}
 
@@ -143,7 +148,7 @@ public:
 };
 
 class AccData {
-public:
+ public:
   AccData() : a(0.0), t(0.0) {}
   AccData(double data, double time) : a(data), t(time) {}
 
@@ -152,7 +157,7 @@ public:
 };
 
 class GyrData {
-public:
+ public:
   GyrData() : w(0.0), t(0.0) {}
   GyrData(double data, double time) : w(data), t(time) {}
 
@@ -160,7 +165,8 @@ public:
   double t;
 };
 
-template <typename _T> class ThreeAxisSensorCalibParams {
+template <typename _T>
+class ThreeAxisSensorCalibParams {
   /** @brief This object contains the calibration parameters (misalignment,
    * scale factors, ...) of a generic orthogonal sensor triad (accelerometers,
    * gyroscopes, etc.)
@@ -210,17 +216,23 @@ template <typename _T> class ThreeAxisSensorCalibParams {
    *
    * X'' = T*K*X
    */
-public:
+ public:
   /** @brief Basic "default" constructor: without any parameter, it initilizes
    * the calibration parameter with default values (zero scaling factors and
    * biases, identity misalignment matrix)
    */
-  ThreeAxisSensorCalibParams(const _T &mis_yz = _T(0), const _T &mis_zy = _T(0),
-                             const _T &mis_zx = _T(0), const _T &mis_xz = _T(0),
-                             const _T &mis_xy = _T(0), const _T &mis_yx = _T(0),
-                             const _T &s_x = _T(1), const _T &s_y = _T(1),
-                             const _T &s_z = _T(1), const _T &b_x = _T(0),
-                             const _T &b_y = _T(0), const _T &b_z = _T(0)) {
+  ThreeAxisSensorCalibParams(const _T& mis_yz = _T(0),
+                             const _T& mis_zy = _T(0),
+                             const _T& mis_zx = _T(0),
+                             const _T& mis_xz = _T(0),
+                             const _T& mis_xy = _T(0),
+                             const _T& mis_yx = _T(0),
+                             const _T& s_x = _T(1),
+                             const _T& s_y = _T(1),
+                             const _T& s_z = _T(1),
+                             const _T& b_x = _T(0),
+                             const _T& b_y = _T(0),
+                             const _T& b_z = _T(0)) {
     mis_mat_ << _T(1), -mis_yz, mis_zy, mis_xz, _T(1), -mis_zx, -mis_xy, mis_yx,
         _T(1);
 
@@ -248,29 +260,29 @@ public:
   inline _T biasY() const { return bias_vec_(1); }
   inline _T biasZ() const { return bias_vec_(2); }
 
-  inline const Eigen::Matrix<_T, 3, 3> &GetMisalignmentMatrix() const {
+  inline const Eigen::Matrix<_T, 3, 3>& GetMisalignmentMatrix() const {
     return mis_mat_;
   }
-  inline const Eigen::Matrix<_T, 3, 3> &GetScaleMatrix() const {
+  inline const Eigen::Matrix<_T, 3, 3>& GetScaleMatrix() const {
     return scale_mat_;
   }
-  inline const Eigen::Matrix<_T, 3, 1> &GetBiasVector() const {
+  inline const Eigen::Matrix<_T, 3, 1>& GetBiasVector() const {
     return bias_vec_;
   }
 
-  inline void SetScale(const Eigen::Matrix<_T, 3, 1> &s_vec) {
+  inline void SetScale(const Eigen::Matrix<_T, 3, 1>& s_vec) {
     scale_mat_(0, 0) = s_vec(0);
     scale_mat_(1, 1) = s_vec(1);
     scale_mat_(2, 2) = s_vec(2);
     Update();
   }
 
-  inline void SetMisalignmentMatrix(const Eigen::Matrix<_T, 3, 3> &mis_mat) {
+  inline void SetMisalignmentMatrix(const Eigen::Matrix<_T, 3, 3>& mis_mat) {
     mis_mat_ = mis_mat;
     Update();
   }
 
-  inline void SetBias(const Eigen::Matrix<_T, 3, 1> &b_vec) {
+  inline void SetBias(const Eigen::Matrix<_T, 3, 1>& b_vec) {
     bias_vec_ = b_vec;
     Update();
   }
@@ -278,8 +290,8 @@ public:
   /** @brief Normalize a raw data X by correcting the misalignment and the
    * scale, i.e., by applying the equation  X'' = T*K*X
    */
-  inline Eigen::Matrix<_T, 3, 1>
-  Normalize(const Eigen::Matrix<_T, 3, 1> &raw_data) const {
+  inline Eigen::Matrix<_T, 3, 1> Normalize(
+      const Eigen::Matrix<_T, 3, 1>& raw_data) const {
     return ms_mat_ * raw_data;
   }
 
@@ -287,18 +299,18 @@ public:
    *         correcting the misalignment and the scale,
    *         i.e., by applying the equation  X' = T*K*(X - B)
    */
-  inline Eigen::Matrix<_T, 3, 1>
-  UnbiasNormalize(const Eigen::Matrix<_T, 3, 1> &raw_data) const {
+  inline Eigen::Matrix<_T, 3, 1> UnbiasNormalize(
+      const Eigen::Matrix<_T, 3, 1>& raw_data) const {
     return ms_mat_ * (raw_data - bias_vec_);
   }
 
   /** @brief Remove the biases from a raw data */
-  inline Eigen::Matrix<_T, 3, 1>
-  Unbias(const Eigen::Matrix<_T, 3, 1> &raw_data) const {
+  inline Eigen::Matrix<_T, 3, 1> Unbias(
+      const Eigen::Matrix<_T, 3, 1>& raw_data) const {
     return raw_data - bias_vec_;
   }
 
-private:
+ private:
   /** @brief Update internal data (e.g., compute Misalignment * scale matrix)
    *         after a parameter is changed */
   void Update() { ms_mat_ = mis_mat_ * scale_mat_; }
@@ -315,4 +327,4 @@ private:
 
 using ThreeAxisSensorCalibParamsd = ThreeAxisSensorCalibParams<double>;
 
-} // namespace OpenICC
+}  // namespace OpenICC

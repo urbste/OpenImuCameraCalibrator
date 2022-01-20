@@ -46,7 +46,7 @@ void AllanGyr::calc() {
   std::cout << m_name << " "
             << " end_t " << end_t << std::endl;
   std::cout << m_name << " "
-            << "dt " << std::endl //
+            << "dt " << std::endl  //
             << "-------------" << (end_t - start_t) << " s" << std::endl
             << "-------------" << (end_t - start_t) / 60 << " min" << std::endl
             << "-------------" << (end_t - start_t) / 3600 << " h" << std::endl;
@@ -78,7 +78,7 @@ std::vector<double> AllanGyr::getDeviation() {
   std::vector<double> sigma2 = calcVariance(period);
   std::vector<double> sigma;
 
-  for (auto &sig : sigma2) {
+  for (auto& sig : sigma2) {
     sigma.push_back(sqrt(sig));
   }
   return sigma;
@@ -127,7 +127,7 @@ std::vector<double> AllanGyr::calcThetas(const double freq) {
   std::vector<double> thetas;
 
   double sum = 0;
-  for (auto &gyro : m_rawData) {
+  for (auto& gyro : m_rawData) {
     sum += gyro.w;
     thetas.push_back(sum / freq);
   }
@@ -135,7 +135,6 @@ std::vector<double> AllanGyr::calcThetas(const double freq) {
 }
 
 void AllanGyr::initStrides() {
-
   int mode = numData / 2;
   unsigned int maxStride = 1;
   int shft = 0;
@@ -201,9 +200,8 @@ double AllanGyr::getAvgDt() {
   double sum_dt = 0.0;
   double start_t = m_rawData[0].t;
   bool first = true;
-  for (auto &gyro : m_rawData) {
-    if (!first)
-      sum_dt += (gyro.t - start_t);
+  for (auto& gyro : m_rawData) {
+    if (!first) sum_dt += (gyro.t - start_t);
     start_t = gyro.t;
     first = false;
   }
@@ -213,7 +211,7 @@ double AllanGyr::getAvgDt() {
 double AllanGyr::getAvgValue() {
   double sum = 0.0;
   int num = 0;
-  for (auto &gyro : m_rawData) {
+  for (auto& gyro : m_rawData) {
     sum += gyro.w;
     ++num;
   }
@@ -222,5 +220,5 @@ double AllanGyr::getAvgValue() {
 
 double AllanGyr::getFreq() const { return m_freq; }
 
-} // namespace allanvar
-} // namespace OpenICC
+}  // namespace allanvar
+}  // namespace OpenICC
