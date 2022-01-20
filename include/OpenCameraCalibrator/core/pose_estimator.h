@@ -56,6 +56,8 @@ class PoseEstimator {
 
   void OptimizeAllPoses();
 
+  void FilterBadPoses();
+
  private:
   //! Pose datasets
   theia::Reconstruction pose_dataset_;

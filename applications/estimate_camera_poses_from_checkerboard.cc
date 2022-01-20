@@ -63,6 +63,8 @@ int main(int argc, char* argv[]) {
     pose_estimator.OptimizeBoardPoints();
     pose_estimator.OptimizeAllPoses();
   }
+  LOG(INFO) << "Filtering bad poses.\n";
+  pose_estimator.FilterBadPoses();
 
   theia::Reconstruction pose_dataset;
   pose_estimator.GetPoseDataset(pose_dataset);

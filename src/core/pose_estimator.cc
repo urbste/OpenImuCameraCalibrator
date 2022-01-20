@@ -16,6 +16,7 @@
 #include "OpenCameraCalibrator/core/pose_estimator.h"
 
 #include "OpenCameraCalibrator/io/read_scene.h"
+#include "OpenCameraCalibrator/utils/utils.h"
 
 #include <theia/io/reconstruction_reader.h>
 #include <theia/io/reconstruction_writer.h>
@@ -94,10 +95,10 @@ bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json& scene_json,
   const double image_diag =
       std::sqrt(camera.ImageWidth() * camera.ImageWidth() +
                 camera.ImageHeight() * camera.ImageHeight());
-  const double max_reproj_error = 0.005 * camera.ImageHeight();
+  const double max_reproj_error = 0.004 * camera.ImageHeight();
   std::cout << "PoseEstimator setting max reprojection error to: "
             << max_reproj_error << "\n";
-  // set error thresh 0.3% from image size and normalize
+  // set error thresh 0.4% from image size and normalize
   ransac_params_.error_thresh = max_reproj_error / image_diag;
   // get scene points and fill them into
   io::scene_points_to_calib_dataset(scene_json, pose_dataset_);
@@ -231,6 +232,31 @@ void PoseEstimator::OptimizeAllPoses() {
   theia::BundleAdjustViews(
       ba_options_, pose_dataset_.ViewIds(), &pose_dataset_);
   LOG(INFO) << "Finished optimizing camera poses.";
+}
+
+void PoseEstimator::FilterBadPoses() {
+
+  // sometimes it happens that poses are far away or
+  // on the wrong side of the calibration board
+  std::vector<double> z_values;
+  for (const auto& v_id : pose_dataset_.ViewIds()) {
+      const auto pos = pose_dataset_.View(v_id)->Camera().GetPosition();
+      z_values.push_back(pos[2]);
+  }
+
+  // get median distance to board
+  double median_z = utils::MedianOfDoubleVec(z_values);
+  for (const auto& v_id : pose_dataset_.ViewIds()) {
+      const auto pos = pose_dataset_.View(v_id)->Camera().GetPosition();
+      double diff = pos[2] - median_z;
+      if (std::abs(diff) > median_z) {
+        LOG(INFO) << "Removing view " << v_id
+                    << " due to large z coordinate: " << pos[2]
+                    << " vs median z coordinate " << median_z  << "\n";
+        pose_dataset_.RemoveView(v_id);
+      }
+  }
+
 }
 
 }  // namespace core
