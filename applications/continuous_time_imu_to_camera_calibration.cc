@@ -167,8 +167,6 @@ int main(int argc, char* argv[]) {
       FLAGS_imu_intrinsics, FLAGS_imu_bias_file, acc_intr, gyr_intr))
       << "Could not open " << FLAGS_imu_intrinsics;
   std::cout << "Loaded IMU intrinsics.\n";
-  std::cout << "accel_calib_triad loaded: " << acc_intr.GetMisalignmentMatrix()
-            << "\n";
   CHECK(FLAGS_spline_error_weighting_json != "")
       << "You need to provide spline error weighting factors. Create with "
          "get_sew_for_dataset.py.";
@@ -193,7 +191,7 @@ int main(int argc, char* argv[]) {
   const int grav_dir_axis = GravDirStringToInt(FLAGS_known_grav_dir_axis);
   int flags = SplineOptimFlags::SPLINE | SplineOptimFlags::T_I_C;
   if (FLAGS_reestimate_biases) {
-      flags |= SplineOptimFlags::IMU_BIASES;
+    flags |= SplineOptimFlags::IMU_BIASES;
   }
   if (grav_dir_axis != -1) {
     Eigen::Vector3d grav_dir(0, 0, 0);
@@ -218,11 +216,11 @@ int main(int argc, char* argv[]) {
 
   std::cout << "g: " << imu_cam_calibrator.trajectory_.GetGravity().transpose()
             << std::endl;
-  std::cout << "accel_bias: "
-            << imu_cam_calibrator.trajectory_.GetAccelBias().transpose()
+  std::cout << "accel_bias at time 0: "
+            << imu_cam_calibrator.trajectory_.GetAcclBias(0).transpose()
             << std::endl;
-  std::cout << "gyro_bias: "
-            << imu_cam_calibrator.trajectory_.GetGyroBias().transpose()
+  std::cout << "gyro_bias at time 0: "
+            << imu_cam_calibrator.trajectory_.GetGyroBias(0).transpose()
             << std::endl;
   const Eigen::Quaterniond q_i_c =
       imu_cam_calibrator.trajectory_.GetT_i_c().so3().unit_quaternion();
@@ -276,12 +274,19 @@ int main(int argc, char* argv[]) {
     // write out spline estimates
     Eigen::Vector3d gyro_spline;
     imu_cam_calibrator.trajectory_.GetAngularVelocity(t_ns, gyro_spline);
+    const auto bias = imu_cam_calibrator.trajectory_.GetGyroBias(t_ns);
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["x"] =
         gyro_spline[0];
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["y"] =
         gyro_spline[1];
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["z"] =
         gyro_spline[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_bias"]["x"] =
+        bias[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_bias"]["y"] =
+        bias[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["gyro_bias"]["z"] =
+        bias[2];
   }
   for (auto& a : accl_meas) {
     const int64_t t_ns = a.first * S_TO_NS;
@@ -296,12 +301,19 @@ int main(int argc, char* argv[]) {
     // write out spline estimates
     Eigen::Vector3d accl_spline;
     imu_cam_calibrator.trajectory_.GetAcceleration(t_ns, accl_spline);
+    const auto bias = imu_cam_calibrator.trajectory_.GetAcclBias(t_ns);
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["x"] =
         accl_spline[0];
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["y"] =
         accl_spline[1];
     json_calibspline_results_out["trajectory"][t_ns_s]["accl_spline"]["z"] =
         accl_spline[2];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_bias"]["x"] =
+        bias[0];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_bias"]["y"] =
+        bias[1];
+    json_calibspline_results_out["trajectory"][t_ns_s]["accl_bias"]["z"] =
+        bias[2];
   }
 
   std::ofstream calibspline_output_json_file(FLAGS_result_output_json);

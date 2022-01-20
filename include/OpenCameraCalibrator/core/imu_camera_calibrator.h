@@ -73,7 +73,8 @@ class ImuCameraCalibrator {
   double GetInitialRSLineDelay() { return inital_cam_line_delay_s_; }
 
   void GetIMUIntrinsics(ThreeAxisSensorCalibParams<double>& acc_intrinsics,
-                        ThreeAxisSensorCalibParams<double>& gyr_intrinsics);
+                        ThreeAxisSensorCalibParams<double>& gyr_intrinsics,
+                        const int64_t time_ns = 0);
 
  private:
   void InitializeGravity(const OpenICC::CameraTelemetryData& telemetry_data);

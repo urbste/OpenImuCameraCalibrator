@@ -53,7 +53,7 @@ CameraCalibrator::CameraCalibrator(const std::string& camera_model,
   ransac_params_.use_mle = true;
   ransac_params_.max_iterations = 1000;
   ransac_params_.min_iterations = 5;
-  ransac_params_.error_thresh = 0.5;
+  ransac_params_.error_thresh = 3.0;
 }
 
 void CameraCalibrator::RemoveViewsReprojError(const double max_reproj_error) {
@@ -265,6 +265,8 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
     double focal_length = 0.0, radial_distortion = 0.0;
     LOG(INFO) << "Initializing " << camera_model_ << " camera model.\n";
 
+    // set error thresh 0.3% from image size
+    ransac_params_.error_thresh = 0.003 * image_height;
     if (camera_model_ == "PINHOLE" ||
         camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
       success_init = utils::initialize_pinhole_camera(correspondences,

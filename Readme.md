@@ -238,15 +238,14 @@ v0.1
 * [x] Rolling shutter calibration -> first resolve problems with templated spline functions
 * [x] Add readout time as a optimizable parameter -> not working well, probably residual weighting needs to be improved
 * [x] Allan variance -> imu_utils
-* [ ] Support AprilTag board from Kalibr to record same datasets
+* [x] Support AprilTag board from Kalibr to record same datasets
 * [x] Calibrate axis misalignment and so on with MutliPoseOptimization from imu_tk
-* [ ] Include imu axis and scale in spline error functions
-* [ ] Beautify logs
-* [ ] Cleanup
+* [x] Include imu axis and scale in spline error functions
+* [x] Beautify logs
+* [x] Cleanup
 
 v0.2
-* [ ] Calibrate also imu parameters like axis misalignment
-* [ ] Model bias over time with a R3 spline
+* [x] Model bias over time with a R3 spline
 * [ ] Pose estimation with UPNP or MLPnP to support arbitraty camera types. Right now: undistortion and then using vanilla PnP --> will lead to problems for Ultra Wide Angle fisheye lenses (e.g. GoPro Max or potentially Max lens mod)
 * [ ] Pose estimation with RSPnP
 * [ ] use only bearings in spline reproj error -> local tangent reprojection error
@@ -254,7 +253,7 @@ v0.2
 * [ ] Extend to multi-camera systems
 * [ ] Docker?
 * [ ] Add more camera models -> Scaramuzza omni model, ...
-* [ ] Integrate updated version of spline optimizer
+* [x] Integrate updated version of spline optimizer
 
 misc
 * [ ] Put together a little paper on how this all works

@@ -21,7 +21,9 @@ enum SplineOptimFlags {
   IMU_INTRINSICS = 1 << 3,
   GRAVITY_DIR = 1 << 4,
   CAM_LINE_DELAY = 1 << 5,
-  SPLINE = 1 << 6
+  SPLINE = 1 << 6,
+  ACC_BIAS = 1 << 7,
+  GYR_BIAS = 1 << 8
 };
 
 const double GRAVITY_MAGN = 9.81;
@@ -44,6 +46,13 @@ class SplineTrajectoryEstimator {
                 int64_t end_time_ns);
 
   void InitSpline(const int flags, const double end_time_s = 0.0);
+
+  void InitBiasSplines(const Eigen::Vector3d& accl_init_bias,
+                       const Eigen::Vector3d& gyr_init_bias,
+                       int64_t dt_accl_bias_ns = 500000000,
+                       int64_t dt_gyro_bias_ns = 500000000,
+                       const double max_accl_range = 1.0,
+                       const double max_gyro_range = 1e-2);
 
   void BatchInitSO3R3VisPoses();
 
@@ -83,7 +92,7 @@ class SplineTrajectoryEstimator {
   // setter
   void SetImageData(const theia::Reconstruction& c);
 
-  void SetG(const Eigen::Vector3d& g);
+  void SetGravity(const Eigen::Vector3d& g);
 
   void SetT_i_c(const Sophus::SE3<double>& T);
 
@@ -118,9 +127,9 @@ class SplineTrajectoryEstimator {
 
   int64_t GetMinTimeNs() const;
 
-  Eigen::Vector3d GetGyroBias() const;
+  Eigen::Vector3d GetGyroBias(const int64_t& time_ns);
 
-  Eigen::Vector3d GetAccelBias() const;
+  Eigen::Vector3d GetAcclBias(const int64_t& time_ns);
 
   double GetMeanReprojectionError();
 
@@ -130,9 +139,9 @@ class SplineTrajectoryEstimator {
 
   double GetRSLineDelay() const;
 
-  ThreeAxisSensorCalibParams<double> GetAcclIntrinsics() const;
+  ThreeAxisSensorCalibParams<double> GetAcclIntrinsics(const int64_t& time_ns);
 
-  ThreeAxisSensorCalibParams<double> GetGyroIntrinsics() const;
+  ThreeAxisSensorCalibParams<double> GetGyroIntrinsics(const int64_t& time_ns);
 
   void ConvertToTheiaRecon(theia::Reconstruction* recon_out);
 
@@ -145,17 +154,45 @@ class SplineTrajectoryEstimator {
                  double& u,
                  int64_t& s,
                  int64_t dt_ns,
-                 size_t nr_knots);
+                 size_t nr_knots,
+                 const int N = N_);
 
-  int64_t dt_so3_ns_;
-  int64_t dt_r3_ns_;
   int64_t start_t_ns_;
   int64_t end_t_ns_;
+
+  //! SO3 and R3 spline meta data
+  int64_t dt_so3_ns_;
+  int64_t dt_r3_ns_;
+
   double inv_r3_dt_;
   double inv_so3_dt_;
+
   size_t nr_knots_so3_;
   size_t nr_knots_r3_;
 
+  so3_vector so3_knots_;
+  vec3_vector r3_knots_;
+
+  std::vector<bool> so3_knot_in_problem_;
+  std::vector<bool> r3_knot_in_problem_;
+
+  //! bias spline meta data
+  size_t nr_knots_accl_bias_;
+  size_t nr_knots_gyro_bias_;
+
+  int64_t dt_accl_bias_ns_;
+  int64_t dt_gyro_bias_ns_;
+
+  double inv_accl_bias_dt_;
+  double inv_gyro_bias_dt_;
+
+  vec3_vector gyro_bias_spline_;
+  vec3_vector accl_bias_spline_;
+
+  double max_accl_bias_range_ = 1.0;
+  double max_gyro_bias_range_ = 1e-2;
+
+  //! parameters
   int optim_flags_;
 
   bool fix_imu_intrinsics_ = false;
@@ -164,24 +201,12 @@ class SplineTrajectoryEstimator {
 
   double imu_to_camera_time_offset_s_ = 0.0;
 
-  so3_vector so3_knots_;
-  vec3_vector r3_knots_;
-
-  std::vector<bool> so3_knot_in_problem_;
-  std::vector<bool> r3_knot_in_problem_;
-
   std::set<theia::TrackId> tracks_in_problem_;
 
   Eigen::Vector3d gravity_;
 
   Eigen::Matrix<double, 6, 1> accl_intrinsics_;
   Eigen::Matrix<double, 9, 1> gyro_intrinsics_;
-
-  Eigen::Vector3d accl_bias_;
-  Eigen::Vector3d gyro_bias_;
-
-  // vec3_vector gyro_bias_spline_;
-  // vec3_vector accel_bias_spline_;
 
   theia::Reconstruction image_data_;
 

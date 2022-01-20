@@ -46,8 +46,7 @@ class PoseEstimator {
                            const std::vector<int>& board_pts3_ids);
 
   bool EstimatePosesFromJson(const nlohmann::json& scene_json,
-                             const theia::Camera camera,
-                             const double max_reproj_error = 3.0);
+                             const theia::Camera camera);
 
   void GetPoseDataset(theia::Reconstruction& pose_dataset) {
     pose_dataset = pose_dataset_;

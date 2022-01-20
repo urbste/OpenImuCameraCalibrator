@@ -18,6 +18,8 @@
 
 #include <sophus/so3.hpp>
 
+static constexpr int BIAS_SPLINE_N = 2;
+
 template <int _N>
 struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
   static constexpr int N = _N;        // Order of the spline.
@@ -35,13 +37,17 @@ struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
                                double inv_r3_dt,
                                double u_so3,
                                double inv_so3_dt,
-                               double inv_std)
+                               double inv_std,
+                               double u_bias,
+                               double inv_bias_dt)
       : measurement(measurement),
         u_r3(u_r3),
         inv_r3_dt(inv_r3_dt),
         u_so3(u_so3),
         inv_so3_dt(inv_so3_dt),
-        inv_std(inv_std) {}
+        inv_std(inv_std),
+        u_bias(u_bias),
+        inv_bias_dt(inv_bias_dt) {}
 
   template <class T>
   bool operator()(T const* const* sKnots, T* sResiduals) const {
@@ -57,9 +63,14 @@ struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
     Vector3 accel_w;
     CeresSplineHelper<T, N>::template evaluate<3, 2>(
         sKnots + N, T(u_r3), T(inv_r3_dt), &accel_w);
-    Eigen::Map<Vector3 const> const gravity(sKnots[2 * N]);
-    Eigen::Map<Vector6 const> const acl_intrs(sKnots[2 * N + 1]);
-    Eigen::Map<Vector3 const> const acl_bias(sKnots[2 * N + 2]);
+
+    Vector3 bias_spline;
+    CeresSplineHelper<T, BIAS_SPLINE_N>::template evaluate<3, 0>(
+        sKnots + 2 * N, T(u_bias), T(inv_bias_dt), &bias_spline);
+
+    Eigen::Map<Vector3 const> const gravity(sKnots[2 * N + BIAS_SPLINE_N]);
+    Eigen::Map<Vector6 const> const acl_intrs(
+        sKnots[2 * N + BIAS_SPLINE_N + 1]);
 
     OpenICC::ThreeAxisSensorCalibParams<T> accel_calib_triad(acl_intrs[0],
                                                              acl_intrs[1],
@@ -70,9 +81,9 @@ struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
                                                              acl_intrs[3],
                                                              acl_intrs[4],
                                                              acl_intrs[5],
-                                                             acl_bias[0],
-                                                             acl_bias[1],
-                                                             acl_bias[2]);
+                                                             bias_spline[0],
+                                                             bias_spline[1],
+                                                             bias_spline[2]);
 
     Vector3 accl_raw;
     accl_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
@@ -87,6 +98,9 @@ struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
   double inv_r3_dt;
   double inv_so3_dt;
   double inv_std;
+  // bias spline
+  double u_bias;
+  double inv_bias_dt;
 };
 
 template <int _N, template <class> class GroupT, bool OLD_TIME_DERIV>
@@ -106,11 +120,15 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
   GyroCostFunctorSplit(const Eigen::Vector3d& measurement,
                        double u_so3,
                        double inv_so3_dt,
-                       double inv_std)
+                       double inv_std,
+                       double u_bias,
+                       double inv_bias_dt)
       : measurement(measurement),
         u_so3(u_so3),
         inv_so3_dt(inv_so3_dt),
-        inv_std(inv_std) {}
+        inv_std(inv_std),
+        u_bias(u_bias),
+        inv_bias_dt(inv_bias_dt) {}
 
   template <class T>
   bool operator()(T const* const* sKnots, T* sResiduals) const {
@@ -125,8 +143,11 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
     CeresSplineHelper<T, N>::template evaluate_lie<GroupT>(
         sKnots, T(u_so3), T(inv_so3_dt), nullptr, &rot_vel);
 
-    Eigen::Map<Vector9 const> const gyr_intrs(sKnots[N]);
-    Eigen::Map<Vector3 const> const gyr_bias(sKnots[N + 1]);
+    Vector3 bias_spline;
+    CeresSplineHelper<T, BIAS_SPLINE_N>::template evaluate<3, 0>(
+        sKnots + N, T(u_bias), T(inv_bias_dt), &bias_spline);
+
+    Eigen::Map<Vector9 const> const gyr_intrs(sKnots[N + BIAS_SPLINE_N]);
     OpenICC::ThreeAxisSensorCalibParams<T> gyro_calib_triad(gyr_intrs[0],
                                                             gyr_intrs[1],
                                                             gyr_intrs[2],
@@ -136,9 +157,9 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
                                                             gyr_intrs[6],
                                                             gyr_intrs[7],
                                                             gyr_intrs[8],
-                                                            gyr_bias[0],
-                                                            gyr_bias[1],
-                                                            gyr_bias[2]);
+                                                            bias_spline[0],
+                                                            bias_spline[1],
+                                                            bias_spline[2]);
 
     Vector3 gyro_raw;
     gyro_raw << T(measurement[0]), T(measurement[1]), T(measurement[2]);
@@ -148,8 +169,12 @@ struct GyroCostFunctorSplit : public CeresSplineHelper<double, _N> {
   }
 
   Eigen::Vector3d measurement;
-  double u_so3, inv_std;
+  double u_so3;
+  double inv_std;
   double inv_so3_dt;
+  // bias
+  double u_bias, inv_std_bias;
+  double inv_bias_dt;
 };
 
 template <int _N>

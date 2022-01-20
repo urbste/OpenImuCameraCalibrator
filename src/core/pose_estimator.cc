@@ -92,11 +92,14 @@ bool PoseEstimator::EstimatePosePinhole(
 }
 
 bool PoseEstimator::EstimatePosesFromJson(const nlohmann::json& scene_json,
-                                          const theia::Camera camera,
-                                          const double max_reproj_error) {
+                                          const theia::Camera camera) {
   const double image_diag =
       std::sqrt(camera.ImageWidth() * camera.ImageWidth() +
                 camera.ImageHeight() * camera.ImageHeight());
+  const double max_reproj_error = 0.005 * camera.ImageHeight();
+  std::cout << "PoseEstimator setting max reprojection error to: "
+            << max_reproj_error << "\n";
+  // set error thresh 0.3% from image size and normalize
   ransac_params_.error_thresh = max_reproj_error / image_diag;
   // get scene points and fill them into
   io::scene_points_to_calib_dataset(scene_json, pose_dataset_);

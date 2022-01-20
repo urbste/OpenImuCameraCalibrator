@@ -16,8 +16,6 @@ SplineTrajectoryEstimator<_T>::SplineTrajectoryEstimator()
 
   accl_intrinsics_ << 0, 0, 0, 1, 1, 1;
   gyro_intrinsics_ << 0, 0, 0, 0, 0, 0, 1, 1, 1;
-  accl_bias_.setZero();
-  gyro_bias_.setZero();
 }
 
 template <int _T>
@@ -34,8 +32,6 @@ SplineTrajectoryEstimator<_T>::SplineTrajectoryEstimator(
 
   accl_intrinsics_ << 0, 0, 0, 1, 1, 1;
   gyro_intrinsics_ << 0, 0, 0, 0, 0, 0, 1, 1, 1;
-  accl_bias_.setZero();
-  gyro_bias_.setZero();
 }
 
 template <int _T>
@@ -52,6 +48,45 @@ void SplineTrajectoryEstimator<_T>::SetTimes(int64_t time_interval_so3_ns,
   nr_knots_r3_ = duration / dt_r3_ns_ + _T;
   inv_so3_dt_ = S_TO_NS / dt_so3_ns_;
   inv_r3_dt_ = S_TO_NS / dt_r3_ns_;
+}
+
+template <int _T>
+void SplineTrajectoryEstimator<_T>::InitBiasSplines(
+    const Eigen::Vector3d& accl_init_bias,
+    const Eigen::Vector3d& gyr_init_bias,
+    int64_t dt_accl_bias_ns,
+    int64_t dt_gyro_bias_ns,
+    const double max_accl_range,
+    const double max_gyro_range) {
+  max_accl_bias_range_ = max_accl_range;
+  max_gyro_bias_range_ = max_gyro_range;
+
+  dt_accl_bias_ns_ = dt_accl_bias_ns;
+  dt_gyro_bias_ns_ = dt_gyro_bias_ns;
+
+  inv_accl_bias_dt_ = 1. / dt_accl_bias_ns_;
+  inv_gyro_bias_dt_ = 1. / dt_gyro_bias_ns_;
+
+  const auto duration = end_t_ns_ - start_t_ns_;
+  nr_knots_accl_bias_ = duration / dt_accl_bias_ns_ + BIAS_SPLINE_N;
+  nr_knots_gyro_bias_ = duration / dt_gyro_bias_ns_ + BIAS_SPLINE_N;
+
+  std::cout << "Initializing " << nr_knots_accl_bias_
+            << " acceleration bias knots with: " << accl_init_bias.transpose()
+            << " m2/s\n";
+  std::cout << "Initializing " << nr_knots_gyro_bias_
+            << " gyroscope bias knots. " << gyr_init_bias.transpose()
+            << " rad/s\n";
+
+  accl_bias_spline_.resize(nr_knots_accl_bias_);
+  gyro_bias_spline_.resize(nr_knots_gyro_bias_);
+
+  for (int i = 0; i < nr_knots_accl_bias_; ++i) {
+    accl_bias_spline_[i] = accl_init_bias;
+  }
+  for (int i = 0; i < nr_knots_gyro_bias_; ++i) {
+    gyro_bias_spline_[i] = gyr_init_bias;
+  }
 }
 
 template <int _T>
@@ -132,20 +167,6 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
     }
   }
 
-  // if imu intrinics should be optimized
-  if (problem_.HasParameterBlock(accl_bias_.data()) &&
-      problem_.HasParameterBlock(gyro_bias_.data())) {
-    if (!(flags & SplineOptimFlags::IMU_BIASES)) {
-      LOG(INFO) << "Keeping IMU biases constant.";
-      problem_.SetParameterBlockConstant(accl_bias_.data());
-      problem_.SetParameterBlockConstant(gyro_bias_.data());
-    } else {
-      problem_.SetParameterBlockVariable(accl_bias_.data());
-      problem_.SetParameterBlockVariable(gyro_bias_.data());
-      LOG(INFO) << "Optimizing IMU biases and intrinsics.";
-    }
-  }
-
   // add local parametrization for SO(3)
   for (size_t i = 0; i < so3_knots_.size(); ++i) {
     if (problem_.HasParameterBlock(so3_knots_[i].data())) {
@@ -181,6 +202,53 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
       }
     }
   }
+
+  // set bias limits
+  // if imu intrinics should be optimized
+  if ((flags & SplineOptimFlags::ACC_BIAS ||
+       flags & SplineOptimFlags::IMU_BIASES)) {
+    LOG(INFO) << "Optimizing accelerometer bias spline.";
+    for (int i = 0; i < accl_bias_spline_.size(); ++i) {
+      if (problem_.HasParameterBlock(accl_bias_spline_[i].data())) {
+        for (int d = 0; d < 3; ++d) {
+          problem_.SetParameterLowerBound(
+              accl_bias_spline_[i].data(), d, -max_accl_bias_range_);
+          problem_.SetParameterUpperBound(
+              accl_bias_spline_[i].data(), d, max_accl_bias_range_);
+        }
+        problem_.SetParameterBlockVariable(accl_bias_spline_[i].data());
+      }
+    }
+  } else {
+    LOG(INFO) << "Fixing accelerometer bias spline.";
+    for (int i = 0; i < accl_bias_spline_.size(); ++i) {
+      if (problem_.HasParameterBlock(accl_bias_spline_[i].data())) {
+        problem_.SetParameterBlockConstant(accl_bias_spline_[i].data());
+      }
+    }
+  }
+  if ((flags & SplineOptimFlags::GYR_BIAS ||
+       flags & SplineOptimFlags::IMU_BIASES)) {
+    LOG(INFO) << "Optimizing gyroscope bias spline.";
+    for (int i = 0; i < gyro_bias_spline_.size(); ++i) {
+      if (problem_.HasParameterBlock(gyro_bias_spline_[i].data())) {
+        for (int d = 0; d < 3; ++d) {
+          problem_.SetParameterLowerBound(
+              gyro_bias_spline_[i].data(), d, -max_gyro_bias_range_);
+          problem_.SetParameterUpperBound(
+              gyro_bias_spline_[i].data(), d, max_gyro_bias_range_);
+        }
+        problem_.SetParameterBlockVariable(gyro_bias_spline_[i].data());
+      }
+    }
+  } else {
+    LOG(INFO) << "Fixing gyroscope bias spline.";
+    for (int i = 0; i < gyro_bias_spline_.size(); ++i) {
+      if (problem_.HasParameterBlock(gyro_bias_spline_[i].data())) {
+        problem_.SetParameterBlockConstant(gyro_bias_spline_[i].data());
+      }
+    }
+  }
 }
 
 template <int _T>
@@ -191,6 +259,11 @@ ceres::Solver::Summary SplineTrajectoryEstimator<_T>::Optimize(
   options.max_num_iterations = max_iters;
   options.num_threads = std::thread::hardware_concurrency();
   options.minimizer_progress_to_stdout = true;
+  options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+  options.function_tolerance = 1e-4;
+  options.parameter_tolerance = 1e-7;
+  options.preconditioner_type = ceres::CLUSTER_TRIDIAGONAL;
+  options.use_inner_iterations = true;
 
   SetFixedParams(flags);
 
@@ -265,107 +338,13 @@ void SplineTrajectoryEstimator<_T>::BatchInitSO3R3VisPoses() {
   }
 }
 
-// template <int _T> void SplineTrajectoryEstimator<_T>::InitR3WithGPS() {
-
-//  r3_knots_ = vec3_vector(nr_knots_r3_);
-//  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
-
-//  // first interpolate spline poses for imu update rate
-//  // create zero-based maps
-//  vec3_map gps_ecef_map;
-
-//  // get sorted gps poses and times
-//  for (size_t i = 0; i < telemetry_data_.gps.timestamp_ms.size(); ++i) {
-//    const double t_s = telemetry_data_.gps.timestamp_ms[i] * MS_TO_S;
-//    gps_ecef_map[t_s] = telemetry_data_.gps.ecef[i];
-//  }
-
-//  std::vector<double> t_gps;
-//  vec3_vector gps_ecef_poses;
-//  for (auto const &gps : gps_ecef_map) {
-//    t_gps.push_back(gps.first);
-//    gps_ecef_poses.push_back(gps.second);
-//  }
-//  // get spline times
-//  std::vector<double> t_r3_spline;
-//  for (size_t i = 0; i < nr_knots_r3_; ++i) {
-//    const double t = (i * dt_r3_ns_ + start_t_ns_) * NS_TO_S;
-//    t_r3_spline.push_back(t);
-//  }
-
-//  vec3_vector interpo_spline_pos;
-//  utils::InterpolateVector3d(t_gps, t_r3_spline, gps_ecef_poses,
-//                             interpo_spline_pos);
-
-//  for (size_t i = 0; i < nr_knots_r3_; ++i) {
-//    r3_knots_[i] = interpo_spline_pos[i];
-//  }
-//  spline_initialized_with_gps_ = true;
-//  LOG(INFO) << "Initialized the spline with GPS coordinates.";
-//}
-
-// template <int _T> void SplineTrajectoryEstimator<_T>::InitR3Knots() {
-//  r3_knots_ = vec3_vector(nr_knots_r3_);
-//  r3_knot_in_problem_ = std::vector(nr_knots_r3_, false);
-//  for (auto i = 0; i < nr_knots_r3_; ++i) {
-//    r3_knots_[i].setZero();
-//  }
-//}
-
-// template <int _T> void SplineTrajectoryEstimator<_T>::InitSO3Knots() {
-//  so3_knots_ = so3_vector(nr_knots_so3_);
-//  so3_knot_in_problem_ = std::vector(nr_knots_so3_, false);
-
-//  // Add local parametrization for SO(3) rotation
-//  for (size_t i = 0; i < nr_knots_so3_; ++i) {
-//    ceres::LocalParameterization *local_parameterization =
-//        new LieLocalParameterization<Sophus::SO3d>();
-
-//    problem_.AddParameterBlock(so3_knots_[i].data(),
-//                               Sophus::SO3d::num_parameters,
-//                               local_parameterization);
-//  }
-//}
-
-// template <int _T>
-// bool SplineTrajectoryEstimator<_T>::AddGPSMeasurement(
-//    const Eigen::Vector3d &meas, const int64_t time_ns,
-//    const double weight_gps) {
-//  double u_r3;
-//  int64_t s_r3;
-//  if (!CalcR3Times(time_ns, u_r3, s_r3)) {
-//    LOG(INFO) << "Wrong time adding GPS measurements.";
-//    return false;
-//  }
-
-//  using FunctorT = GPSCostFunctor<N_>;
-//  FunctorT *functor = new FunctorT(meas, u_r3, inv_r3_dt_, weight_gps);
-
-//  ceres::DynamicAutoDiffCostFunction<FunctorT> *cost_function =
-//      new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
-
-//  for (int i = 0; i < N_; i++) {
-//    cost_function->AddParameterBlock(3);
-//  }
-//  cost_function->SetNumResiduals(3);
-
-//  std::vector<double *> vec;
-//  for (int i = 0; i < N_; i++) {
-//    const int t = s_r3 + i;
-//    vec.emplace_back(r3_knots_[t].data());
-//    r3_knot_in_problem_[t] = true;
-//  }
-//  problem_.AddResidualBlock(cost_function, NULL, vec);
-//  return true;
-//}
-
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
     const Eigen::Vector3d& meas,
     const int64_t time_ns,
     const double weight_se3) {
-  double u_r3, u_so3;
-  int64_t s_r3, s_so3;
+  double u_r3, u_so3, u_bias;
+  int64_t s_r3, s_so3, s_bias;
   if (!CalcR3Times(time_ns, u_r3, s_r3)) {
     LOG(INFO) << "Wrong time adding r3 accelerometer measurements. time_ns: "
               << time_ns << " u_r3: " << u_r3 << " s_r3:" << s_r3;
@@ -376,16 +355,32 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
               << time_ns << " u_r3: " << u_r3 << " s_r3:" << s_r3;
     return false;
   }
+  if (!CalcTimes(time_ns,
+                 u_bias,
+                 s_bias,
+                 dt_accl_bias_ns_,
+                 nr_knots_accl_bias_,
+                 BIAS_SPLINE_N)) {
+    LOG(INFO) << "Wrong time adding accelerometer bias measurements. time_ns: "
+              << time_ns << " u_r3: " << u_bias << " s_r3:" << s_bias;
+    return false;
+  }
 
   using FunctorT = AccelerationCostFunctorSplit<N_>;
-  FunctorT* functor =
-      new FunctorT(meas, u_r3, inv_r3_dt_, u_so3, inv_so3_dt_, weight_se3);
+  FunctorT* functor = new FunctorT(meas,
+                                   u_r3,
+                                   inv_r3_dt_,
+                                   u_so3,
+                                   inv_so3_dt_,
+                                   weight_se3,
+                                   u_bias,
+                                   inv_accl_bias_dt_);
 
   ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
   std::vector<double*> vec;
-  // so3
+  // so3 spline
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
     const int t = s_so3 + i;
@@ -393,13 +388,21 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
     so3_knot_in_problem_[t] = true;
   }
 
-  // r3
+  // R3 spline
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(3);
     const int t = s_r3 + i;
     vec.emplace_back(r3_knots_[t].data());
     r3_knot_in_problem_[t] = true;
   }
+
+  // bias spline
+  for (int i = 0; i < BIAS_SPLINE_N; i++) {
+    cost_function->AddParameterBlock(3);
+    const int t = s_bias + i;
+    vec.emplace_back(accl_bias_spline_[t].data());
+  }
+
   // gravity
   cost_function->AddParameterBlock(3);
   vec.emplace_back(gravity_.data());
@@ -407,18 +410,12 @@ bool SplineTrajectoryEstimator<_T>::AddAccelerometerMeasurement(
   // imu intrinsics and bias
   cost_function->AddParameterBlock(6);
   vec.emplace_back(accl_intrinsics_.data());
-  cost_function->AddParameterBlock(3);
-  vec.emplace_back(accl_bias_.data());
 
   // number of residuals
   cost_function->SetNumResiduals(3);
 
   problem_.AddResidualBlock(cost_function, NULL, vec);
 
-  for (int i = 0; i < 3; ++i) {
-    problem_.SetParameterLowerBound(accl_bias_.data(), i, -0.5);
-    problem_.SetParameterUpperBound(accl_bias_.data(), i, 0.5);
-  }
   return true;
 }
 
@@ -427,20 +424,33 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
     const Eigen::Vector3d& meas,
     const int64_t time_ns,
     const double weight_so3) {
-  double u_so3;
-  int64_t s_so3;
+  double u_so3, u_bias;
+  int64_t s_so3, s_bias;
   if (!CalcSO3Times(time_ns, u_so3, s_so3)) {
     LOG(INFO) << "Wrong time adding so3 gyroscope measurements. time_ns: "
               << time_ns << " u_r3: " << u_so3 << " s_r3:" << s_so3;
     return false;
   }
 
+  if (!CalcTimes(time_ns,
+                 u_bias,
+                 s_bias,
+                 dt_gyro_bias_ns_,
+                 nr_knots_gyro_bias_,
+                 BIAS_SPLINE_N)) {
+    LOG(INFO) << "Wrong time adding so3 gyroscope bias measurements. time_ns: "
+              << time_ns << " u_r3: " << u_bias << " s_r3:" << s_bias;
+    return false;
+  }
+
   using FunctorT = GyroCostFunctorSplit<N_, Sophus::SO3, false>;
-  FunctorT* functor = new FunctorT(meas, u_so3, inv_so3_dt_, weight_so3);
+  FunctorT* functor = new FunctorT(
+      meas, u_so3, inv_so3_dt_, weight_so3, u_bias, inv_gyro_bias_dt_);
 
   ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
+  // SO3 spline
   std::vector<double*> vec;
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(4);
@@ -448,22 +458,19 @@ bool SplineTrajectoryEstimator<_T>::AddGyroscopeMeasurement(
     vec.emplace_back(so3_knots_[t].data());
     so3_knot_in_problem_[t] = true;
   }
-
-  // bias and intrinsics
+  // bias spline
+  for (int i = 0; i < BIAS_SPLINE_N; ++i) {
+    cost_function->AddParameterBlock(3);
+    const int t = s_bias + i;
+    vec.emplace_back(gyro_bias_spline_[t].data());
+  }
+  // intrinsics
   cost_function->AddParameterBlock(9);
   vec.emplace_back(gyro_intrinsics_.data());
-  cost_function->AddParameterBlock(3);
-  vec.emplace_back(gyro_bias_.data());
 
   cost_function->SetNumResiduals(3);
 
   problem_.AddResidualBlock(cost_function, NULL, vec);
-
-  // gyro biases are usually very small numbers < 1e-2
-  for (int i = 0; i < 3; ++i) {
-    problem_.SetParameterLowerBound(gyro_bias_.data(), i, -1e-2);
-    problem_.SetParameterUpperBound(gyro_bias_.data(), i, 1e-2);
-  }
 
   return true;
 }
@@ -758,7 +765,8 @@ bool SplineTrajectoryEstimator<_T>::CalcTimes(const int64_t sensor_time,
                                               double& u,
                                               int64_t& s,
                                               int64_t dt_ns,
-                                              size_t nr_knots) {
+                                              size_t nr_knots,
+                                              const int N) {
   const int64_t st_ns = (sensor_time - start_t_ns_);
 
   if (st_ns < 0.0) {
@@ -771,7 +779,7 @@ bool SplineTrajectoryEstimator<_T>::CalcTimes(const int64_t sensor_time,
     return false;
   }
 
-  if (size_t(s + N_) > nr_knots) {
+  if (size_t(s + N) > nr_knots) {
     return false;
   }
 
@@ -819,16 +827,6 @@ int64_t SplineTrajectoryEstimator<_T>::GetMinTimeNs() const {
 }
 
 template <int _T>
-Eigen::Vector3d SplineTrajectoryEstimator<_T>::GetGyroBias() const {
-  return gyro_bias_;
-}
-
-template <int _T>
-Eigen::Vector3d SplineTrajectoryEstimator<_T>::GetAccelBias() const {
-  return accl_bias_;
-}
-
-template <int _T>
 void SplineTrajectoryEstimator<_T>::SetImageData(
     const theia::Reconstruction& c) {
   image_data_ = c;
@@ -856,7 +854,7 @@ void SplineTrajectoryEstimator<_T>::SetImageData(
 }
 
 template <int _T>
-void SplineTrajectoryEstimator<_T>::SetG(const Eigen::Vector3d& g) {
+void SplineTrajectoryEstimator<_T>::SetGravity(const Eigen::Vector3d& g) {
   gravity_ = g;
 }
 
@@ -1145,7 +1143,8 @@ double SplineTrajectoryEstimator<_T>::GetRSLineDelay() const {
 
 template <int _T>
 ThreeAxisSensorCalibParams<double>
-SplineTrajectoryEstimator<_T>::GetAcclIntrinsics() const {
+SplineTrajectoryEstimator<_T>::GetAcclIntrinsics(const int64_t& time_ns) {
+  const auto accl_bias_at_time = GetAcclBias(time_ns);
   ThreeAxisSensorCalibParams<double> accel_calib_triad(accl_intrinsics_[0],
                                                        accl_intrinsics_[1],
                                                        accl_intrinsics_[2],
@@ -1155,15 +1154,16 @@ SplineTrajectoryEstimator<_T>::GetAcclIntrinsics() const {
                                                        accl_intrinsics_[3],
                                                        accl_intrinsics_[4],
                                                        accl_intrinsics_[5],
-                                                       accl_bias_[0],
-                                                       accl_bias_[1],
-                                                       accl_bias_[2]);
+                                                       accl_bias_at_time[0],
+                                                       accl_bias_at_time[1],
+                                                       accl_bias_at_time[2]);
   return accel_calib_triad;
 }
 
 template <int _T>
 ThreeAxisSensorCalibParams<double>
-SplineTrajectoryEstimator<_T>::GetGyroIntrinsics() const {
+SplineTrajectoryEstimator<_T>::GetGyroIntrinsics(const int64_t& time_ns) {
+  const auto gyro_bias_at_time = GetAcclBias(time_ns);
   ThreeAxisSensorCalibParams<double> gyro_calib_triad(gyro_intrinsics_[0],
                                                       gyro_intrinsics_[1],
                                                       gyro_intrinsics_[2],
@@ -1173,10 +1173,66 @@ SplineTrajectoryEstimator<_T>::GetGyroIntrinsics() const {
                                                       gyro_intrinsics_[6],
                                                       gyro_intrinsics_[7],
                                                       gyro_intrinsics_[8],
-                                                      gyro_bias_[0],
-                                                      gyro_bias_[1],
-                                                      gyro_bias_[2]);
+                                                      gyro_bias_at_time[0],
+                                                      gyro_bias_at_time[1],
+                                                      gyro_bias_at_time[2]);
   return gyro_calib_triad;
+}
+
+template <int _T>
+Eigen::Vector3d SplineTrajectoryEstimator<_T>::GetGyroBias(
+    const int64_t& time_ns) {
+  double u;
+  int64_t s;
+  Eigen::Vector3d gyro_bias;
+  gyro_bias.setZero();
+
+  if (!CalcTimes(time_ns,
+                 u,
+                 s,
+                 dt_gyro_bias_ns_,
+                 nr_knots_gyro_bias_,
+                 BIAS_SPLINE_N)) {
+    return gyro_bias;
+  }
+
+  std::vector<const double*> vec;
+  for (int i = 0; i < BIAS_SPLINE_N; ++i) {
+    vec.emplace_back(gyro_bias_spline_[s + i].data());
+  }
+
+  CeresSplineHelper<double, BIAS_SPLINE_N>::template evaluate<3, 0>(
+      &vec[0], u, inv_gyro_bias_dt_, &gyro_bias);
+
+  return gyro_bias;
+}
+
+template <int _T>
+Eigen::Vector3d SplineTrajectoryEstimator<_T>::GetAcclBias(
+    const int64_t& time_ns) {
+  double u;
+  int64_t s;
+  Eigen::Vector3d accl_bias;
+  accl_bias.setZero();
+
+  if (!CalcTimes(time_ns,
+                 u,
+                 s,
+                 dt_accl_bias_ns_,
+                 nr_knots_accl_bias_,
+                 BIAS_SPLINE_N)) {
+    return accl_bias;
+  }
+
+  std::vector<const double*> vec;
+  for (int i = 0; i < BIAS_SPLINE_N; ++i) {
+    vec.emplace_back(accl_bias_spline_[s + i].data());
+  }
+
+  CeresSplineHelper<double, BIAS_SPLINE_N>::template evaluate<3, 0>(
+      &vec[0], u, inv_accl_bias_dt_, &accl_bias);
+
+  return accl_bias;
 }
 
 template <int _T>
@@ -1191,11 +1247,6 @@ void SplineTrajectoryEstimator<_T>::SetIMUIntrinsics(
       gyro_intrinsics.misZX(), gyro_intrinsics.misXZ(), gyro_intrinsics.misXY(),
       gyro_intrinsics.misYX(), gyro_intrinsics.scaleX(),
       gyro_intrinsics.scaleY(), gyro_intrinsics.scaleZ();
-
-  accl_bias_ << accl_intrinsics.biasX(), accl_intrinsics.biasY(),
-      accl_intrinsics.biasZ();
-  gyro_bias_ << gyro_intrinsics.biasX(), gyro_intrinsics.biasY(),
-      gyro_intrinsics.biasZ();
 }
 }  // namespace core
 }  // namespace OpenICC

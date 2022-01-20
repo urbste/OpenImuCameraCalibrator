@@ -17,7 +17,7 @@ def main():
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='/media/Data/builds/openicc_release_new/applications') 
+                        default='/media/Data/builds/openicc_release/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
                         default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 
@@ -51,11 +51,11 @@ def main():
     parser.add_argument("--gravity_const", 
                         help="gravity constant", default=9.811104, type=float)
     parser.add_argument("--recompute_corners", 
-                        help="If the corners should be extracted again when running a dataset multiple times.", default=0, type=int)
+                        help="If the corners should be extracted again when running a dataset multiple times.", default=1, type=int)
     parser.add_argument("--bias_calib_remove_s", 
                         help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
     parser.add_argument("--reestimate_bias_spline_opt", 
-                        help="If biases should be also estimated during spline optimization", default=0, type=int)
+                        help="If biases should be also estimated during spline optimization", default=1, type=int)
     parser.add_argument("--optimize_board_points", 
                         help="if board points should be optimized during camera calibration and after pose estimation.", default=0, type=int)
     parser.add_argument("--known_gravity_axis", 
@@ -259,8 +259,8 @@ def main():
     spline_init = Popen(["python", py_spline_file,
                        "--input_json_path=" + gopro_telemetry_gen,
                        "--output_path=" + spline_weighting_json,
-                       "--q_so3=" + str(0.995),
-                       "--q_r3=" + str(0.995)])
+                       "--q_so3=" + str(0.99),
+                       "--q_r3=" + str(0.99)])
     error_spline_init = spline_init.wait()  
     print("==================================================================")
     print("Spline weighting and knot spacing estimation took {:.2f}s.".format(time.time()-start))

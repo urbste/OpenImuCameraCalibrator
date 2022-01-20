@@ -163,12 +163,14 @@ bool BoardExtractor::ExtractBoard(const Mat& image,
                                                              1);
 
       if (charuco_corners.size() > 0) {
-        cv::cornerSubPix(image,
-                         charuco_corners,
-                         cv::Size(detector_params_->cornerRefinementWinSize,
-                                  detector_params_->cornerRefinementWinSize),
-                         cv::Size(-1, -1),
-                         TermCriteria());
+        cv::cornerSubPix(
+            image,
+            charuco_corners,
+            cv::Size(detector_params_->cornerRefinementWinSize,
+                     detector_params_->cornerRefinementWinSize),
+            cv::Size(-1, -1),
+            cv::TermCriteria(
+                cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 20, 0.01));
 
         //          if (marker_ids.size() > 0) {
         //              cv::Mat imageCopy;

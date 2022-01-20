@@ -77,6 +77,13 @@ void ImuCameraCalibrator::BatchInitSpline(
   // camera poses (T_w_c)
   trajectory_.SetImageData(image_data_);
   trajectory_.BatchInitSO3R3VisPoses();
+  // TODO make the bias spline dt configurable
+  trajectory_.InitBiasSplines(accl_intrinsics.GetBiasVector(),
+                              gyro_intrinsics.GetBiasVector(),
+                              5 * 1e9,
+                              5 * 1e9,
+                              1.0,
+                              1e-2);
 
   LOG(INFO) << "Adding Vision measurements to spline";
 
@@ -94,8 +101,8 @@ void ImuCameraCalibrator::BatchInitSpline(
 
   LOG(INFO) << "Adding IMU measurements to spline";
   for (size_t i = 0; i < telemetry_data.accelerometer.size(); ++i) {
-    const double t = telemetry_data.accelerometer[i].timestamp_s() +
-                     time_offset_imu_to_cam;
+    const double t =
+        telemetry_data.accelerometer[i].timestamp_s() + time_offset_imu_to_cam;
     if (t < t0_s_ || t >= tend_s_) continue;
     gyro_measurements_[t] = telemetry_data.gyroscope[i].data();
     accl_measurements_[t] = telemetry_data.accelerometer[i].data();
@@ -118,7 +125,7 @@ void ImuCameraCalibrator::BatchInitSpline(
 }
 
 void ImuCameraCalibrator::SetKnownGravityDir(const Eigen::Vector3d& gravity) {
-  trajectory_.SetG(gravity);
+  trajectory_.SetGravity(gravity);
 }
 
 void ImuCameraCalibrator::InitializeGravity(
@@ -151,7 +158,7 @@ void ImuCameraCalibrator::InitializeGravity(
       }
     }
   }
-  trajectory_.SetG(gravity_init_);
+  trajectory_.SetGravity(gravity_init_);
 }
 
 double ImuCameraCalibrator::Optimize(const int iterations,
@@ -187,9 +194,10 @@ void ImuCameraCalibrator::ClearSpline() {
 
 void ImuCameraCalibrator::GetIMUIntrinsics(
     ThreeAxisSensorCalibParams<double>& acc_intrinsics,
-    ThreeAxisSensorCalibParams<double>& gyr_intrinsics) {
-  acc_intrinsics = trajectory_.GetAcclIntrinsics();
-  gyr_intrinsics = trajectory_.GetGyroIntrinsics();
+    ThreeAxisSensorCalibParams<double>& gyr_intrinsics,
+    const int64_t time_ns) {
+  acc_intrinsics = trajectory_.GetAcclIntrinsics(time_ns);
+  gyr_intrinsics = trajectory_.GetGyroIntrinsics(time_ns);
 }
 
 }  // namespace core
