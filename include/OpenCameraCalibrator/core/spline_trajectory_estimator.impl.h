@@ -52,6 +52,7 @@ void SplineTrajectoryEstimator<_T>::SetTimes(int64_t time_interval_so3_ns,
   std::cout<<"inv_so3_dt_"<<inv_so3_dt_<<"\n";
   std::cout<<"inv_r3_dt_"<<inv_r3_dt_<<"\n";
 
+
 }
 
 template <int _T>
@@ -555,12 +556,12 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
       int64_t s_r3 = 0, s_so3 = 0;
       if (!CalcR3Times(image_rs_obs_time, u_r3, s_r3)) {
         LOG(INFO) << "Wrong time observation r3 vision measurements. time_ns: "
-                  << image_obs_time_ns << " u_r3: " << u_r3 << " s_r3:" << s_r3;
+                  << image_rs_obs_time << " u_r3: " << u_r3 << " s_r3:" << s_r3;
         return false;
       }
       if (!CalcSO3Times(image_rs_obs_time, u_so3, s_so3)) {
         LOG(INFO) << "Wrong time reference so3 vision measurements. time_ns: "
-                  << image_obs_time_ns << " u_r3: " << u_so3 << " s_r3:" << s_so3;
+                  << image_rs_obs_time << " u_r3: " << u_so3 << " s_r3:" << s_so3;
         return false;
       }
       using FunctorT = RSSingleReprojectionCostFunctorSplit<N_>;

@@ -57,7 +57,7 @@ void ImuCameraCalibrator::BatchInitSpline(
   tend_s_ = cam_timestamps_[result.second - cam_timestamps_.begin()];
   const int64_t start_t_ns = t0_s_ * S_TO_NS;
   const int64_t end_t_ns =
-      tend_s_ * S_TO_NS + 0.01 * S_TO_NS + inital_cam_line_delay_s_;
+      tend_s_ * S_TO_NS + S_TO_NS*(540*inital_cam_line_delay_s_);
   const int64_t dt_so3_ns = spline_weight_data_.dt_so3 * S_TO_NS;
   const int64_t dt_r3_ns = spline_weight_data_.dt_r3 * S_TO_NS;
 
@@ -90,11 +90,11 @@ void ImuCameraCalibrator::BatchInitSpline(
   // rolling shutter camera
   if (inital_cam_line_delay_s_ != 0.0) {
     for (const auto& vid : vision_dataset.ViewIds()) {
-      trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 3.0);
+      trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 5.0);
     }
   } else {
     for (const auto& vid : vision_dataset.ViewIds()) {
-      trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 3.0);
+      trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 5.0);
     }
   }
   LOG(INFO) << "Added all Vision measurements to the spline estimator";
