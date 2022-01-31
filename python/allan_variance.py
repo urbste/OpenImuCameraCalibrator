@@ -18,7 +18,7 @@ def main():
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_src', 
                         help="Path to OpenCameraCalibrator src folder.",
-                        default='/home/steffen/Projects/OpenCameraCalibrator')   
+                        default='/media/Data/projects/OpenImuCameraCalibrator')   
     args = parser.parse_args()
 
 

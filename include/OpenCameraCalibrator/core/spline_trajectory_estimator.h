@@ -131,7 +131,9 @@ class SplineTrajectoryEstimator {
 
   Eigen::Vector3d GetAcclBias(const int64_t& time_ns);
 
-  double GetMeanReprojectionError();
+  double GetMeanRSReprojectionError();
+
+  double GetMeanGSReprojectionError();
 
   Eigen::Vector3d GetGravity() const;
 
@@ -198,7 +200,7 @@ class SplineTrajectoryEstimator {
   bool fix_imu_intrinsics_ = false;
 
   double cam_line_delay_s_ = 0.0;
-
+  double cam_line_delay_offset_s_ = 0.0;
   double imu_to_camera_time_offset_s_ = 0.0;
 
   std::set<theia::TrackId> tracks_in_problem_;

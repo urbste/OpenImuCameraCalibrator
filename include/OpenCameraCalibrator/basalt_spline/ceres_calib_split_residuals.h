@@ -18,7 +18,7 @@
 
 #include <sophus/so3.hpp>
 
-static constexpr int BIAS_SPLINE_N = 2;
+static constexpr int BIAS_SPLINE_N = 3;
 
 template <int _N>
 struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {
@@ -190,19 +190,17 @@ struct GSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   GSReprojectionCostFunctorSplit(const theia::View* view,
-                                 const theia::Reconstruction* image_data,
                                  const double u_so3,
                                  const double u_r3,
                                  const double inv_so3_dt,
                                  const double inv_r3_dt,
-                                 std::vector<theia::TrackId> track_ids)
+                                 theia::TrackId tid)
       : view(view),
-        image_data(image_data),
         u_so3(u_so3),
         u_r3(u_r3),
         inv_so3_dt(inv_so3_dt),
         inv_r3_dt(inv_r3_dt),
-        track_ids(track_ids) {}
+        tid(tid) {}
   template <class T>
   bool operator()(T const* const* sKnots, T* sResiduals) const {
     using Vector3 = Eigen::Matrix<T, 3, 1>;
@@ -220,25 +218,21 @@ struct GSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
       intr[i] = T(cam.intrinsics()[i]);
     }
 
-    const T t_so3_row = T(u_so3);
-    const T t_r3_row = T(u_r3);
-
     Sophus::SO3<T> R_w_i;
     CeresSplineHelper<T, N>::template evaluate_lie<Sophus::SO3>(
-        sKnots, t_so3_row, T(inv_so3_dt), &R_w_i);
+        sKnots, T(u_so3), T(inv_so3_dt), &R_w_i);
 
     Vector3 t_w_i;
     CeresSplineHelper<T, N>::template evaluate<3, 0>(
-        sKnots + N, t_r3_row, T(inv_r3_dt), &t_w_i);
+        sKnots + N, T(u_r3), T(inv_r3_dt), &t_w_i);
 
     Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
     Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();
 
-    for (size_t i = 0; i < track_ids.size(); ++i) {
-      const auto feature = *view->GetFeature(track_ids[i]);
+      const auto feature = *view->GetFeature(tid);
 
       // get corresponding 3d point
-      Eigen::Map<Vector4 const> const scene_point(sKnots[N2 + i]);
+      Eigen::Map<Vector4 const> const scene_point(sKnots[N2 + 1]);
 
       Vector3 p3d = (T_c_w_matrix * scene_point).hnormalized();
 
@@ -270,20 +264,19 @@ struct GSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
       }
 
       if (!success) {
-        sResiduals[2 * i + 0] = T(1e10);
-        sResiduals[2 * i + 1] = T(1e10);
+        sResiduals[0] = T(1e10);
+        sResiduals[1] = T(1e10);
       } else {
         const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
         const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
-        sResiduals[2 * i + 0] = inv_info_x * (reprojection[0] - T(feature.x()));
-        sResiduals[2 * i + 1] = inv_info_y * (reprojection[1] - T(feature.y()));
+        sResiduals[0] = inv_info_x * (reprojection[0] - T(feature.x()));
+        sResiduals[1] = inv_info_y * (reprojection[1] - T(feature.y()));
       }
-    }
+
     return true;
   }
   const theia::View* view;
-  const theia::Reconstruction* image_data;
-  std::vector<theia::TrackId> track_ids;
+  theia::TrackId tid;
   double u_so3;
   double inv_so3_dt;
   double u_r3;
@@ -341,9 +334,17 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
       const auto feature = *view->GetFeature(track_ids[i]);
 
       // get time for respective RS line
-      const T y_coord = T(feature.y()) * line_delay[0];
-      const T t_so3_row = T(u_so3) + y_coord;
-      const T t_r3_row = T(u_r3) + y_coord;
+      const T y_coord_t_s = T(feature.y()) * line_delay[0];
+      const T u_line_delay_so3 = y_coord_t_s * inv_so3_dt;
+      const T u_line_delay_r3 = y_coord_t_s * inv_r3_dt;
+
+      const T t_so3_row = T(u_so3) + u_line_delay_so3;
+      const T t_r3_row = T(u_r3) + u_line_delay_r3;
+
+//      // get time for respective RS line
+//      const T y_coord = T(feature.y()) * line_delay[0];
+//      const T t_so3_row = T(u_so3) + y_coord;
+//      const T t_r3_row = T(u_r3) + y_coord;
 
       Sophus::SO3<T> R_w_i;
       CeresSplineHelper<T, N>::template evaluate_lie<Sophus::SO3>(
@@ -403,6 +404,129 @@ struct RSReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
   const theia::View* view;
   const theia::Reconstruction* image_data;
   std::vector<theia::TrackId> track_ids;
+  double u_so3;
+  double inv_so3_dt;
+  double u_r3;
+  double inv_r3_dt;
+};
+
+
+template <int _N>
+struct RSSingleReprojectionCostFunctorSplit : public CeresSplineHelper<double, _N> {
+  static constexpr int N = _N;        // Order of the spline.
+  static constexpr int DEG = _N - 1;  // Degree of the spline.
+
+  using MatN = Eigen::Matrix<double, _N, _N>;
+  using VecN = Eigen::Matrix<double, _N, 1>;
+
+  using Vec3 = Eigen::Matrix<double, 3, 1>;
+  using Mat3 = Eigen::Matrix<double, 3, 3>;
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  RSSingleReprojectionCostFunctorSplit(const theia::View* view,
+                                 const double u_so3,
+                                 const double u_r3,
+                                 const double inv_so3_dt,
+                                 const double inv_r3_dt,
+                                 const theia::TrackId tid)
+      : view(view),
+        u_so3(u_so3),
+        u_r3(u_r3),
+        inv_so3_dt(inv_so3_dt),
+        inv_r3_dt(inv_r3_dt),
+        tid(tid) {}
+  template <class T>
+  bool operator()(T const* const* sKnots, T* sResiduals) const {
+    using Vector3 = Eigen::Matrix<T, 3, 1>;
+    using Vector4 = Eigen::Matrix<T, 4, 1>;
+    using Vector1 = Eigen::Matrix<T, 1, 1>;
+    using Matrix4 = Eigen::Matrix<T, 4, 4>;
+
+    const int N2 = 2 * N;
+    Eigen::Map<Sophus::SE3<T> const> const T_i_c(sKnots[N2]);
+    Eigen::Map<Vector1 const> const line_delay_offset(sKnots[N2 + 1]);
+
+    const auto cam = view->Camera();
+    const auto cam_model = cam.GetCameraIntrinsicsModelType();
+
+    T intr[10];
+    for (int i = 0; i < cam.CameraIntrinsics()->NumParameters(); ++i) {
+      intr[i] = T(cam.intrinsics()[i]);
+    }
+
+    // if we have a rolling shutter cam we will always need to evaluate with
+    // line delay
+    const auto feature = *view->GetFeature(tid);
+
+      // get time for respective RS line
+      const T u_line_delay_so3 = line_delay_offset[0] * inv_so3_dt;
+      const T u_line_delay_r3 = line_delay_offset[0] * inv_r3_dt;
+
+      const T t_so3_row = T(u_so3) + u_line_delay_so3;
+      const T t_r3_row = T(u_r3) + u_line_delay_r3;
+
+    //      // get time for respective RS line
+    //      const T y_coord = T(feature.y()) * line_delay[0];
+    //      const T t_so3_row = T(u_so3) + y_coord;
+    //      const T t_r3_row = T(u_r3) + y_coord;
+
+      Sophus::SO3<T> R_w_i;
+      CeresSplineHelper<T, N>::template evaluate_lie<Sophus::SO3>(
+          sKnots, t_so3_row, T(inv_so3_dt), &R_w_i);
+
+      Vector3 t_w_i;
+      CeresSplineHelper<T, N>::template evaluate<3, 0>(
+          sKnots + N, t_r3_row, T(inv_r3_dt), &t_w_i);
+
+      Sophus::SE3<T> T_w_c = Sophus::SE3<T>(R_w_i, t_w_i) * T_i_c;
+      Matrix4 T_c_w_matrix = T_w_c.inverse().matrix();
+
+      // get corresponding 3d point
+      Eigen::Map<Vector4 const> const scene_point(sKnots[N2 + 2]);
+
+      Vector3 p3d = (T_c_w_matrix * scene_point).hnormalized();
+
+      T reprojection[2];
+      bool success = false;
+      if (theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION ==
+          cam.GetCameraIntrinsicsModelType()) {
+        success =
+            theia::DivisionUndistortionCameraModel::CameraToPixelCoordinates(
+                intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::DOUBLE_SPHERE == cam_model) {
+        success = theia::DoubleSphereCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::PINHOLE == cam_model) {
+        success = theia::PinholeCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::FISHEYE == cam_model) {
+        success = theia::FisheyeCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::EXTENDED_UNIFIED ==
+                 cam_model) {
+        success = theia::ExtendedUnifiedCameraModel::CameraToPixelCoordinates(
+            intr, p3d.data(), reprojection);
+      } else if (theia::CameraIntrinsicsModelType::PINHOLE_RADIAL_TANGENTIAL ==
+                 cam_model) {
+        success =
+            theia::PinholeRadialTangentialCameraModel::CameraToPixelCoordinates(
+                intr, p3d.data(), reprojection);
+      }
+
+      if (!success) {
+        sResiduals[0] = T(1e10);
+        sResiduals[1] = T(1e10);
+      } else {
+        const T inv_info_x = T(1. / ceres::sqrt(feature.covariance_(0, 0)));
+        const T inv_info_y = T(1. / ceres::sqrt(feature.covariance_(1, 1)));
+        sResiduals[0] = inv_info_x * (reprojection[0] - T(feature.x()));
+        sResiduals[1] = inv_info_y * (reprojection[1] - T(feature.y()));
+      }
+
+    return true;
+  }
+  const theia::View* view;
+  theia::TrackId tid;
   double u_so3;
   double inv_so3_dt;
   double u_r3;

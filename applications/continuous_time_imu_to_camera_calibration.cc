@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
       const int board_pt3_id = std::stoi(img_pts.key());
       const Eigen::Vector2d corner(
           Eigen::Vector2d(img_pts.value()[0], img_pts.value()[1]));
-      Eigen::Matrix2d cov = Eigen::Matrix2d::Identity();
+      Eigen::Matrix2d cov = 0.5*Eigen::Matrix2d::Identity();
       theia::Feature feat(corner, cov);
       recon_calib_dataset.AddObservation(view_id, board_pt3_id, feat);
     }
@@ -210,7 +210,7 @@ int main(int argc, char* argv[]) {
 
   double reproj_error_after_ld = reproj_error;
   if (FLAGS_calibrate_cam_line_delay && !FLAGS_global_shutter) {
-    flags = SplineOptimFlags::CAM_LINE_DELAY;
+    flags = SplineOptimFlags::SPLINE | SplineOptimFlags::CAM_LINE_DELAY;
     reproj_error_after_ld = imu_cam_calibrator.Optimize(10, flags);
   }
   LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";

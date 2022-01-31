@@ -165,7 +165,10 @@ double ImuCameraCalibrator::Optimize(const int iterations,
                                      const int optim_flags) {
   ceres::Solver::Summary summary =
       trajectory_.Optimize(iterations, optim_flags);
-  return trajectory_.GetMeanReprojectionError();
+  if (inital_cam_line_delay_s_ == 0.0) {
+    return trajectory_.GetMeanGSReprojectionError();
+  }
+  return trajectory_.GetMeanRSReprojectionError();
 }
 
 void ImuCameraCalibrator::ToTheiaReconDataset(

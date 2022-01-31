@@ -48,6 +48,10 @@ void SplineTrajectoryEstimator<_T>::SetTimes(int64_t time_interval_so3_ns,
   nr_knots_r3_ = duration / dt_r3_ns_ + _T;
   inv_so3_dt_ = S_TO_NS / dt_so3_ns_;
   inv_r3_dt_ = S_TO_NS / dt_r3_ns_;
+
+  std::cout<<"inv_so3_dt_"<<inv_so3_dt_<<"\n";
+  std::cout<<"inv_r3_dt_"<<inv_r3_dt_<<"\n";
+
 }
 
 template <int _T>
@@ -106,15 +110,17 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
   }
 
   // if IMU to Cam trafo should be optimized
-  if (problem_.HasParameterBlock(&cam_line_delay_s_) &&
-      cam_line_delay_s_ != 0.0) {
+  if (problem_.HasParameterBlock(&cam_line_delay_offset_s_)) {
     if (!(flags & SplineOptimFlags::CAM_LINE_DELAY)) {
-      problem_.SetParameterBlockConstant(&cam_line_delay_s_);
+      problem_.SetParameterBlockConstant(&cam_line_delay_offset_s_);
       LOG(INFO) << "Keeping camera line delay constant at: "
                 << cam_line_delay_s_;
     } else {
-      problem_.SetParameterBlockVariable(&cam_line_delay_s_);
-      LOG(INFO) << "Optimizing camera line delay.";
+      problem_.SetParameterBlockVariable(&cam_line_delay_offset_s_);
+      // give it 10% variability
+      problem_.SetParameterLowerBound(&cam_line_delay_offset_s_, 0, -cam_line_delay_s_ * 0.1);
+      problem_.SetParameterUpperBound(&cam_line_delay_offset_s_, 0, cam_line_delay_s_ * 0.1);
+      LOG(INFO) << "Optimizing camera line delay offset.";
     }
   }
 
@@ -249,6 +255,8 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
       }
     }
   }
+  problem_.SetParameterBlockConstant(accl_bias_spline_[0].data());
+  problem_.SetParameterBlockConstant(gyro_bias_spline_[0].data());
 }
 
 template <int _T>
@@ -480,6 +488,7 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
     const theia::View* view, const double robust_loss_width) {
   const int64_t image_obs_time_ns = view->GetTimestamp() * S_TO_NS;
   const auto track_ids = view->TrackIds();
+  for (const auto& tid : track_ids) {
 
   double u_r3 = 0.0, u_so3 = 0.0;
   int64_t s_r3 = 0, s_so3 = 0;
@@ -496,7 +505,7 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
 
   using FunctorT = GSReprojectionCostFunctorSplit<N_>;
   FunctorT* functor = new FunctorT(
-      view, &image_data_, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, track_ids);
+      view, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, tid);
 
   ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
       new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
@@ -506,13 +515,11 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
     cost_function->AddParameterBlock(4);
     const int t = s_so3 + i;
     vec.emplace_back(so3_knots_[t].data());
-    so3_knot_in_problem_[t] = true;
   }
   for (int i = 0; i < N_; i++) {
     cost_function->AddParameterBlock(3);
     const int t = s_r3 + i;
     vec.emplace_back(r3_knots_[t].data());
-    r3_knot_in_problem_[t] = true;
   }
 
   // camera to imu transformation
@@ -520,18 +527,17 @@ bool SplineTrajectoryEstimator<_T>::AddGSCameraMeasurement(
   vec.emplace_back(T_i_c_.data());
 
   // object point
-  for (size_t i = 0; i < track_ids.size(); ++i) {
     cost_function->AddParameterBlock(4);
     vec.emplace_back(
-        image_data_.MutableTrack(track_ids[i])->MutablePoint()->data());
-    tracks_in_problem_.insert(track_ids[i]);
-  }
+        image_data_.MutableTrack(tid)->MutablePoint()->data());
+    tracks_in_problem_.insert(tid);
 
-  cost_function->SetNumResiduals(track_ids.size() * 2);
+
+  cost_function->SetNumResiduals(2);
 
   ceres::LossFunction* loss_function = new ceres::HuberLoss(robust_loss_width);
   problem_.AddResidualBlock(cost_function, loss_function, vec);
-
+   }
   return true;
 }
 
@@ -541,79 +547,73 @@ bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
   const int64_t image_obs_time_ns = view->GetTimestamp() * S_TO_NS;
   const auto track_ids = view->TrackIds();
 
-  double u_r3 = 0.0, u_so3 = 0.0;
-  int64_t s_r3 = 0, s_so3 = 0;
-  if (!CalcR3Times(image_obs_time_ns, u_r3, s_r3)) {
-    LOG(INFO) << "Wrong time observation r3 vision measurements. time_ns: "
-              << image_obs_time_ns << " u_r3: " << u_r3 << " s_r3:" << s_r3;
-    return false;
+  for (const auto& tid : track_ids) {
+      const auto feat = view->GetFeature(tid);
+      const uint64_t image_rs_obs_time = image_obs_time_ns + S_TO_NS * feat->y() * cam_line_delay_s_;
+
+      double u_r3 = 0.0, u_so3 = 0.0;
+      int64_t s_r3 = 0, s_so3 = 0;
+      if (!CalcR3Times(image_rs_obs_time, u_r3, s_r3)) {
+        LOG(INFO) << "Wrong time observation r3 vision measurements. time_ns: "
+                  << image_obs_time_ns << " u_r3: " << u_r3 << " s_r3:" << s_r3;
+        return false;
+      }
+      if (!CalcSO3Times(image_rs_obs_time, u_so3, s_so3)) {
+        LOG(INFO) << "Wrong time reference so3 vision measurements. time_ns: "
+                  << image_obs_time_ns << " u_r3: " << u_so3 << " s_r3:" << s_so3;
+        return false;
+      }
+      using FunctorT = RSSingleReprojectionCostFunctorSplit<N_>;
+      FunctorT* functor = new FunctorT(
+          view, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, tid);
+
+      ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
+          new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
+
+
+
+      std::vector<double*> vec;
+      for (int i = 0; i < N_; i++) {
+        cost_function->AddParameterBlock(4);
+        const int t = s_so3 + i;
+        vec.emplace_back(so3_knots_[t].data());
+      }
+      for (int i = 0; i < N_; i++) {
+        cost_function->AddParameterBlock(3);
+        const int t = s_r3 + i;
+        vec.emplace_back(r3_knots_[t].data());
+      }
+
+      // camera to imu transformation
+      cost_function->AddParameterBlock(7);
+      vec.emplace_back(T_i_c_.data());
+
+      // line delay for rolling shutter cameras
+      cost_function->AddParameterBlock(1);
+      vec.emplace_back(&cam_line_delay_offset_s_);
+
+      // object point
+      cost_function->AddParameterBlock(4);
+      vec.emplace_back(
+            image_data_.MutableTrack(tid)->MutablePoint()->data());
+      tracks_in_problem_.insert(tid);
+
+      cost_function->SetNumResiduals(2);
+
+      if (robust_loss_width == 0.0) {
+        problem_.AddResidualBlock(cost_function, NULL, vec);
+      } else {
+        ceres::LossFunction* loss_function =
+            new ceres::HuberLoss(robust_loss_width);
+        problem_.AddResidualBlock(cost_function, loss_function, vec);
+      }
   }
-  if (!CalcSO3Times(image_obs_time_ns, u_so3, s_so3)) {
-    LOG(INFO) << "Wrong time reference so3 vision measurements. time_ns: "
-              << image_obs_time_ns << " u_r3: " << u_so3 << " s_r3:" << s_so3;
-    return false;
-  }
-
-  using FunctorT = RSReprojectionCostFunctorSplit<N_>;
-  FunctorT* functor = new FunctorT(
-      view, &image_data_, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, track_ids);
-
-  ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
-      new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
-
-  std::vector<double*> vec;
-  for (int i = 0; i < N_; i++) {
-    cost_function->AddParameterBlock(4);
-    const int t = s_so3 + i;
-    vec.emplace_back(so3_knots_[t].data());
-    so3_knot_in_problem_[t] = true;
-  }
-  for (int i = 0; i < N_; i++) {
-    cost_function->AddParameterBlock(3);
-    const int t = s_r3 + i;
-    vec.emplace_back(r3_knots_[t].data());
-    r3_knot_in_problem_[t] = true;
-  }
-
-  // camera to imu transformation
-  cost_function->AddParameterBlock(7);
-  vec.emplace_back(T_i_c_.data());
-
-  // line delay for rolling shutter cameras
-  cost_function->AddParameterBlock(1);
-  vec.emplace_back(&cam_line_delay_s_);
-
-  // object point
-  for (size_t i = 0; i < track_ids.size(); ++i) {
-    cost_function->AddParameterBlock(4);
-    vec.emplace_back(
-        image_data_.MutableTrack(track_ids[i])->MutablePoint()->data());
-    tracks_in_problem_.insert(track_ids[i]);
-  }
-
-  cost_function->SetNumResiduals(track_ids.size() * 2);
-
-  if (robust_loss_width == 0.0) {
-    problem_.AddResidualBlock(cost_function, NULL, vec);
-  } else {
-    ceres::LossFunction* loss_function =
-        new ceres::HuberLoss(robust_loss_width);
-    problem_.AddResidualBlock(cost_function, loss_function, vec);
-  }
-
-  // bound translation
-  //  problem_.SetParameterLowerBound(T_i_c_.data(), 4, -1e-2);
-  //  problem_.SetParameterUpperBound(T_i_c_.data(), 4, 1e-2);
-  //  problem_.SetParameterLowerBound(T_i_c_.data(), 5, -10e-2);
-  //  problem_.SetParameterUpperBound(T_i_c_.data(), 5, 10e-2);
-  //  problem_.SetParameterLowerBound(T_i_c_.data(), 6, -1e-2);
-  //  problem_.SetParameterUpperBound(T_i_c_.data(), 6, 1e-2);
 
   return true;
 }
 
 // template <int _T>
-// bool SplineTrajectoryEstimator<_T>::AddRSInvCameraMeasurement(
+// bool SplineTrajectoryEstimator<_T>::AddRSCameraMeasurement(
 //    const theia::View *view, const double robust_loss_width) {
 //  std::vector<theia::TrackId> tracks = view->TrackIds();
 //  const size_t nr_obs = tracks.size();
@@ -993,84 +993,139 @@ bool SplineTrajectoryEstimator<_T>::GetAcceleration(
 }
 
 template <int _T>
-double SplineTrajectoryEstimator<_T>::GetMeanReprojectionError() {
+double SplineTrajectoryEstimator<_T>::GetMeanRSReprojectionError() {
   // ConvertInvDepthPointsToHom();
   double sum_error = 0.0;
   int num_points = 0;
   for (const auto vid : image_data_.ViewIds()) {
     const auto* view = image_data_.View(vid);
     std::vector<theia::TrackId> tracks = view->TrackIds();
-    const size_t nr_obs = tracks.size();
-    if (nr_obs <= 0) {
-      return false;
-    }
+    for (const auto& tid : tracks) {
+        const auto feat = view->GetFeature(tid);
 
-    const int64_t image_time_ns = view->GetTimestamp() * S_TO_NS;
+        const int64_t image_rs_time_ns = S_TO_NS *
+                (view->GetTimestamp() + feat->y() * cam_line_delay_s_);
 
-    double u_r3, u_so3;
-    int64_t s_r3, s_so3;
-    if (!CalcR3Times(image_time_ns, u_r3, s_r3)) {
-      return 0.0;
-    }
-    if (!CalcSO3Times(image_time_ns, u_so3, s_so3)) {
-      return 0.0;
-    }
+        double u_r3, u_so3;
+        int64_t s_r3, s_so3;
+        if (!CalcR3Times(image_rs_time_ns, u_r3, s_r3)) {
+          return 0.0;
+        }
+        if (!CalcSO3Times(image_rs_time_ns, u_so3, s_so3)) {
+          return 0.0;
+        }
 
-    using FunctorT = RSReprojectionCostFunctorSplit<N_>;
-    FunctorT* functor = new FunctorT(
-        view, &image_data_, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, tracks);
+        using FunctorT = RSSingleReprojectionCostFunctorSplit<N_>;
+        FunctorT* functor = new FunctorT(
+            view, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, tid);
 
-    ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
-        new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
+        ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
+            new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
 
-    std::vector<double*> vec;
-    for (int i = 0; i < N_; i++) {
-      cost_function->AddParameterBlock(4);
-      const int t = s_so3 + i;
-      vec.emplace_back(so3_knots_[t].data());
-    }
-    for (int i = 0; i < N_; i++) {
-      cost_function->AddParameterBlock(3);
-      const int t = s_r3 + i;
-      vec.emplace_back(r3_knots_[t].data());
-    }
+        std::vector<double*> vec;
+        for (int i = 0; i < N_; i++) {
+          cost_function->AddParameterBlock(4);
+          const int t = s_so3 + i;
+          vec.emplace_back(so3_knots_[t].data());
+        }
+        for (int i = 0; i < N_; i++) {
+          cost_function->AddParameterBlock(3);
+          const int t = s_r3 + i;
+          vec.emplace_back(r3_knots_[t].data());
+        }
 
-    // camera to imu transformation
-    cost_function->AddParameterBlock(7);
-    vec.emplace_back(T_i_c_.data());
+        // camera to imu transformation
+        cost_function->AddParameterBlock(7);
+        vec.emplace_back(T_i_c_.data());
 
-    // line delay for rolling shutter cameras
-    cost_function->AddParameterBlock(1);
-    vec.emplace_back(&cam_line_delay_s_);
+        // line delay for rolling shutter cameras
+        cost_function->AddParameterBlock(1);
+        vec.emplace_back(&cam_line_delay_offset_s_);
 
-    // all object points
-    for (size_t i = 0; i < nr_obs; ++i) {
-      cost_function->AddParameterBlock(4);
-      vec.emplace_back(
-          image_data_.MutableTrack(tracks[i])->MutablePoint()->data());
-    }
+        // all object points
+          cost_function->AddParameterBlock(4);
+          vec.emplace_back(
+              image_data_.MutableTrack(tid)->MutablePoint()->data());
 
-    cost_function->SetNumResiduals(2 * nr_obs);
-    {
-      Eigen::VectorXd residual;
-      residual.setZero(nr_obs * 2);
 
-      cost_function->Evaluate(&vec[0], residual.data(), NULL);
+        cost_function->SetNumResiduals(2);
+        {
+          Eigen::Vector2d residual;
+          residual.setZero();
 
-      for (size_t i = 0; i < nr_obs; i++) {
-        Eigen::Vector2d res_point = residual.segment<2>(2 * i);
-        if (res_point[0] != 0.0 && res_point[1] != 0.0) {
-          sum_error += res_point.norm();
+          cost_function->Evaluate(&vec[0], residual.data(), NULL);
+          sum_error += residual.norm();
           num_points += 1;
         }
-      }
     }
   }
 
-  std::cout << "Mean reprojection error " << sum_error / num_points
-            << " number residuals: " << num_points << std::endl;
+  return sum_error / (double)num_points;
+}
 
-  return sum_error / num_points;
+template <int _T>
+double SplineTrajectoryEstimator<_T>::GetMeanGSReprojectionError() {
+  // ConvertInvDepthPointsToHom();
+  double sum_error = 0.0;
+  int num_points = 0;
+  for (const auto vid : image_data_.ViewIds()) {
+    const auto* view = image_data_.View(vid);
+    std::vector<theia::TrackId> tracks = view->TrackIds();
+    for (const auto& tid : tracks) {
+
+        const int64_t image_time_ns = S_TO_NS * view->GetTimestamp();
+
+        double u_r3, u_so3;
+        int64_t s_r3, s_so3;
+        if (!CalcR3Times(image_time_ns, u_r3, s_r3)) {
+          return 0.0;
+        }
+        if (!CalcSO3Times(image_time_ns, u_so3, s_so3)) {
+          return 0.0;
+        }
+
+        using FunctorT = GSReprojectionCostFunctorSplit<N_>;
+        FunctorT* functor = new FunctorT(
+            view, u_so3, u_r3, inv_so3_dt_, inv_r3_dt_, tid);
+
+        ceres::DynamicAutoDiffCostFunction<FunctorT>* cost_function =
+            new ceres::DynamicAutoDiffCostFunction<FunctorT>(functor);
+
+        std::vector<double*> vec;
+        for (int i = 0; i < N_; i++) {
+          cost_function->AddParameterBlock(4);
+          const int t = s_so3 + i;
+          vec.emplace_back(so3_knots_[t].data());
+        }
+        for (int i = 0; i < N_; i++) {
+          cost_function->AddParameterBlock(3);
+          const int t = s_r3 + i;
+          vec.emplace_back(r3_knots_[t].data());
+        }
+
+        // camera to imu transformation
+        cost_function->AddParameterBlock(7);
+        vec.emplace_back(T_i_c_.data());
+
+        // all object points
+          cost_function->AddParameterBlock(4);
+          vec.emplace_back(
+              image_data_.MutableTrack(tid)->MutablePoint()->data());
+
+
+        cost_function->SetNumResiduals(2);
+        {
+          Eigen::Vector2d residual;
+          residual.setZero();
+
+          cost_function->Evaluate(&vec[0], residual.data(), NULL);
+          sum_error += residual.norm();
+          num_points += 1;
+        }
+    }
+  }
+
+  return sum_error / (double)num_points;
 }
 
 template <int _T>
@@ -1138,7 +1193,8 @@ Sophus::SE3d SplineTrajectoryEstimator<_T>::GetT_i_c() const {
 
 template <int _T>
 double SplineTrajectoryEstimator<_T>::GetRSLineDelay() const {
-  return cam_line_delay_s_;
+    std::cout<<"optimized cam_line_delay_offset_s_: "<<cam_line_delay_offset_s_<<"\n";
+  return cam_line_delay_s_ + cam_line_delay_offset_s_;
 }
 
 template <int _T>
