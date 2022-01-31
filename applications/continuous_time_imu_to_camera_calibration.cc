@@ -210,7 +210,7 @@ int main(int argc, char* argv[]) {
 
   double reproj_error_after_ld = reproj_error;
   if (FLAGS_calibrate_cam_line_delay && !FLAGS_global_shutter) {
-    flags = SplineOptimFlags::SPLINE | SplineOptimFlags::CAM_LINE_DELAY;
+    flags = SplineOptimFlags::CAM_LINE_DELAY;
     reproj_error_after_ld = imu_cam_calibrator.Optimize(10, flags);
   }
   LOG(INFO) << "Mean reprojection error " << reproj_error << "px\n";

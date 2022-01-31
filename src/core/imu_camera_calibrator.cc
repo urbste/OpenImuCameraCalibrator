@@ -102,7 +102,7 @@ void ImuCameraCalibrator::BatchInitSpline(
   LOG(INFO) << "Adding IMU measurements to spline";
   for (size_t i = 0; i < telemetry_data.accelerometer.size(); ++i) {
     const double t =
-        telemetry_data.accelerometer[i].timestamp_s() + time_offset_imu_to_cam;
+        telemetry_data.accelerometer[i].timestamp_s() - telemetry_data.accelerometer[0].timestamp_s();
     if (t < t0_s_ || t >= tend_s_) continue;
     gyro_measurements_[t] = telemetry_data.gyroscope[i].data();
     accl_measurements_[t] = telemetry_data.accelerometer[i].data();

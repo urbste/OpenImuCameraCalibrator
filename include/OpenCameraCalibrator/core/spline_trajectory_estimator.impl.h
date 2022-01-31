@@ -118,8 +118,8 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
     } else {
       problem_.SetParameterBlockVariable(&cam_line_delay_offset_s_);
       // give it 10% variability
-      problem_.SetParameterLowerBound(&cam_line_delay_offset_s_, 0, -cam_line_delay_s_ * 0.1);
-      problem_.SetParameterUpperBound(&cam_line_delay_offset_s_, 0, cam_line_delay_s_ * 0.1);
+      //problem_.SetParameterLowerBound(&cam_line_delay_offset_s_, 0, -cam_line_delay_s_ * 0.1);
+      //problem_.SetParameterUpperBound(&cam_line_delay_offset_s_, 0, cam_line_delay_s_ * 0.1);
       LOG(INFO) << "Optimizing camera line delay offset.";
     }
   }
