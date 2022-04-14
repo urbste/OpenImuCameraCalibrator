@@ -45,12 +45,12 @@ def main():
     parser.add_argument('--output_path', 
                         help="output path",
                         default='/media/Data/Sparsenet/CameraCalibrationStudy/Kalibr/Gopro9/1080_50/imu_calib/bag_input')
-    parser.add_argument('--path_to_src', 
-                        help="Path to OpenCameraCalibrator src folder.",
-                        default='/home/Data/Projects/OpenCameraCalibrator')  
     parser.add_argument('--downsample_fac', default=2, type=float)
     parser.add_argument('--skip_frames', default=0, type=int)   
     args = parser.parse_args()
+
+    path_to_file = os.path.dirname(os.path.abspath(__file__))
+    path_to_src = os.path.join(path_to_file,"../")
 
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
@@ -60,7 +60,7 @@ def main():
 
     cam_video_fn = os.path.basename(calib_video)
     # extract imu data
-    js_extract_file = pjoin(args.path_to_src,"javascript","extract_metadata.js")
+    js_extract_file = pjoin(path_to_src,"javascript","extract_metadata.js")
     telemetry_extract = Popen(["node",js_extract_file,
                        args.input_path,
                        cam_video_fn,

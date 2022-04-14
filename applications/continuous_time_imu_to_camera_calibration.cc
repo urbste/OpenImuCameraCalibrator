@@ -52,7 +52,7 @@ DEFINE_string(imu_intrinsics,
               "",
               "IMU intrinsics, scale and misalignment matrices. E.g. estimated "
               "with static_imu_calibration or from a datasheet.");
-DEFINE_string(imu_bias_file, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/imu_bias/imu_bias_GX010018.json", "IMU bias json");
+DEFINE_string(imu_bias_file, "", "IMU bias json");
 DEFINE_bool(global_shutter, false, "If camera has a global shutter.");
 
 DEFINE_string(spline_error_weighting_json,
@@ -62,7 +62,7 @@ DEFINE_string(output_path, "", "");
 DEFINE_bool(calibrate_cam_line_delay,
             false,
             "If camera rolling shutter line delay should be calibrated.");
-DEFINE_string(result_output_json, "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/BatchCalib/dataset2/cam_imu/cam_imu_calib_result_GX010020.json", "Path to result json file");
+DEFINE_string(result_output_json, "", "Path to result json file");
 DEFINE_double(max_t, 1000., "Maximum nr of seconds to take");
 DEFINE_bool(reestimate_biases,
             false,
@@ -440,9 +440,9 @@ int main(int argc, char* argv[]) {
           1.0,
           cv::Scalar(255, 0, 0));
       cv::imshow("spline reprojection", image);
-      cv::waitKey(10);
+      cv::waitKey(0);
       ++nr_frames;
-      if (nr_frames > 100) break;
+      if (nr_frames > 500) break;
     }
   }
   return 0;

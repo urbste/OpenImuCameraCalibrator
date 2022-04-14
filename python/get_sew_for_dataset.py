@@ -17,9 +17,12 @@ def main():
                         help="path to metadata json")
     parser.add_argument("--output_path",
                         help="output path")
-    parser.add_argument("--q_so3", help="quality value for rotational component, i.e. gyro signal", default=0.98, type=float)
-    parser.add_argument("--q_r3", help="quality value for translational component, i.e. accelerometer signal", default=0.96, type=float)
-    parser.add_argument("--use_gopro_importer", default=0)
+    parser.add_argument("--q_so3", help="quality value for rotational component, i.e. gyro signal", 
+                        default=0.98, type=float)
+    parser.add_argument("--q_r3", help="quality value for translational component, i.e. accelerometer signal", 
+                        default=0.96, type=float)
+    parser.add_argument("--use_gopro_importer", 
+                        default=0)
     args = parser.parse_args()
 
     json_importer = TelemetryImporter()

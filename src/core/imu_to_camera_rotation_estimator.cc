@@ -114,7 +114,6 @@ double ImuToCameraRotationEstimator::SolveClosedForm(
 }
 
 bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
-    const double dt_vis,
     const double dt_imu,
     Matrix3d& R_imu_to_camera,
     double& time_offset_imu_to_camera,
@@ -230,7 +229,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
 
   unsigned int iter = 0;
   double error = 0.0;
-
+  LOG(INFO) << "Estimating camera to IMU rotation.";
   while (std::abs(c - d) > tolerance) {
     Eigen::Matrix3d Rsc, Rsd;
     Eigen::Vector3d biasc, biasd;
@@ -267,8 +266,8 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
   LOG(INFO) << "Final gyro to camera quaternion is: " << qat.w() << " "
             << qat.x() << " " << qat.y() << " " << qat.z() << "\n";
   LOG(INFO) << "Gyro bias is estimated to be: " << gyro_bias[0] << ", "
-            << gyro_bias[1] << ", " << gyro_bias[2] << "\n";
-  LOG(INFO) << "Estimated time offset: " << time_offset_imu_to_camera << "\n";
+            << gyro_bias[1] << ", " << gyro_bias[2] << "rad/s\n";
+  LOG(INFO) << "Estimated time offset: " << time_offset_imu_to_camera << "s\n";
   LOG(INFO) << "Final alignment error: " << error << "\n";
 
   return true;

@@ -18,10 +18,7 @@ def main():
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='') 
-    parser.add_argument('--path_to_src', 
-                        help="Path to OpenCameraCalibrator src folder.",
-                        default='/home/steffen/Projects/OpenCameraCalibrator')   
+                        default='')
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
                         default=1, type=float)
@@ -54,6 +51,8 @@ def main():
 
     args = parser.parse_args()
 
+    path_to_file = os.path.dirname(os.path.abspath(__file__))
+    path_to_src = os.path.join(path_to_file,"../")
 
     # 
     # 0. Check inputs 

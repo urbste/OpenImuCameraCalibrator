@@ -20,18 +20,17 @@ def main():
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
                         default='/media/Data/builds/openicc_release/applications') 
-    parser.add_argument('--path_to_src', 
-                        help="Path to OpenCameraCalibrator src folder.",
-                        default='/media/Data/projects/OpenImuCameraCalibrator')   
-    parser.add_argument("--gravity_const", help="gravity constant", default=9.811104, type=float)
+    parser.add_argument("--gravity_const", help="gravity constant", 
+                        default=9.811104, type=float)
     parser.add_argument("--initial_static_duration_s", 
-    help="duration of the initial static phase for bias estimation", default=15, type=float)
-
-    parser.add_argument("--verbose", help="If calibration steps should output more information.", default=0, type=int)
-
+                        help="duration of the initial static phase for bias estimation", 
+                        default=15, type=float)
+    parser.add_argument("--verbose", help="If calibration steps should output more information.", 
+                        default=0, type=int)
     args = parser.parse_args()
 
-
+    path_to_file = os.path.dirname(os.path.abspath(__file__))
+    path_to_src = os.path.join(path_to_file,"../")
     # # 
     # # 0. Check inputs 
     # #
@@ -51,7 +50,7 @@ def main():
     #
     # 1. Extracting GoPro telemetry
     #   
-    js_extract_file = pjoin(args.path_to_src,"javascript","extract_metadata.js")
+    js_extract_file = pjoin(path_to_src,"javascript","extract_metadata.js")
     print("==================================================================")
     print("Extracting GoPro telemetry.")
     print("==================================================================")

@@ -20,10 +20,7 @@ def main():
                         default='/media/Data/builds/openicc_release/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json') 
-    parser.add_argument('--path_to_src', 
-                        help="Path to OpenCameraCalibrator src folder.",
-                        default='/media/Data/projects/OpenImuCameraCalibrator')   
+                        default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json')  
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
                         default=2, type=float)
@@ -33,31 +30,37 @@ def main():
                         default="DIVISION_UNDISTORTION", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
-                        default=0.021, 
-                        type=float)
+                        default=0.021, type=float)
     parser.add_argument("--num_squares_x",
                         help="number of squares in x direction.",
-                        default=10) # 10 for charuco board, 14 radon board
+                        default=10, type=int) # 10 for charuco board, 14 radon board
     parser.add_argument("--num_squares_y",
                         help="number of squares in x direction.",
-                        default=8) # 8 for charuco board, 9 radon board
+                        default=8, type=int) # 8 for charuco board, 9 radon board
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
-                        default=0.03)
+                        default=0.03, type=float)
     parser.add_argument("--calib_cam_line_delay",
-                        help="If camera line delay should be calibrated (EXPERIMENTAL)", default=0)
+                        help="If camera line delay should be calibrated (EXPERIMENTAL)", 
+                        default=0)
     parser.add_argument("--board_type", 
-                        help="Board type (radon or charuco)", default="charuco", type=str)
+                        help="Board type (radon or charuco)", 
+                        default="charuco", type=str)
     parser.add_argument("--gravity_const", 
-                        help="gravity constant", default=9.811104, type=float)
+                        help="gravity constant", 
+                        default=9.811104, type=float)
     parser.add_argument("--recompute_corners", 
-                        help="If the corners should be extracted again when running a dataset multiple times.", default=1, type=int)
+                        help="If the corners should be extracted again when running a dataset multiple times.", 
+                        default=1, type=int)
     parser.add_argument("--bias_calib_remove_s", 
-                        help="How many seconds to remove from start and end (due to press of button)", default=1.0, type=float)
+                        help="How many seconds to remove from start and end (due to press of button)", 
+                        default=1.0, type=float)
     parser.add_argument("--reestimate_bias_spline_opt", 
-                        help="If biases should be also estimated during spline optimization", default=1, type=int)
+                        help="If biases should be also estimated during spline optimization", 
+                        default=0, type=int)
     parser.add_argument("--optimize_board_points", 
-                        help="if board points should be optimized during camera calibration and after pose estimation.", default=0, type=int)
+                        help="if board points should be optimized during camera calibration and after pose estimation.", 
+                        default=1, type=int)
     parser.add_argument("--known_gravity_axis", 
                         help="If the gravity direction in the calibration board is exactly known.", 
                         choices=["X","Y","Z","UNKOWN"], default="UNKOWN", type=str)
@@ -68,6 +71,8 @@ def main():
 
     args = parser.parse_args()
 
+    path_to_file = os.path.dirname(os.path.abspath(__file__))
+    path_to_src = os.path.join(path_to_file,"../")
 
     # # 
     # # 0. Check inputs 
@@ -105,7 +110,7 @@ def main():
     cam_calib_file_path = pjoin(cam_calib_path, cam_calib)
     calib_dataset_json = cam_calib_file_path+".json"
 
-    aruco_detector_params = pjoin(args.path_to_src, 'resource', 'charuco_detector_params.yml')
+    aruco_detector_params = pjoin(path_to_src, 'resource', 'charuco_detector_params.yml')
     checker_size_m = str(args.checker_size_m)
     imu_cam_calibration_json = pjoin(cam_imu_path, "imu_to_cam_calibration_"+cam_imu_video_fn+".json")
 
@@ -185,7 +190,7 @@ def main():
     #
     # 2. Extracting GoPro telemetry
     #   
-    js_extract_file = pjoin(args.path_to_src,"javascript","extract_metadata.js")
+    js_extract_file = pjoin(path_to_src,"javascript","extract_metadata.js")
     print("==================================================================")
     print("Extracting GoPro telemetry for imu bias and camera imu calibration.")
     print("==================================================================")
@@ -215,7 +220,7 @@ def main():
     #
     # 4. Estimating IMU biases
     #  
-    py_imu_file = pjoin(args.path_to_src,"python","get_imu_biases.py")
+    py_imu_file = pjoin(path_to_src,"python","get_imu_biases.py")
     print("==================================================================")
     print("Estimating IMU biases.")
     print("==================================================================")
@@ -251,7 +256,7 @@ def main():
     # 
     # 6. Estimate spline error weighting parameters
     #  
-    py_spline_file = pjoin(args.path_to_src,"python","get_sew_for_dataset.py")
+    py_spline_file = pjoin(path_to_src,"python","get_sew_for_dataset.py")
     print("==================================================================")
     print("Estimating Spline error weighting and knot spacing.")
     print("==================================================================")
@@ -323,7 +328,7 @@ def main():
     #
     # 9. Print results
     #   
-    py_spline_file = pjoin(args.path_to_src,"python","print_result_stats.py")
+    py_spline_file = pjoin(path_to_src,"python","print_result_stats.py")
     print("==================================================================")
     print("Print results.")
     print("==================================================================")

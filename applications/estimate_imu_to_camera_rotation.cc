@@ -102,6 +102,7 @@ int main(int argc, char* argv[]) {
                 telemetry_data.gyroscope[i - 1].timestamp_s();
   }
   imu_dt_s /= static_cast<double>(telemetry_data.gyroscope.size() - 1);
+  LOG(INFO) << "Mean IMU data rate: "<<1./imu_dt_s<<"Hz";
 
   quat_map visual_rotations;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {
@@ -136,6 +137,7 @@ int main(int argc, char* argv[]) {
     tVis_missing_frames.push_back(vis.first);
     visual_rotations_missing_frames.push_back(vis.second);
   }
+  LOG(INFO) << "Interpolating visual quaternions to IMU rate.";
   // interpolate visual rotations as some views might be missing
   quat_vector visual_rotations_interpolated_vec;
   OpenICC::utils::InterpolateQuaternions(tVis_missing_frames,
@@ -154,8 +156,7 @@ int main(int argc, char* argv[]) {
 
   rotation_estimator.SetAngularVelocities(angular_velocities);
   rotation_estimator.SetVisualRotations(visual_rotations_interpolated);
-  rotation_estimator.EstimateCameraImuRotation(cam_dt_s,
-                                               imu_dt_s,
+  rotation_estimator.EstimateCameraImuRotation(imu_dt_s,
                                                R_gyro_to_camera,
                                                time_offset_gyro_to_camera,
                                                gyro_bias,
@@ -169,64 +170,63 @@ int main(int argc, char* argv[]) {
   output_json["gyro_to_camera_rotation"]["x"] = q_gyro_to_cam.x();
   output_json["gyro_to_camera_rotation"]["y"] = q_gyro_to_cam.y();
   output_json["gyro_to_camera_rotation"]["z"] = q_gyro_to_cam.z();
-  output_json["time_offset_gyro_to_cam"] =
-      t_imu_to_cam_0;  // + time_offset_gyro_to_camera;
+  output_json["time_offset_gyro_to_cam"] = time_offset_gyro_to_camera;
 
   // write prettified JSON to another file
   std::ofstream out_file(FLAGS_imu_rotation_init_output);
   out_file << std::setw(4) << output_json << std::endl;
 
-  // write to txt for testing
-  // std::ofstream
-  // vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/poses.txt");
-  // std::ofstream
-  // acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/accelerometer.txt");
-  // std::ofstream
-  // gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope_original.txt");
-  std::ofstream gyr_out_trafo(
-      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
-      "BatchCalib/dataset2/cam_imu/gyroscope_transformed.txt");
-  std::ofstream vis_interp_out(
-      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
-      "BatchCalib/dataset2/cam_imu/visual_gyroscope.txt");
-  std::ofstream vis_interp_all_out(
-      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
-      "BatchCalib/dataset2/cam_imu/visual_gyroscope_all.txt");
-  //  for (auto v : visual_rotations) {
-  //    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
-  //    vis_out << v.first * 1e9 << " " << pos[0] <<" "<<pos[1]<<" "<<
-  //               pos[2]<<" "<<v.second.w()<< " " <<
-  //               v.second.x()<< " " << v.second.y()<< " " <<
-  //               v.second.z()<<"\n";
-  //  }
-  //  vis_out.close();
-  //  for (auto a : acclerations) {
-  //    acc_out << a.first * 1e9 << " " << a.second[0] <<" "<<a.second[1]<<"
-  //    "<<a.second[2]<<"\n";
-  //  }
-  //  acc_out.close();
-  //  for (auto v : angular_velocities) {
-  //    gyr_out << v.first * 1e9 << " " << v.second[0] <<" "<<v.second[1]<<"
-  //    "<<v.second[2]<<"\n";
-  //  }
-  //  gyr_out.close();
-  //  for (auto v : imu_vel) {
-  //    gyr_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
-  //  }
-  //  gyr_out.close();
-  for (auto v : imu_vel) {
-    Eigen::Vector3d a = R_gyro_to_camera * v;
-    gyr_out_trafo << 1 << " " << a[0] << " " << a[1] << " " << a[2] << "\n";
-  }
-  gyr_out_trafo.close();
-  for (auto v : ang_vel) {
-    vis_interp_out << 1 << " " << v[0] << " " << v[1] << " " << v[2] << "\n";
-  }
-  vis_interp_out.close();
-  for (auto q : visual_rotations) {
-    vis_interp_all_out << 1 << " " << q.second.w() << " " << q.second.x() << " "
-                       << q.second.y() << " " << q.second.z() << "\n";
-  }
-  vis_interp_all_out.close();
+//  // write to txt for testing
+//  // std::ofstream
+//  // vis_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/poses.txt");
+//  // std::ofstream
+//  // acc_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/accelerometer.txt");
+//  // std::ofstream
+//  // gyr_out("/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/GoPro6Calib1080NoStable3_30/gyroscope_original.txt");
+//  std::ofstream gyr_out_trafo(
+//      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
+//      "BatchCalib/dataset2/cam_imu/gyroscope_transformed.txt");
+//  std::ofstream vis_interp_out(
+//      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
+//      "BatchCalib/dataset2/cam_imu/visual_gyroscope.txt");
+//  std::ofstream vis_interp_all_out(
+//      "/media/Data/work_projects/ImageStabelization/GoPro10Calibration/"
+//      "BatchCalib/dataset2/cam_imu/visual_gyroscope_all.txt");
+//  //  for (auto v : visual_rotations) {
+//  //    Eigen::Vector3d pos = visual_translation.find(v.first)->second;
+//  //    vis_out << v.first * 1e9 << " " << pos[0] <<" "<<pos[1]<<" "<<
+//  //               pos[2]<<" "<<v.second.w()<< " " <<
+//  //               v.second.x()<< " " << v.second.y()<< " " <<
+//  //               v.second.z()<<"\n";
+//  //  }
+//  //  vis_out.close();
+//  //  for (auto a : acclerations) {
+//  //    acc_out << a.first * 1e9 << " " << a.second[0] <<" "<<a.second[1]<<"
+//  //    "<<a.second[2]<<"\n";
+//  //  }
+//  //  acc_out.close();
+//  //  for (auto v : angular_velocities) {
+//  //    gyr_out << v.first * 1e9 << " " << v.second[0] <<" "<<v.second[1]<<"
+//  //    "<<v.second[2]<<"\n";
+//  //  }
+//  //  gyr_out.close();
+//  //  for (auto v : imu_vel) {
+//  //    gyr_out << 1 << " " << v[0] <<" "<<v[1]<<" "<<v[2]<<"\n";
+//  //  }
+//  //  gyr_out.close();
+//  for (auto v : imu_vel) {
+//    Eigen::Vector3d a = R_gyro_to_camera * v;
+//    gyr_out_trafo << 1 << " " << a[0] << " " << a[1] << " " << a[2] << "\n";
+//  }
+//  gyr_out_trafo.close();
+//  for (auto v : ang_vel) {
+//    vis_interp_out << 1 << " " << v[0] << " " << v[1] << " " << v[2] << "\n";
+//  }
+//  vis_interp_out.close();
+//  for (auto q : visual_rotations) {
+//    vis_interp_all_out << 1 << " " << q.second.w() << " " << q.second.x() << " "
+//                       << q.second.y() << " " << q.second.z() << "\n";
+//  }
+//  vis_interp_all_out.close();
   return 0;
 }

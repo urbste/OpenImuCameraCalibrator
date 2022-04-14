@@ -36,8 +36,7 @@ class ImuToCameraRotationEstimator {
     imu_angular_vel_ = imu_angular_vel;
   }
 
-  bool EstimateCameraImuRotation(const double dt_vis,
-                                 const double dt_imu,
+  bool EstimateCameraImuRotation(const double dt_imu,
                                  Eigen::Matrix3d& R_imu_to_camera,
                                  double& time_offset_imu_to_camera,
                                  Eigen::Vector3d& gyro_bias,

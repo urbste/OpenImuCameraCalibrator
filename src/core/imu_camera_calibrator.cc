@@ -80,21 +80,21 @@ void ImuCameraCalibrator::BatchInitSpline(
   // TODO make the bias spline dt configurable
   trajectory_.InitBiasSplines(accl_intrinsics.GetBiasVector(),
                               gyro_intrinsics.GetBiasVector(),
-                              5 * 1e9,
-                              5 * 1e9,
+                              10 * 1e9,
+                              10 * 1e9,
                               1.0,
-                              1e-2);
+                              1e-1);
 
   LOG(INFO) << "Adding Vision measurements to spline";
 
   // rolling shutter camera
   if (inital_cam_line_delay_s_ != 0.0) {
     for (const auto& vid : vision_dataset.ViewIds()) {
-      trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 3.0);
+      trajectory_.AddRSCameraMeasurement(vision_dataset.View(vid), 0.0);
     }
   } else {
     for (const auto& vid : vision_dataset.ViewIds()) {
-      trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 3.0);
+      trajectory_.AddGSCameraMeasurement(vision_dataset.View(vid), 0.0);
     }
   }
   LOG(INFO) << "Added all Vision measurements to the spline estimator";

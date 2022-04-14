@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-base_path = "/media/steffen/0F78151A1CEDE4A2/Sparsenet/SparsnetTests2020/"
+base_path = ""
 
 def read_file(base_path, file):
     with open(os.path.join(base_path,file)) as f:

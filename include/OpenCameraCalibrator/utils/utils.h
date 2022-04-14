@@ -50,7 +50,7 @@ double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
 
 std::vector<std::string> load_images(const std::string& img_dir_path);
 
-int FindClosestTimestamp(const double t_imu,
+size_t FindClosestTimestamp(const double t_imu,
                          const std::vector<double>& vis_timestamps,
                          double& distance_to_nearest_timestamp);
 

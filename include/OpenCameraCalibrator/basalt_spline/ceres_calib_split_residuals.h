@@ -18,7 +18,7 @@
 
 #include <sophus/so3.hpp>
 
-static constexpr int BIAS_SPLINE_N = 2;
+static constexpr int BIAS_SPLINE_N = 3;
 
 template <int _N>
 struct AccelerationCostFunctorSplit : public CeresSplineHelper<double, _N> {

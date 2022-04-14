@@ -191,11 +191,11 @@ std::vector<std::string> load_images(const std::string& img_dir_path) {
   return img_paths;
 }
 
-int FindClosestTimestamp(const double t_imu,
+size_t FindClosestTimestamp(const double t_imu,
                          const std::vector<double>& vis_timestamps,
                          double& distance_to_nearest_timestamp) {
   double dist = std::numeric_limits<double>::max();
-  int idx = 0;
+  size_t idx = 0;
   for (size_t i = 0; i < vis_timestamps.size(); ++i) {
     double new_dist = std::abs(t_imu - vis_timestamps[i]);
     if (new_dist < dist) {
@@ -221,11 +221,13 @@ void InterpolateQuaternions(std::vector<double> t_old,
                             std::vector<double> t_new,
                             const quat_vector& input_q,
                             quat_vector& interpolated_q) {
+  assert(input_q.size() == t_old.size());
+
   for (size_t i = 0; i < t_new.size(); ++i) {
     double dist_to_nearest_vis_t;
-    int nearest_old_idx =
+    size_t nearest_old_idx =
         FindClosestTimestamp(t_new[i], t_old, dist_to_nearest_vis_t);
-    if (nearest_old_idx < t_new.size()) {
+    if (nearest_old_idx < t_old.size()-1) {
       const double fraction =
           dist_to_nearest_vis_t /
           (t_old[nearest_old_idx + 1] - t_old[nearest_old_idx]);

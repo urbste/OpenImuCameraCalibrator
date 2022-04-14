@@ -1,4 +1,5 @@
 import json
+from xmlrpc.client import INVALID_XMLRPC
 import numpy as np
 from csv import reader
 from scipy.spatial.transform import Rotation as R
@@ -68,8 +69,8 @@ class TelemetryImporter:
     '''
     def _read_gopro_telemetry(self, path_to_json, skip_seconds=0.0):
 
-        json_file = open(path_to_json, 'r')
-        json_data = json.load(json_file)
+        with open(path_to_json, 'r') as f:
+            json_data = json.load(f)
 
         accl = []
         gyro  = []
@@ -113,12 +114,12 @@ class TelemetryImporter:
         return telemetry
 
     def read_pilotguru_telemetry(self, path_to_accl_json, path_to_gyro_json, path_to_cam_json, skip_seconds=0.0):
-        accl_json_file = open(path_to_accl_json, 'r')
-        accl_data = json.load(accl_json_file)
-        gyro_json_file = open(path_to_gyro_json, 'r')
-        gyro_data = json.load(gyro_json_file)       
-        cam_json_file = open(path_to_cam_json, 'r')
-        cam_data = json.load(cam_json_file)
+        with open(path_to_accl_json, 'r') as accl_json_file:
+            accl_data = json.load(accl_json_file)
+        with open(path_to_gyro_json, 'r') as gyro_json_file:
+            gyro_data = json.load(gyro_json_file)       
+        with open(path_to_cam_json, 'r') as cam_json_file:
+            cam_data = json.load(cam_json_file)
 
         accl = []
         gyro  = []
@@ -188,8 +189,8 @@ class TelemetryImporter:
         self.telemetry["camera_fps"] = 0.0
 
     def read_generic_json(self, path_to_json, skip_seconds=0.0):
-        json_file = open(path_to_json, 'r')
-        json_data = json.load(json_file)
+        with open(path_to_json, 'r') as f:
+            json_data = json.load(f)
 
         accl = []
         gyro  = []
@@ -211,6 +212,50 @@ class TelemetryImporter:
         self.telemetry["gyroscope"] = gyro
         self.telemetry["timestamps_ns"] = timestamps_ns
         self.telemetry["camera_fps"] = json_data["camera_fps"] 
+
+    def read_zed_jsonl(self, path_to_jsonl, skip_seconds=0.0):
+        with open(path_to_jsonl, 'r') as f:
+            json_list = [json.loads(line) for line in f]
+
+        accl = []
+        gyro  = []
+        imu_timestamps_s = []
+        frametimes_s = []
+        for json_str in json_list:
+            if "sensor" in json_str:
+                if json_str["sensor"]["type"] == "gyroscope":
+                    gyro.append(json_str["sensor"]["values"])
+                    imu_timestamps_s.append(json_str["time"])
+                elif json_str["sensor"]["type"] == "accelerometer":
+                    accl.append(json_str["sensor"]["values"])
+                
+            elif "frames" in json_str:
+                frametimes_s.append(json_str["time"])
+        # now get imu samples inside camera times
+        imu_timestamps_s = np.array(imu_timestamps_s)
+        frametimes_s = np.array(frametimes_s)
+        gyro = np.array(gyro)
+        accl = np.array(accl)
+        # get only IMU data in the frametime range
+        imu_ids = np.equal(
+            imu_timestamps_s >= frametimes_s[0], imu_timestamps_s <= frametimes_s[-1])
+
+        gyro = gyro[imu_ids,:]
+        accl = accl[imu_ids,:]
+        imu_timestamps_ns = imu_timestamps_s[imu_ids] / self.ns_to_sec
+        imu_timestamps_ns -= imu_timestamps_ns[0]
+        
+        if skip_seconds != 0.0:
+            accl, gyro, imu_timestamps_ns = self._remove_seconds(accl, gyro, imu_timestamps_ns, skip_seconds)
+
+        accl = accl[0:len(imu_timestamps_ns)]
+        gyro = gyro[0:len(imu_timestamps_ns)]
+
+        frametimes_s = np.array(frametimes_s)
+        self.telemetry["accelerometer"] = accl.tolist()
+        self.telemetry["gyroscope"] = gyro.tolist()
+        self.telemetry["timestamps_ns"] = imu_timestamps_ns.tolist()
+        self.telemetry["camera_fps"] = 1/np.mean(np.array(frametimes_s[1:] - frametimes_s[:-1]))
 
     def get_camera_quaternions_at_frametimes(self):
         # interpolate camera quaternions to frametimes
@@ -269,3 +314,6 @@ class TelemetryConverter:
         self.telemetry_importer.read_csv(csv_file, skip_seconds=skip_seconds)
         self._dump_final_json(output_path)
     
+    def convert_zed_recorder_files(self, jsonl_file, output_path, skip_seconds=0.0):
+        self.telemetry_importer.read_zed_jsonl(jsonl_file, skip_seconds=skip_seconds)
+        self._dump_final_json(output_path)

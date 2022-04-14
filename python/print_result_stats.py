@@ -14,7 +14,7 @@ def read_calib_json(file):
 
 
 def main():
-    parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
+    parser = ArgumentParser("OpenICC")
     parser.add_argument('--path_results', 
                         default='', 
                         help="Path to calibration dataset")

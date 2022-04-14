@@ -37,9 +37,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("OpenCameraCalibrator - Image Extractor")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_to_videofile', 
-                        default='/media/Data/Sparsenet/GoProEvaluation/EvaluateCoriAndIori/GX017365.MP4')
+                        default='')
     parser.add_argument('--path_to_image_output', 
-                        default='/media/Data/Sparsenet/GoProEvaluation/EvaluateCoriAndIori/images')
+                        default='')
     parser.add_argument('--resize_factor', default=1.0, type=float)
     args = parser.parse_args()
 

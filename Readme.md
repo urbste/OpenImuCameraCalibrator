@@ -1,4 +1,5 @@
 # OpenICC: An Open IMU and Camera Calibrator
+
 WORK IN PROGRESS
 
 I developed this repository to experiment with the accurate calibration of action cameras (e.g. GoPro cameras) to use them for geometric vision tasks like Structure-from-Motion, Photogrammetry and SLAM. Modern action cameras are equipped with various sensors like IMUs (accelerometer, gyroscope and magnetometer) and GPS. However the calibration data (e.g. camera projection and IMU to camera transformations) is not available.
@@ -15,8 +16,8 @@ This is where the OpenImuCameraCalibrator comes in. With this toolbox you can:
 * Extract the meta data integrated in the MP4 video file (called **telemetry data**)
 * Calibrate the **Camera to IMU rotation matrix** and find the dataset dependent **time offset**
 * Perform full **continuous time batch optimization** to find the full transformation matrix between IMU and camera
-* Do an intrinsic calibrtion of your IMU using the method described in [11]
-* [Experimental] Calibrate the **rolling shutter line delay**
+* Do an intrinsic calibration of your IMU using the method described in [11]
+* [Experimental] Calibrate the **rolling shutter line delay** (not really working yet)
 
 ## Results
 This section provides some results for my two GoPro cameras (6 and 9). You can use this to verify your own results or use them as initial values for your application. So far I have been setting them to FullHD with wide FoV and 30/60 fps. This is probably the most common setting that people use.
@@ -63,7 +64,7 @@ Tested on Ubuntu 18.04 and 20.04.
 3. Clone and build the [TheiaSfM fork](https://github.com/urbste/pyTheiaSfM).
 ``` bash
 git clone https://github.com/urbste/pyTheiaSfM
-cd TheiaSfM && mkdir -p build && cd build
+cd pyTheiaSfM && mkdir -p build && cd build
 cmake .. && make -j
 sudo make install
 ```
@@ -71,7 +72,7 @@ sudo make install
 4. Install node >= 12.x (needed to extract GoPro telemetry)
 ``` bash
 curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-sudo apt-get install -y nodejs npm
+sudo apt-get install -y nodejs
 ``` 
 
 5. Build this project
@@ -87,72 +88,13 @@ cd ../javascript && npm install
 pip install -r requirements.txt
 ```
 
-## Example: Intrinsic IMU parameter estimation
+## Usage examples
 
-For this example I am using a dataset recorded with the GoPro9. Please read the paper [11] on how to record the dataset and details on how the method works.
-Remember to let the camera stand still for >= 10 seconds in the beginning. This is also a parameter you need to supply to the calibration script.
+- [Calibrate a GoPro9](docs/gopro_calibration.md)
+- [Calibrate a SamsungS20FE](docs/samsung_s20_calibration.md)
+- [Calibrate a GoPro IMU intrinsics](docs/imu_intrinsics.md)
+- [Estimate a GoPro IMU noise parameters](docs/imu_noise_parameters.md)
 
-You can get a sample dataset from: [link](https://drive.google.com/file/d/1fawlqSYcylyNDVnfgCETT7DLccmVDVKX/view?usp=sharing). 
-The folder **static_imu_calib** contains an example file.
-You can run the static imu calibration with. Remember to supply your build and source path of OpenICC to the script:
-``` python
-python python/static_multipose_imu_calibration.py --path_static_calib_dataset=/path/to/example_dataset/dataset3/static_multi_pose --initial_static_duration_s=10 --path_to_build=/your_path_to_openicc_build/applications --path_to_src=/your_path_to_openicc_src 
-```
-
-If successfull this script will output a json file **static_calib_result.json** containing IMU intrinsics for your camera. **You can supply this json file later to VI calibration using the --path_to_imu_intrinsics flag.**
-
-
-## Example: Visual-Inertial Calibration of a GoPro Camera
-For this example I am using a GoPro 9. To calibrate the camera and the IMU to camera transformation we will use the following script: **python/run_gopro_calibration.py** 
-
-0. Get the test data from here: [link](https://drive.google.com/file/d/1fawlqSYcylyNDVnfgCETT7DLccmVDVKX/view?usp=sharing). Then you can skip step 1. & 2. 
-
-1. Data acquisition
-
-   1.1 Print out the target: resource/board.png to a paper and attach it to something rigid (e.g. a wall). Measure the size of a black square in meter (e.g. 0.021m).
-   
-   1.2 Now record **3** videos.
-
-   1.2.1 The first is to calibrate the camera.
-        Move **SLOWLY** around the board. We do not want motion blur or the rolling shutter to influence the result. Record for about 20-30s. --> e.g. GH0000.MP4
-
-   1.2.2 Place the GoPro on the floor or on a table and press record. Leave it there for 10-20s without touching it or walking around it. This video will be used to estimate the current IMU bias. We assume it to be fixed during the calibration. --> e.g. GH0001.MP4
-
-   1.2.3 Finally record the last video. Again record the board and make sure that you have good lighting conditions. If possible set the shutter time of your GoPro the minimum (e.g. 1/480). If the board is barely visible your lighting condition is not good enough. Having a very fast shutter assures crisp corners and less motion blur. Also it should improve RS line delay calibration. --> e.g. GH0002.MP4
-   - Excite all 3 axis -> 3 translation and 3 rotation.
-   - Move fast, but not too fast (motion blur). 
-   - Make sure that most of the board is visible
-
-2. Create the following folder structure:
-
-```
-MyDataset
-|-- cam
-|     |-- GH0000.MP4
-|   imu_bias
-|     |-- GH0001.MP4
-|   cam_imu
-|     |-- GH0002.MP4
-```
-
-3. Run the calibration
-Only use the PINHOLE model whenever you do not expect any distortion (e.g. smartphone)!
-``` python
-python python/run_gopro_calibration.py --path_calib_dataset=/your/path/MyDataset --checker_size_m=0.021 --image_downsample_factor=2 --camera_model=DIVISION_UNDISTORTION
-```
-Also check out all the other parameters you can set!
-
-4. The spline calibration in the end should converge smoothly after 8-15 iterations. If not, your recordings are probably not good enough to perform a decent calibration. Also have a look at the final spline fit to the IMU readings:
-![SplineFit](resource/ExampleSplineFit.png)
-
-## Estimate IMU Noise Parameters
-1. Record a > 2h GoPro video where the GoPro is actually standing still. Use the lowest resolution and FPS setting, as we do not need the video feed for this
-2. Still this will create multiple video files, so we need to extract the telemetry from each and merge it to a large one.
-3. Put all video files in a single folder
-4. Use [allan_variance.py](python/allan_variance.py) to concatenate all telemetry files into a single on
-5. Finally run [fit_allan_variance](applications/fit_allan_variance) binary on the concatenated telemetry file
-6. This will give you noise density and random walk values for each axis x-y-z of gyroscope and accelerometer
-7. Average these values and use them in your favorite VIO or SLAM, e.g. [ORB-SLAM3](https://github.com/urbste/ORB_SLAM3)
 
 ## Acknowlegements
 This library would not have been possible without these great OpenSource projects:
@@ -187,47 +129,6 @@ ters, 1(1):137–144, Jan 2016.
    * [8] Efficient Derivative Computation for Cumulative B-Splines on Lie Groups, C. Sommer, V. Usenko, D. Schubert, N. Demmel, D. Cremers, In 2020 Conference on Computer Vision and Pattern Recognition (CVPR) 
    * [9] Larsson, Viktor, Zuzana Kukelova, and Yinqiang Zheng. "Making minimal solvers for absolute pose estimation compact and robust." Proceedings of the IEEE International Conference on Computer Vision. 2017.
    * [10] Hannes Ovrén and Per-Erik Forssén Spline Error Weighting for Robust Visual-Inertial Fusion In Proceedings of the IEEE on Computer Vision and Pattern Recognition (CVPR) June 2018
-
-
-## How to compare to Kalibr
-Work-in-progress!
-
-1. Download CDE package from [here](https://github.com/ethz-asl/kalibr/wiki/downloads)
-
-2. Open AprilTag target on screen or print it from [here](https://github.com/ethz-asl/kalibr/wiki/downloads)
-
-3. Create a AprilTag yaml file and enter size of tag
-
-4. Find out your GoPro IMU noise params (see above)
-
-5. Finally create a imu.yaml
-
-Example from my GoPro 9 
-``` yaml
-#Accelerometers
-accelerometer_noise_density: 1.5e-02   # White noise
-accelerometer_random_walk:   4.5e-04   # Bias instability
-
-#Gyroscopes
-gyroscope_noise_density:     1.1e-03   # White noise
-gyroscope_random_walk:       3.0e-05   # Bias instability
-
-rostopic:                    /imu0      #the IMU ROS topic
-update_rate:                 200.0      #Hz (for discretization of the values above)
-```
-
-6. Use python/extract_for_kalibr_bagcreator.py to extract telemetry and single images
-
-7. Run kalibr_bagcreator
-
-8. Run kalibr_calibrate_cameras
-
-Use omni-radtan model.
-
-9. Run kalibr_calibrate_imu_camera
-
-with --time-calibration
-
 
 ## Working on / ToDo / Contributions Welcome
 v0.1

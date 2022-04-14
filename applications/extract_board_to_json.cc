@@ -94,7 +94,6 @@ int main(int argc, char* argv[]) {
     board_extractor.ExtractVideoToJson(FLAGS_input_path,
                                        FLAGS_save_corners_json_path,
                                        FLAGS_downsample_factor);
-
   } else {
     board_extractor.ExtractImageFolderToJson(FLAGS_input_path,
                                              FLAGS_save_corners_json_path,
