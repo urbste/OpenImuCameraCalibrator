@@ -13,9 +13,9 @@ minDistanceToBorder: 3
 minMarkerDistance: 5.0
 minMarkerDistanceRate: 0.02
 cornerRefinementMethod: 1 # 1->subpix 3->apriltag
-cornerRefinementWinSize: 5
-cornerRefinementMaxIterations: 20
-cornerRefinementMinAccuracy: 0.05
+cornerRefinementWinSize: 21
+cornerRefinementMaxIterations: 10
+cornerRefinementMinAccuracy: 0.001
 markerBorderBits: 1
 perspectiveRemovePixelPerCell: 21
 perspectiveRemoveIgnoredMarginPerCell: 0.13

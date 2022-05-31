@@ -25,6 +25,7 @@
 #include "theia/sfm/camera/double_sphere_camera_model.h"
 #include "theia/sfm/camera/extended_unified_camera_model.h"
 #include "theia/sfm/camera/fisheye_camera_model.h"
+#include "theia/sfm/camera/orthographic_camera_model.h"
 #include "theia/sfm/camera/pinhole_camera_model.h"
 #include "theia/sfm/camera/pinhole_radial_tangential_camera_model.h"
 
@@ -61,7 +62,13 @@ bool write_camera_calibration(const std::string& output_file,
   if (camera.GetCameraIntrinsicsModelType() ==
       theia::CameraIntrinsicsModelType::PINHOLE) {
     json_obj["intrinsics"]["aspect_ratio"] = intrinsics->GetParameter(
-        theia::PinholeCameraModel::InternalParametersIndex::ASPECT_RATIO);
+        theia::PinholeCameraModel::ASPECT_RATIO);
+    json_obj["intrinsics"]["radial_distortion_1"] = intrinsics->GetParameter(
+        theia::PinholeCameraModel::
+            RADIAL_DISTORTION_1);
+    json_obj["intrinsics"]["radial_distortion_2"] = intrinsics->GetParameter(
+        theia::PinholeCameraModel::
+            RADIAL_DISTORTION_2);
   } else if (camera.GetCameraIntrinsicsModelType() ==
              theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION) {
     json_obj["intrinsics"]["aspect_ratio"] =
@@ -70,63 +77,73 @@ bool write_camera_calibration(const std::string& output_file,
     json_obj["intrinsic_type"] = utils::CameraIDToString(
         (int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION);
     json_obj["intrinsics"]["div_undist_distortion"] = intrinsics->GetParameter(
-        theia::DivisionUndistortionCameraModel::InternalParametersIndex::
+        theia::DivisionUndistortionCameraModel::
             RADIAL_DISTORTION_1);
   } else if (camera.GetCameraIntrinsicsModelType() ==
              theia::CameraIntrinsicsModelType::DOUBLE_SPHERE) {
     json_obj["intrinsics"]["aspect_ratio"] = intrinsics->GetParameter(
-        theia::DoubleSphereCameraModel::InternalParametersIndex::ASPECT_RATIO);
+        theia::DoubleSphereCameraModel::ASPECT_RATIO);
     json_obj["intrinsics"]["xi"] = intrinsics->GetParameter(
-        theia::DoubleSphereCameraModel::InternalParametersIndex::XI);
+        theia::DoubleSphereCameraModel::XI);
     json_obj["intrinsics"]["alpha"] = intrinsics->GetParameter(
-        theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA);
+        theia::DoubleSphereCameraModel::ALPHA);
   } else if (camera.GetCameraIntrinsicsModelType() ==
              theia::CameraIntrinsicsModelType::EXTENDED_UNIFIED) {
     json_obj["intrinsics"]["aspect_ratio"] =
         intrinsics->GetParameter(theia::ExtendedUnifiedCameraModel::
                                      InternalParametersIndex::ASPECT_RATIO);
     json_obj["intrinsics"]["alpha"] = intrinsics->GetParameter(
-        theia::ExtendedUnifiedCameraModel::InternalParametersIndex::ALPHA);
+        theia::ExtendedUnifiedCameraModel::ALPHA);
     json_obj["intrinsics"]["beta"] = intrinsics->GetParameter(
-        theia::ExtendedUnifiedCameraModel::InternalParametersIndex::BETA);
+        theia::ExtendedUnifiedCameraModel::BETA);
   } else if (camera.GetCameraIntrinsicsModelType() ==
              theia::CameraIntrinsicsModelType::FISHEYE) {
     json_obj["intrinsics"]["aspect_ratio"] = intrinsics->GetParameter(
-        theia::FisheyeCameraModel::InternalParametersIndex::ASPECT_RATIO);
+        theia::FisheyeCameraModel::ASPECT_RATIO);
     json_obj["intrinsics"]["radial_distortion_1"] = intrinsics->GetParameter(
-        theia::FisheyeCameraModel::InternalParametersIndex::
+        theia::FisheyeCameraModel::
             RADIAL_DISTORTION_1);
     json_obj["intrinsics"]["radial_distortion_2"] = intrinsics->GetParameter(
-        theia::FisheyeCameraModel::InternalParametersIndex::
+        theia::FisheyeCameraModel::
             RADIAL_DISTORTION_2);
     json_obj["intrinsics"]["radial_distortion_3"] = intrinsics->GetParameter(
-        theia::FisheyeCameraModel::InternalParametersIndex::
+        theia::FisheyeCameraModel::
             RADIAL_DISTORTION_3);
     json_obj["intrinsics"]["radial_distortion_4"] = intrinsics->GetParameter(
-        theia::FisheyeCameraModel::InternalParametersIndex::
+        theia::FisheyeCameraModel::
             RADIAL_DISTORTION_4);
   } else if (camera.GetCameraIntrinsicsModelType() ==
              theia::CameraIntrinsicsModelType::PINHOLE_RADIAL_TANGENTIAL) {
     json_obj["intrinsics"]["aspect_ratio"] = intrinsics->GetParameter(
-        theia::FisheyeCameraModel::InternalParametersIndex::ASPECT_RATIO);
+        theia::FisheyeCameraModel::ASPECT_RATIO);
     json_obj["intrinsics"]["radial_distortion_1"] = intrinsics->GetParameter(
-        theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+        theia::PinholeRadialTangentialCameraModel::
             RADIAL_DISTORTION_1);
     json_obj["intrinsics"]["radial_distortion_2"] = intrinsics->GetParameter(
-        theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+        theia::PinholeRadialTangentialCameraModel::
             RADIAL_DISTORTION_2);
     json_obj["intrinsics"]["radial_distortion_3"] = intrinsics->GetParameter(
-        theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+        theia::PinholeRadialTangentialCameraModel::
             RADIAL_DISTORTION_3);
     json_obj["intrinsics"]["tangential_distortion_1"] =
         intrinsics->GetParameter(
-            theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+            theia::PinholeRadialTangentialCameraModel::
                 TANGENTIAL_DISTORTION_1);
     json_obj["intrinsics"]["tangential_distortion_2"] =
         intrinsics->GetParameter(
-            theia::PinholeRadialTangentialCameraModel::InternalParametersIndex::
+            theia::PinholeRadialTangentialCameraModel::
                 TANGENTIAL_DISTORTION_2);
-  } else {
+  } else if (camera.GetCameraIntrinsicsModelType() ==
+               theia::CameraIntrinsicsModelType::ORTHOGRAPHIC) {
+      json_obj["intrinsics"]["aspect_ratio"] = intrinsics->GetParameter(
+          theia::OrthographicCameraModel::ASPECT_RATIO);
+      json_obj["intrinsics"]["radial_distortion_1"] = intrinsics->GetParameter(
+          theia::OrthographicCameraModel::
+              RADIAL_DISTORTION_1);
+      json_obj["intrinsics"]["radial_distortion_2"] = intrinsics->GetParameter(
+          theia::OrthographicCameraModel::
+              RADIAL_DISTORTION_2);
+   } else {
     std::cerr << "Camera model type not supported\n";
   }
 

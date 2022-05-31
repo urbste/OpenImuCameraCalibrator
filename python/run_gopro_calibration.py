@@ -146,24 +146,24 @@ def main():
                     "--num_squares_y="+str(args.num_squares_y),
                     "--logtostderr=1"])
     error_cam_calib = cam_calib.wait()
-    print("Extracing corners for imu camera calibration.")
-    cam_imu_calib_corners = Popen([pjoin(bin_path,'extract_board_to_json'),
-                    "--input_path=" + cam_imu_video[0],
-                    "--aruco_detector_params=" + aruco_detector_params,
-                    "--board_type=" + args.board_type,
-                    "--save_corners_json_path=" + cam_imu_corners_json,
-                    "--downsample_factor=" + str(args.image_downsample_factor),
-                    "--checker_square_length_m=" + checker_size_m,
-                    "--verbose=" + str(args.verbose),
-                    "--recompute_corners=" + str(args.recompute_corners),
-                    "--num_squares_x="+str(args.num_squares_x),
-                    "--num_squares_y="+str(args.num_squares_y),
-                    "--logtostderr=1"])
-    error_cam_calib = cam_imu_calib_corners.wait()
-    print("Finished corner extraction.")
-    print("==================================================================")
-    print("Corner extraction took {:.2f}s.".format(time.time()-start))
-    print("==================================================================")
+    # print("Extracing corners for imu camera calibration.")
+    # cam_imu_calib_corners = Popen([pjoin(bin_path,'extract_board_to_json'),
+    #                 "--input_path=" + cam_imu_video[0],
+    #                 "--aruco_detector_params=" + aruco_detector_params,
+    #                 "--board_type=" + args.board_type,
+    #                 "--save_corners_json_path=" + cam_imu_corners_json,
+    #                 "--downsample_factor=" + str(args.image_downsample_factor),
+    #                 "--checker_square_length_m=" + checker_size_m,
+    #                 "--verbose=" + str(args.verbose),
+    #                 "--recompute_corners=" + str(args.recompute_corners),
+    #                 "--num_squares_x="+str(args.num_squares_x),
+    #                 "--num_squares_y="+str(args.num_squares_y),
+    #                 "--logtostderr=1"])
+    # error_cam_calib = cam_imu_calib_corners.wait()
+    # print("Finished corner extraction.")
+    # print("==================================================================")
+    # print("Corner extraction took {:.2f}s.".format(time.time()-start))
+    # print("==================================================================")
 
     #
     # 1. Calibrate camera
@@ -180,7 +180,7 @@ def main():
                     "--grid_size=" + str(args.voxel_grid_size),
                     "--optimize_board_points="+str(args.optimize_board_points),
                     "--verbose=" + str(args.verbose),
-                    "--logtostderr=0"])
+                    "--logtostderr=1"])
     error_cam_calib = cam_calib.wait()
     print("Finished camera calibration.")
     print("==================================================================")

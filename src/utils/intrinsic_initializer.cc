@@ -28,7 +28,10 @@
 
 #include <opencv2/core/eigen.hpp>
 
-const size_t MIN_NUM_POINTS = 20;
+#include <unsupported/Eigen/Polynomials>
+
+
+const size_t MIN_NUM_POINTS = 12;
 
 namespace OpenICC {
 namespace utils {
@@ -295,5 +298,114 @@ bool initialize_doublesphere_model(
   return success;
 }  // for target rows
 
+
+// cf. https://github.com/Seagate/telecentric-calibration/blob/main/src/estimate_params.m
+bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+    Eigen::Matrix3d& R,
+    Eigen::Vector3d& t,
+    Eigen::Matrix3d& H,
+    double& focal_length,
+    const Eigen::Vector2d& principal_pt,
+    const bool verbose) {
+    if (correspondences.size() <= MIN_NUM_POINTS) {
+      return false;
+    }
+
+    Eigen::MatrixXd pts2d;
+    Eigen::MatrixXd pts3d;
+
+    const size_t num_pts = correspondences.size();
+    pts2d.resize(2*num_pts,1);
+    pts3d.resize(2*num_pts,6);
+    pts2d.setZero();
+    pts3d.setZero();
+
+    for (size_t i = 0; i < num_pts; ++i) {
+        // add principal point because it was substracted for other cam models
+        pts2d(i,0) = correspondences[i].feature[0] + principal_pt[0];
+        pts2d(i+num_pts,0) = correspondences[i].feature[1] + principal_pt[1];
+        Eigen::Vector3d world_pt = correspondences[i].world_point;
+        world_pt[2] = 1.0;
+        pts3d.block<1,3>(i,0) = world_pt;
+        pts3d.block<1,3>(i+num_pts,3) = world_pt;
+    }
+
+    Eigen::MatrixXd h = pts3d.completeOrthogonalDecomposition().pseudoInverse() * pts2d;
+    // ortho homography
+    H << h(0,0), h(1,0), h(2,0),
+         h(3,0), h(4,0), h(5,0),
+         0, 0, 1.;
+
+    // get magnification of orthographic camera
+    const double c1 = h(0,0)*h(0,0) + h(1,0)*h(1,0) + h(3,0)*h(3,0) + h(4,0)*h(4,0);
+    const double c2 = std::pow((h(0,0)*h(4,0) - h(1,0)*h(3,0)),2);
+    Eigen::Matrix<double, 5, 1> coeff;
+    // order of coeffs are swapped in Eigen compared to numpy and Matlab
+    coeff << c2, 0., -c1, 0., 1;
+    Eigen::PolynomialSolver<double, Eigen::Dynamic> solver;
+    solver.compute(coeff);
+    bool has_real_root = false;
+    const double magnification = solver.greatestRealRoot(has_real_root);
+    if (!has_real_root || std::isinf(magnification) ||std::isnan(magnification) || magnification <= 0.0) {
+        std::cout<<"Magnification could not be estimated for this view!";
+        return false;
+    }
+
+    Eigen::Matrix3d K_init;
+    K_init << magnification, 0, principal_pt[0],
+              0, magnification, principal_pt[1],
+              0, 0, 1;
+    // focal length in this case is basically f = magnification / pixel_pitch
+    focal_length = magnification;
+
+    const Eigen::Matrix3d E = K_init.completeOrthogonalDecomposition().pseudoInverse() * H;
+    // return translation
+    t <<(H(0,2) - principal_pt[0]) / magnification,
+        (H(1,2) - principal_pt[1]) / magnification,
+        1.0;
+
+    const double r13 = std::sqrt(1-std::pow(E(0,0),2) - std::pow(E(1,0),2));
+    const double r23 = std::sqrt(1-std::pow(E(0,1),2) - std::pow(E(1,1),2));
+    const Eigen::Vector3d r1(E(0,0), E(1,0), r13);
+    const Eigen::Vector3d r2(E(0,1), E(1,1), r23);
+    const Eigen::Vector3d r3 = r1.cross(r2);
+    // return rotation
+    R << r1, r2, r3;
+
+    if (R.determinant() - 1. > 1e-4) {
+        VLOG(1) << "Rotation matrix is not orhtogonal!";
+    }
+    if (verbose) {
+      std::cout << "Estimated magnification: " << magnification
+                << std::endl;
+    }
+    return true;
+}
+
+// cf. https://github.com/Seagate/telecentric-calibration/blob/main/src/estimate_params.m
+bool initialize_orthographic_focal_length(
+    const aligned_vector<Eigen::Matrix3d>& ortho_homographies,
+    double& alpha,
+    double& beta) {
+    Eigen::MatrixXd G, w;
+    const size_t num_calib_views = ortho_homographies.size();
+    G.resize(num_calib_views, 4);
+    G.setZero();
+    G.col(0).setOnes();
+    w.resize(num_calib_views, 1);
+    w.setZero();
+    for (size_t i=0; i < num_calib_views; ++i) {
+        const auto& H = ortho_homographies[i];
+        G(i,1) = -std::pow(H(1,0),2) - std::pow(H(1,1),2);
+        G(i,2) = -std::pow(H(0,0),2) - std::pow(H(0,1),2);
+        G(i,3) = 2.0 * (H(0,0)*H(1,0) + H(0,1)*H(1,1));
+        w(i)   = -std::pow(H(0,0)*H(1,1) - H(0,1)* H(1,0),2);
+    }
+    Eigen::MatrixXd l = G.completeOrthogonalDecomposition().pseudoInverse() * w;
+    alpha = std::sqrt( (l(1)*l(2)-l(3)*l(3)) / l(2));
+    beta = std::sqrt(l(2));
+
+    return true;
+}
 }  // namespace utils
 }  // namespace OpenICC

@@ -24,6 +24,7 @@
 #include <theia/sfm/bundle_adjustment/bundle_adjustment.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_uncalibrated_absolute_pose.h>
+#include <theia/sfm/estimators/estimate_calibrated_absolute_pose.h>
 #include <theia/sfm/estimators/feature_correspondence_2d_3d.h>
 #include <theia/solvers/ransac.h>
 // camera types
@@ -33,6 +34,7 @@
 #include <theia/sfm/camera/fisheye_camera_model.h>
 #include <theia/sfm/camera/pinhole_camera_model.h>
 #include <theia/sfm/camera/pinhole_radial_tangential_camera_model.h>
+#include <theia/sfm/camera/orthographic_camera_model.h>
 
 #include "OpenCameraCalibrator/io/read_scene.h"
 #include "OpenCameraCalibrator/io/write_camera_calibration.h"
@@ -187,11 +189,11 @@ bool CameraCalibrator::RunCalibration() {
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH |
       theia::OptimizeIntrinsicsType::ASPECT_RATIO;
 
-  if (camera_model_ == "PINHOLE") {
+  if (camera_model_ != "PINHOLE") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
-    ba_options.intrinsics_to_optimize |=
+    ba_options.intrinsics_to_optimize |= theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
         theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION;
   }
   summary = theia::BundleAdjustViews(
@@ -224,10 +226,18 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
   const int image_width = scene_json["image_width"];
   const int image_height = scene_json["image_height"];
   // initial principal point
-  const double px = static_cast<double>(image_width) / 2.0;
-  const double py = static_cast<double>(image_height) / 2.0;
+  const Eigen::Vector2d principal_pt(
+              static_cast<double>(image_width) / 2.0,
+              static_cast<double>(image_height) / 2.0);
+
+  theia::RansacSummary ransac_summary;
+  // set error thresh 0.3% from image size
+  ransac_params_.error_thresh = 0.003 * image_height;
 
   vec3_vector saved_poses;
+  aligned_vector<Eigen::Matrix3d> ortho_homographies;
+
+  std::map<theia::ViewId,std::vector<theia::FeatureCorrespondence2D3D>> allcorrespondences;
   // iterate views and estimate poses
   const auto views = scene_json["views"];
   const size_t total_nr_views = views.size();
@@ -250,23 +260,18 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
         board_pt3_ids.size());
     for (size_t i = 0; i < board_pt3_ids.size(); ++i) {
       theia::FeatureCorrespondence2D3D correspondence;
-      correspondence.feature[0] = corners[i][0] - px;
-      correspondence.feature[1] = corners[i][1] - py;
-      const Eigen::Vector4d track =
-          recon_calib_dataset_.Track(board_pt3_ids[i])->Point();
-      correspondence.world_point = track.hnormalized();
+      correspondence.feature = corners[i] - principal_pt;
+      correspondence.world_point = recon_calib_dataset_.Track(board_pt3_ids[i])->Point().hnormalized();
       correspondences[i] = correspondence;
     }
 
-    theia::RansacSummary ransac_summary;
     Eigen::Matrix3d rotation;
     Eigen::Vector3d position;
+    Eigen::Matrix3d homography;
     bool success_init = false;
     double focal_length = 0.0, radial_distortion = 0.0;
     LOG(INFO) << "Initializing " << camera_model_ << " camera model.\n";
 
-    // set error thresh 0.3% from image size
-    ransac_params_.error_thresh = 0.003 * image_height;
     if (camera_model_ == "PINHOLE" ||
         camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
       success_init = utils::initialize_pinhole_camera(correspondences,
@@ -287,7 +292,16 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
           focal_length,
           radial_distortion,
           verbose_);
-    } else {
+    } else if (camera_model_ == "ORTHOGRAPHIC") {
+        success_init = utils::initialize_orthographic_camera_model(
+            correspondences,
+            rotation,
+            position,
+            homography,
+            focal_length,
+            principal_pt,
+            verbose_);
+      } else {
       success_init = utils::initialize_radial_undistortion_camera(
           correspondences,
           ransac_params_,
@@ -323,6 +337,10 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
       continue;
     }
 
+
+    if (camera_model_ == "ORTHOGRAPHIC") {
+        ortho_homographies.push_back(homography);
+    }
     saved_poses.push_back(position);
 
     theia::ViewId view_id = AddView(rotation,
@@ -333,8 +351,80 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
                                     image_height,
                                     timestamp_s);
 
+    allcorrespondences[view_id] = correspondences;
     for (size_t i = 0; i < board_pt3_ids.size(); ++i) {
       AddObservation(view_id, board_pt3_ids[i], corners[i]);
+    }
+  }
+
+  std::cout<<"Using "<<recon_calib_dataset_.ViewIds().size()<<" views for calibration.\n";
+  // use opencv initCameraMatrix2D
+  if (camera_model_ == "PINHOLE" ||
+      camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
+    std::vector<std::vector<cv::Point3f>> objPts_cv;
+    std::vector<std::vector<cv::Point2f>> boardPts_cv;
+
+    for (const auto& vid : recon_calib_dataset_.ViewIds()) {
+      const auto view = recon_calib_dataset_.View(vid);
+      std::vector<cv::Point3f> tmp3d;
+      std::vector<cv::Point2f> tmp2d;
+
+      for (const auto& tid : view->TrackIds()) {
+          const Eigen::Vector3d pt3 = recon_calib_dataset_.Track(tid)->Point().hnormalized();
+          const Eigen::Vector2d pt2 = view->GetFeature(tid)->point_;
+          tmp3d.push_back(cv::Point3f(pt3[0],pt3[1],pt3[2]));
+          tmp2d.push_back(cv::Point2f(pt2[0],pt2[1]));
+      }
+      objPts_cv.push_back(tmp3d);
+      boardPts_cv.push_back(tmp2d);
+    }
+    cv::Mat init_K = cv::initCameraMatrix2D(objPts_cv,
+            boardPts_cv, cv::Size(image_width, image_height), 1.0);
+    std::cout<<"cv::initCameraMatrix2D initial camera matrix: "<<init_K<<std::endl;
+    cv::Mat dist;
+    std::vector<cv::Mat> rvecs, tvecs;
+    const double reproj_err = cv::calibrateCamera(objPts_cv, boardPts_cv,
+                                                  cv::Size(image_width, image_height), init_K, dist, rvecs, tvecs, cv::CALIB_FIX_ASPECT_RATIO);
+    std::cout<<"cv::calibrateCamera camera matrix: "<<init_K<<std::endl;
+    std::cout<<"cv::calibrateCamera distortion: "<<dist<<std::endl;
+    std::cout<<"cv::calibrateCamera reprojection error: "<<reproj_err<<"\n";
+
+    // now set all views focal length to that value
+    int idx = 0;
+    for (const auto& vid : recon_calib_dataset_.ViewIds()) {
+      auto m_view = recon_calib_dataset_.MutableView(vid);
+      m_view->MutableCamera()->SetFocalLength(init_K.at<double>(0,0));
+      m_view->MutableCamera()->SetPrincipalPoint(init_K.at<double>(0,2),init_K.at<double>(1,2));
+      if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
+        m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
+          theia::PinholeRadialTangentialCameraModel::RADIAL_DISTORTION_1, dist.at<double>(0));
+        m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
+          theia::PinholeRadialTangentialCameraModel::RADIAL_DISTORTION_2, dist.at<double>(1));
+        m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
+          theia::PinholeRadialTangentialCameraModel::RADIAL_DISTORTION_3, dist.at<double>(4));
+        m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
+          theia::PinholeRadialTangentialCameraModel::TANGENTIAL_DISTORTION_1, dist.at<double>(2));
+        m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
+          theia::PinholeRadialTangentialCameraModel::TANGENTIAL_DISTORTION_2, dist.at<double>(3));
+      }
+      cv::Matx33d Rcv;
+      cv::Rodrigues(rvecs[idx],Rcv);
+      cv::Matx31d pcv = -Rcv.t() * cv::Vec3d(tvecs[idx]);
+      m_view->MutableCamera()->SetPosition(Eigen::Vector3d(pcv(0,0),pcv(1,0),pcv(2,0)));
+      m_view->MutableCamera()->SetOrientationFromAngleAxis(
+                  Eigen::Vector3d(rvecs[idx].at<double>(0),rvecs[idx].at<double>(1),rvecs[idx].at<double>(2)));
+      idx++;
+    }
+  } else if (camera_model_ == "ORTHOGRAPHIC") {
+    std::cout<<"Initializing a orthographic camera."<<std::endl;
+    double alpha, beta;
+    utils::initialize_orthographic_focal_length(ortho_homographies, alpha, beta);
+    std::cout<<"Initialized an orthographic camera with alpha: "<<alpha<<" and beta "<<beta<<"."<<std::endl;
+    for (const auto& vid : recon_calib_dataset_.ViewIds()) {
+        auto m_view = recon_calib_dataset_.MutableView(vid);
+        m_view->MutableCamera()->SetFocalLength(alpha);
+        m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
+          theia::OrthographicCameraModel::ASPECT_RATIO, beta / alpha);
     }
   }
 
@@ -396,55 +486,49 @@ void CameraCalibrator::PrintResult() {
     std::cout
         << "DIVISION_UNDISTORTION model: "
         << "Distortion: "
-        << cam.intrinsics()[theia::DivisionUndistortionCameraModel::
-                                InternalParametersIndex::RADIAL_DISTORTION_1]
+        << cam.intrinsics()[theia::DivisionUndistortionCameraModel:: RADIAL_DISTORTION_1]
         << "\n";
   } else if (camera_model_ == "DOUBLE_SPHERE") {
     std::cout
         << "DOUBLE_SPHERE model: "
         << "XI: "
         << cam.intrinsics()
-               [theia::DoubleSphereCameraModel::InternalParametersIndex::XI]
+               [theia::DoubleSphereCameraModel::XI]
         << " ALPHA: "
         << cam.intrinsics()
-               [theia::DoubleSphereCameraModel::InternalParametersIndex::ALPHA]
+               [theia::DoubleSphereCameraModel::ALPHA]
         << "\n";
   } else if (camera_model_ == "EXTENDED_UNIFIED") {
     std::cout << "EXTENDED_UNIFIED model: "
-              << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::
-                                      InternalParametersIndex::ALPHA]
+              << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::ALPHA]
               << " BETA: "
-              << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::
-                                      InternalParametersIndex::BETA]
+              << cam.intrinsics()[theia::ExtendedUnifiedCameraModel::BETA]
               << "\n";
   } else if (camera_model_ == "FISHEYE") {
     std::cout
         << "FISHEYE model: "
         << "Radial distortion 1: "
-        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+        << cam.intrinsics()[theia::FisheyeCameraModel::
                                 RADIAL_DISTORTION_1]
         << " Radial distortion 2: "
-        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+        << cam.intrinsics()[theia::FisheyeCameraModel::
                                 RADIAL_DISTORTION_2]
         << " Radial distortion 3: "
-        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+        << cam.intrinsics()[theia::FisheyeCameraModel::
                                 RADIAL_DISTORTION_3]
         << " Radial distortion 4: "
-        << cam.intrinsics()[theia::FisheyeCameraModel::InternalParametersIndex::
+        << cam.intrinsics()[theia::FisheyeCameraModel::
                                 RADIAL_DISTORTION_4]
         << "\n";
-  } else if (camera_model_ == "PINHOLE_DISTORTION") {
+  } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
     std::cout
         << "Pinhole with radial-tangential distortion: "
         << "Radial distortion 1: "
-        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::
-                                InternalParametersIndex::RADIAL_DISTORTION_1]
+        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::RADIAL_DISTORTION_1]
         << " Radial distortion 2: "
-        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::
-                                InternalParametersIndex::RADIAL_DISTORTION_2]
+        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::RADIAL_DISTORTION_2]
         << " Radial distortion 3: "
-        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::
-                                InternalParametersIndex::RADIAL_DISTORTION_3]
+        << cam.intrinsics()[theia::PinholeRadialTangentialCameraModel::RADIAL_DISTORTION_3]
         << " Tangential distortion 1: "
         << cam.intrinsics()
                [theia::PinholeRadialTangentialCameraModel::
@@ -454,7 +538,23 @@ void CameraCalibrator::PrintResult() {
                [theia::PinholeRadialTangentialCameraModel::
                     InternalParametersIndex::TANGENTIAL_DISTORTION_2]
         << "\n";
-  }
+  } else if (camera_model_ == "PINHOLE") {
+      std::cout
+          << "Pinhole with radial distortion: "
+          << "Radial distortion 1: "
+          << cam.intrinsics()[theia::PinholeCameraModel::RADIAL_DISTORTION_1]
+          << " Radial distortion 2: "
+          << cam.intrinsics()[theia::PinholeCameraModel::RADIAL_DISTORTION_2]
+          << "\n";
+    } else if (camera_model_ == "ORTHOGRAPHIC") {
+      std::cout
+          << "Orthographic with radial distortion: "
+          << "Radial distortion 1: "
+          << cam.intrinsics()[theia::OrthographicCameraModel::RADIAL_DISTORTION_1]
+          << " Radial distortion 2: "
+          << cam.intrinsics()[theia::OrthographicCameraModel::RADIAL_DISTORTION_2]
+          << "\n";
+    }
 }
 }  // namespace core
 }  // namespace OpenICC

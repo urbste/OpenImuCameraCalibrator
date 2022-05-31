@@ -28,7 +28,7 @@ DEFINE_string(camera_model_to_calibrate,
               "DOUBLE_SPHERE",
               "What camera model do you want to calibrate. Options:"
               "PINHOLE,PINHOLE_RADIAL_TANGENTIAL,DIVISION_UNDISTORTION,DOUBLE_"
-              "SPHERE,EXTENDED_UNIFIED,FISHEYE");
+              "SPHERE,EXTENDED_UNIFIED,FISHEYE,ORTHOGRAPHIC");
 DEFINE_string(save_path_calib_dataset,
               "",
               "Where to save the recon dataset to.");
