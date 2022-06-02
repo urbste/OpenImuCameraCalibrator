@@ -162,7 +162,7 @@ bool BoardExtractor::ExtractBoard(const Mat& image,
                                                              cv::noArray(),
                                                              1);
 
-      if (charuco_corners.size() > 0) {
+      if (charuco_corners.size() > 4) {
         cv::cornerSubPix(
             image,
             charuco_corners,
@@ -170,7 +170,7 @@ bool BoardExtractor::ExtractBoard(const Mat& image,
                      detector_params_->cornerRefinementWinSize),
             cv::Size(-1, -1),
             cv::TermCriteria(
-                cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 20, 0.01));
+                cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 40, 0.001));
 
         //          if (marker_ids.size() > 0) {
         //              cv::Mat imageCopy;
@@ -268,24 +268,25 @@ void BoardExtractor::BoardToJson(nlohmann::json& output_json) {
 bool BoardExtractor::ExtractImageFolderToJson(
     const std::string& image_folder,
     const std::string& save_path,
-    const double img_downsample_factor) {
+    const double img_downsample_factor,
+    const std::string img_file_ext) {
   if (!board_initialized_) {
     LOG(ERROR) << "No board initialized.\n";
     return false;
   }
   if (image_folder == "") {
-    LOG(ERROR) << "Video path is empty.\n";
+    LOG(ERROR) << "Image file path is empty.\n";
     return false;
   }
 
   // get filenames
   std::vector<std::string> filenames;
-  cv::glob(image_folder + "/*.png", filenames, false);
+  cv::glob(image_folder + "/*."+img_file_ext, filenames, false);
   std::sort(filenames.begin(), filenames.end());
 
   if (filenames.size() <= 0) {
     LOG(ERROR)
-        << "No image files found in folder. Must be timestamp_in_ns.png!";
+        << "No image files found in folder. Must be timestamp_in_ns."<<img_file_ext<<"!";
     return false;
   }
 
@@ -320,7 +321,9 @@ bool BoardExtractor::ExtractImageFolderToJson(
     aligned_vector<Eigen::Vector2d> corners;
     std::vector<int> ids;
     cv::cvtColor(image, image, cv::COLOR_BGR2GRAY);
-    ExtractBoard(image, corners, ids);
+    if (!ExtractBoard(image, corners, ids)) {
+        continue;
+    }
 
     for (size_t c = 0; c < ids.size(); ++c) {
       output_json["views"][view_us]["image_points"][std::to_string(ids[c])] = {
@@ -353,15 +356,15 @@ bool BoardExtractor::ExtractImageFolderToJson(
                     cv::FONT_HERSHEY_PLAIN,
                     1,
                     cv::Scalar(0, 0, 255));
+        cv::putText(image,
+                    "Number corners: " + std::to_string(corners.size()),
+                    cv::Point(10, 20),
+                    cv::FONT_HERSHEY_COMPLEX_SMALL,
+                    2,
+                    cv::Scalar(0, 0, 255));
+        cv::imshow("corners", image);
+        cv::waitKey(1);
       }
-      cv::putText(image,
-                  "Number corners: " + std::to_string(corners.size()),
-                  cv::Point(10, 20),
-                  cv::FONT_HERSHEY_COMPLEX_SMALL,
-                  2,
-                  cv::Scalar(0, 0, 255));
-      cv::imshow("corners", image);
-      cv::waitKey(1);
     }
   }
   std::vector<double> times, delta_ts;

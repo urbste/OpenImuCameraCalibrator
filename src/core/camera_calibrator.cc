@@ -140,9 +140,15 @@ bool CameraCalibrator::RunCalibration() {
   // bundle adjust everything
   theia::BundleAdjustmentOptions ba_options;
   ba_options.verbose = true;
-  ba_options.loss_function_type = theia::LossFunctionType::HUBER;
-  ba_options.robust_loss_width = 1.345;
+  if (camera_model_ != "ORTHOGRAPHIC") {
+    ba_options.loss_function_type = theia::LossFunctionType::HUBER;
+    ba_options.robust_loss_width = 1.345;
+  } else {
+    ba_options.loss_function_type = theia::LossFunctionType::TRIVIAL;
+  }
   ba_options.num_threads = std::thread::hardware_concurrency();
+  // with this flag we set tz constant during optimization
+  ba_options.orthographic_camera = camera_model_ == "ORTHOGRAPHIC";
 
   /////////////////////////////////////////////////
   /// 1. Optimize focal length and radial distortion, keep principal point fixed
@@ -151,7 +157,7 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
-  if (camera_model_ != "PINHOLE") {
+  if (camera_model_ != "PINHOLE" && camera_model_ != "ORTHOGRAPHIC") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
@@ -165,36 +171,41 @@ bool CameraCalibrator::RunCalibration() {
   /////////////////////////////////////////////////
   /// 2. Optimize principal point keeping everything else fixed
   /////////////////////////////////////////////////
-  LOG(INFO) << "Optimizing principal point.";
-  ba_options.constant_camera_orientation = true;
-  ba_options.constant_camera_position = true;
-  ba_options.intrinsics_to_optimize =
+  if (camera_model_ != "ORTHOGRAPHIC") {
+    LOG(INFO) << "Optimizing principal point.";
+    ba_options.constant_camera_orientation = true;
+    ba_options.constant_camera_position = true;
+    ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
 
-  summary = theia::BundleAdjustViews(
+    summary = theia::BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
-  if (recon_calib_dataset_.NumViews() < min_num_view_) {
-    std::cout << "Not enough views left for proper calibration!" << std::endl;
-    return false;
+    if (recon_calib_dataset_.NumViews() < min_num_view_) {
+      std::cout << "Not enough views left for proper calibration!" << std::endl;
+      return false;
+    }
   }
-
   /////////////////////////////////////////////////
   /// 3. Full optimization
   /////////////////////////////////////////////////
   ba_options.constant_camera_orientation = false;
   ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
-      theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS |
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH |
       theia::OptimizeIntrinsicsType::ASPECT_RATIO;
 
-  if (camera_model_ != "PINHOLE") {
+  if (camera_model_ != "PINHOLE" && camera_model_ != "ORTHOGRAPHIC") {
     ba_options.intrinsics_to_optimize |=
-        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
+        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
+            theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS ;
   } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
     ba_options.intrinsics_to_optimize |= theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
-        theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION;
+        theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION |
+            theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS ;
+  } else if (camera_model_ == "ORTHOGRAPHIC") {
+    //ba_options.intrinsics_to_optimize |=
+    //    theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
   summary = theia::BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);

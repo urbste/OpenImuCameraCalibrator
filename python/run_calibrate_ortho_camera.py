@@ -81,7 +81,7 @@ def main():
     start = time.time()
     print("Extracing corners for camera calibration.")
     cam_calib = Popen([pjoin(bin_path,'extract_board_to_json'),
-                    "--input_path=" + cam_calib_video[0],
+                    "--input_path=" + cam_calib_path,
                     "--aruco_detector_params=" + aruco_detector_params,
                     "--board_type=" + args.board_type,
                     "--save_corners_json_path=" + cam_corners_json,

@@ -1,5 +1,5 @@
 %YAML:1.0
-nmarkers: 1024
+#nmarkers: 1024
 adaptiveThreshWinSizeMin: 3
 adaptiveThreshWinSizeMax: 23
 adaptiveThreshWinSizeStep: 10
@@ -12,8 +12,8 @@ minCornerDistance: 5.0
 minDistanceToBorder: 3
 minMarkerDistance: 5.0
 minMarkerDistanceRate: 0.02
-cornerRefinementMethod: 1 # 1->subpix 3->apriltag
-cornerRefinementWinSize: 21
+cornerRefinementMethod: 3 # 1->subpix 3->apriltag
+cornerRefinementWinSize: 11
 cornerRefinementMaxIterations: 10
 cornerRefinementMinAccuracy: 0.001
 markerBorderBits: 1

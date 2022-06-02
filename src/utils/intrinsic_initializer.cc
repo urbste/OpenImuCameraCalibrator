@@ -21,6 +21,7 @@
 #include "theia/sfm/camera/double_sphere_camera_model.h"
 #include "theia/sfm/camera/pinhole_camera_model.h"
 #include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
+#include "theia/sfm/pose/orthographic_four_point.h"
 
 #include <theia/sfm/estimators/estimate_calibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
@@ -35,6 +36,8 @@ const size_t MIN_NUM_POINTS = 12;
 
 namespace OpenICC {
 namespace utils {
+
+
 
 bool initialize_pinhole_camera(
     const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
@@ -311,6 +314,9 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
       return false;
     }
 
+//    theia::PlanarUncalibratedOrthographicPose(
+//                )
+
     Eigen::MatrixXd pts2d;
     Eigen::MatrixXd pts3d;
 
@@ -330,7 +336,7 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
         pts3d.block<1,3>(i+num_pts,3) = world_pt;
     }
 
-    Eigen::MatrixXd h = pts3d.completeOrthogonalDecomposition().pseudoInverse() * pts2d;
+    Eigen::MatrixXd h = pseudoInverse(pts3d) * pts2d;
     // ortho homography
     H << h(0,0), h(1,0), h(2,0),
          h(3,0), h(4,0), h(5,0),
@@ -347,7 +353,7 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
     bool has_real_root = false;
     const double magnification = solver.greatestRealRoot(has_real_root);
     if (!has_real_root || std::isinf(magnification) ||std::isnan(magnification) || magnification <= 0.0) {
-        std::cout<<"Magnification could not be estimated for this view!";
+        LOG(INFO) << "Magnification could not be estimated for this view!";
         return false;
     }
 
@@ -358,7 +364,7 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
     // focal length in this case is basically f = magnification / pixel_pitch
     focal_length = magnification;
 
-    const Eigen::Matrix3d E = K_init.completeOrthogonalDecomposition().pseudoInverse() * H;
+    const Eigen::Matrix3d E = pseudoInverse(K_init) * H;
     // return translation
     t <<(H(0,2) - principal_pt[0]) / magnification,
         (H(1,2) - principal_pt[1]) / magnification,
@@ -370,13 +376,19 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
     const Eigen::Vector3d r2(E(0,1), E(1,1), r23);
     const Eigen::Vector3d r3 = r1.cross(r2);
     // return rotation
-    R << r1, r2, r3;
+    Eigen::Matrix3d Rtmp;
+    Rtmp.col(0) = r1;
+    Rtmp.col(1) = r2;
+    Rtmp.col(2) = r3;
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd_R_frob(Rtmp, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    R = svd_R_frob.matrixU() * svd_R_frob.matrixV().transpose();
 
-    if (R.determinant() - 1. > 1e-4) {
-        VLOG(1) << "Rotation matrix is not orhtogonal!";
+    if (std::abs(R.determinant() - 1.) > 1e-5) {
+        LOG(INFO) << "Rotation matrix is not orthogonal!";
+        return false;
     }
     if (verbose) {
-      std::cout << "Estimated magnification: " << magnification
+      VLOG(1) << "Estimated magnification: " << magnification
                 << std::endl;
     }
     return true;
@@ -395,13 +407,13 @@ bool initialize_orthographic_focal_length(
     w.resize(num_calib_views, 1);
     w.setZero();
     for (size_t i=0; i < num_calib_views; ++i) {
-        const auto& H = ortho_homographies[i];
+        const auto H = ortho_homographies[i];
         G(i,1) = -std::pow(H(1,0),2) - std::pow(H(1,1),2);
         G(i,2) = -std::pow(H(0,0),2) - std::pow(H(0,1),2);
         G(i,3) = 2.0 * (H(0,0)*H(1,0) + H(0,1)*H(1,1));
         w(i)   = -std::pow(H(0,0)*H(1,1) - H(0,1)* H(1,0),2);
     }
-    Eigen::MatrixXd l = G.completeOrthogonalDecomposition().pseudoInverse() * w;
+    Eigen::MatrixXd l = pseudoInverse(G) * w;
     alpha = std::sqrt( (l(1)*l(2)-l(3)*l(3)) / l(2));
     beta = std::sqrt(l(2));
 
