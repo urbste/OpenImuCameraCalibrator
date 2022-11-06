@@ -13,7 +13,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - ZED Camera Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/ZED2i/dataset2', 
+                        default='', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",

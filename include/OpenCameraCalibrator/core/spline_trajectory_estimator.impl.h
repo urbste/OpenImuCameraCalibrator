@@ -935,11 +935,9 @@ bool SplineTrajectoryEstimator<_T>::GetPose(const int64_t& time_ns,
 template <int _T>
 bool SplineTrajectoryEstimator<_T>::GetAngularVelocity(
     const int64_t& time_ns, Eigen::Vector3d& velocity) {
-  double u_r3, u_so3;
-  int64_t s_r3, s_so3;
-  if (!CalcR3Times(time_ns, u_r3, s_r3)) {
-    return false;
-  }
+  double u_so3;
+  int64_t s_so3;
+
   if (!CalcSO3Times(time_ns, u_so3, s_so3)) {
     return false;
   }

@@ -44,12 +44,14 @@ bool ReadGoProTelemetry(const std::string& path_to_telemetry_file,
     ImuReading<double> reading((double)e["cts"] * MS_TO_S, v);
     telemetry.accelerometer.push_back(reading);
   }
+
   for (const auto& e : gyro) {
     Eigen::Vector3d v;
     v << e["value"][1], e["value"][2], e["value"][0];
     ImuReading<double> reading((double)e["cts"] * MS_TO_S, v);
     telemetry.accelerometer.push_back(reading);
   }
+
   for (const auto& e : gps5) {
     Eigen::Vector3d v;
     Eigen::Vector2d vel2d_vel3d;
@@ -59,6 +61,11 @@ bool ReadGoProTelemetry(const std::string& path_to_telemetry_file,
     telemetry.gps.timestamp_ms.emplace_back(e["cts"]);
     telemetry.gps.precision.emplace_back(e["precision"]);
     telemetry.gps.vel2d_vel3d.emplace_back(vel2d_vel3d);
+  }
+
+  const auto cori = j["1"]["streams"]["CORI"]["samples"];
+  for (const auto& e : cori) {
+    telemetry.img_timestamps_s.emplace_back((double)e["cts"] * MS_TO_S);
   }
 
   file.close();

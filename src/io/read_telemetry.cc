@@ -54,6 +54,16 @@ bool ReadTelemetryJSON(const std::string& path_to_telemetry_file,
     telemetry.gyroscope.push_back(gyr_reading);
   }
 
+  // if we have accurate image timestamps
+  // otherwise video timestamps will be used
+  const auto accurate_timestamps_ns = j["img_timestamps_ns"];
+  if (accurate_timestamps_ns.size() > 0) {
+    for (size_t i = 0; i < accurate_timestamps_ns.size(); ++i) {
+      telemetry.img_timestamps_s.emplace_back(
+                  (double)accurate_timestamps_ns[i]*NS_TO_S);
+    }
+  }
+
   file.close();
   return true;
 }

@@ -13,14 +13,14 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
+                        default='', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='/media/Data/builds/openicc_release/applications') 
+                        default='/media/Data/projects/OpenICCBuilds/RelDebug/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/StaticMultiPose/GoPro9/dataset2/static_calib_result.json')  
+                        default='')  
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
                         default=2, type=float)
@@ -281,14 +281,12 @@ def main():
     # in the case of GoPro's we can actually take the first IMU timestamp as an initial guess
     # for the time offset IMU->CAM
     importer = TelemetryImporter()
-    importer.read_generic_json(gopro_telemetry_gen)
-    t_imu_2_cam = -importer.telemetry["timestamps_ns"][0]*1e-9
+    importer.read_gopro_telemetry(gopro_telemetry)
     spline_init = Popen([pjoin(bin_path,"estimate_imu_to_camera_rotation"),
                        "--telemetry_json=" + gopro_telemetry_gen,
                        "--input_pose_calibration_dataset=" + pose_calib_dataset,
                        "--imu_bias_estimate=" + imu_bias_json,
                        "--imu_rotation_init_output=" + imu_cam_calibration_json,
-                       "--delta_t_imu_to_cam=" + str(t_imu_2_cam),
                        "--logtostderr=1"])
     error_spline_init = spline_init.wait()  
     print("==================================================================")

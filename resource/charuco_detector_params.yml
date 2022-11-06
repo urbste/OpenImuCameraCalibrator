@@ -6,9 +6,9 @@ adaptiveThreshWinSizeStep: 10
 adaptiveThreshWinSize: 21
 adaptiveThreshConstant: 3
 minMarkerPerimeterRate: 0.01
-maxMarkerPerimeterRate: 4.0
+maxMarkerPerimeterRate: 2.0
 polygonalApproxAccuracyRate: 0.05
-minCornerDistance: 5.0
+minCornerDistance: 2.0
 minDistanceToBorder: 3
 minMarkerDistance: 5.0
 minMarkerDistanceRate: 0.02

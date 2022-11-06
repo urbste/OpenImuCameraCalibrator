@@ -147,7 +147,7 @@ bool BoardExtractor::ExtractBoard(const Mat& image,
                                  rejected_markers,
                                  cv::noArray(),
                                  cv::noArray(),
-                                 10);
+                                 5, -1.);
 
     // interpolate charuco corners
     int interpolatedCorners = 0;

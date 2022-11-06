@@ -122,6 +122,7 @@ theia::ViewId CameraCalibrator::AddView(
     cam->CameraIntrinsics()->SetParameter(
         theia::ExtendedUnifiedCameraModel::BETA, 1.0);
   } else if (camera_model_ == "FISHEYE") {
+  } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
   }
 
   return view_id;

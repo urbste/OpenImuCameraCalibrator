@@ -32,14 +32,13 @@ void ImuCameraCalibrator::BatchInitSpline(
   T_i_c_init_ = T_i_c_init;
 
   trajectory_.SetT_i_c(T_i_c_init);
-  trajectory_.SetImuToCameraTimeOffset(
-      -telemetry_data.accelerometer[0].timestamp_s());
   trajectory_.SetIMUIntrinsics(accl_intrinsics, gyro_intrinsics);
 
   // set camera timestamps and sort them
   const auto& view_ids = vision_dataset.ViewIds();
   for (const theia::ViewId view_id : view_ids) {
-    cam_timestamps_.push_back(vision_dataset.View(view_id)->GetTimestamp());
+    cam_timestamps_.push_back(
+        vision_dataset.View(view_id)->GetTimestamp());
   }
   std::sort(cam_timestamps_.begin(), cam_timestamps_.end());
 

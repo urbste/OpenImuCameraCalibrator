@@ -82,16 +82,26 @@ int main(int argc, char* argv[]) {
     std::cout << "Could not read: " << FLAGS_telemetry_json << std::endl;
   }
 
-  const double t_imu_to_cam_0 = FLAGS_delta_t_imu_to_cam;
-  if (t_imu_to_cam_0 != 0.0) {
-    LOG(INFO) << "Using supplied initial imu 2 camera time offset: "
-              << t_imu_to_cam_0 << std::endl;
+  double t_imu_to_cam_0 = 0.0;
+  double delta_t0_cam = 0.0;
+  if (telemetry_data.img_timestamps_s.size() > 0) {
+    delta_t0_cam = telemetry_data.img_timestamps_s[0];
+    LOG(INFO) << "It seems there are accurate image timestamps. Using first image timestamp as offset to video timestamps! Offset: "
+              << delta_t0_cam << " s."<<std::endl;
+    // if we have a more accurate image timestamp
+    // in the case of gopro the cori timestamp
+
   }
+  else if (t_imu_to_cam_0 != 0.0) {
+    t_imu_to_cam_0 = FLAGS_delta_t_imu_to_cam;
+    LOG(INFO) << "Using supplied initial imu 2 camera time offset: "
+                << t_imu_to_cam_0 << std::endl;
+  }
+
   // fill measurementes
   vec3_map angular_velocities;
   for (size_t i = 0; i < telemetry_data.gyroscope.size(); ++i) {
-    angular_velocities[telemetry_data.gyroscope[i].timestamp_s() +
-                       t_imu_to_cam_0] =
+    angular_velocities[telemetry_data.gyroscope[i].timestamp_s()] =
         telemetry_data.gyroscope[i].data() - gyro_bias;
   }
 
@@ -107,7 +117,7 @@ int main(int argc, char* argv[]) {
   quat_map visual_rotations;
   for (size_t i = 0; i < pose_dataset.ViewIds().size(); ++i) {
     const theia::View* view = pose_dataset.View(pose_dataset.ViewIds()[i]);
-    const double timestamp_s = view->GetTimestamp();
+    const double timestamp_s = view->GetTimestamp() + delta_t0_cam;
     // cam to world trafo, so transposed rotation matrix
     Eigen::Quaterniond vis_quat(
         view->Camera().GetOrientationAsRotationMatrix());

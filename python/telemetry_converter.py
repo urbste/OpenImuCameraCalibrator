@@ -2,8 +2,7 @@ import json
 from xmlrpc.client import INVALID_XMLRPC
 import numpy as np
 from csv import reader
-from scipy.spatial.transform import Rotation as R
-from scipy.spatial.transform import Slerp
+
 
 class TelemetryImporter:
     ''' TelemetryImporter
@@ -40,15 +39,23 @@ class TelemetryImporter:
             accl = []
             gyro = []
             timestamps_ns = []
-            last_timestamp = 0.0
+            image_timestamps_ns = []
+            last_timestamp, last_img_timestamp = 0.0, 0.0
+
             for p in path_to_jsons:
                 telemetry = self._read_gopro_telemetry(p, skip_seconds=0.0)
                 accl.extend(telemetry["accelerometer"])
                 gyro.extend(telemetry["gyroscope"])
                 times = last_timestamp + np.asarray(telemetry["timestamps_ns"])
+                img_times = last_img_timestamp + np.asarray(telemetry["img_timestamps_ns"])
+
+                last_img_timestamp = img_times[-1]
                 last_timestamp = times[-1]
-                print("setting last timest to: ",last_timestamp)
+                print("Setting last sensor time to: ",last_timestamp)
+                print("Setting last image time to: ",last_img_timestamp)
+
                 timestamps_ns.extend(times.tolist())
+                image_timestamps_ns.extend(img_times.tolist())
             if skip_seconds != 0.0:
                 accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)
                 accl = accl[0:len(timestamps_ns)]
@@ -57,6 +64,7 @@ class TelemetryImporter:
             self.telemetry["accelerometer"] = accl
             self.telemetry["gyroscope"] = gyro
             self.telemetry["timestamps_ns"] = timestamps_ns
+            self.telemetry["img_timestamps_ns"] = image_timestamps_ns
             self.telemetry["camera_fps"] = telemetry["camera_fps"]
         else:
             self.telemetry = self._read_gopro_telemetry(path_to_jsons, skip_seconds=skip_seconds)
@@ -72,12 +80,10 @@ class TelemetryImporter:
         with open(path_to_json, 'r') as f:
             json_data = json.load(f)
 
-        accl = []
-        gyro  = []
-        cori = []
-        gravity = []
-        timestamps_ns = []
-        cori_timestamps_ns = []
+        accl, gyro, cori, gravity  = [], [], [], []
+        timestamps_ns, cori_timestamps_ns, gps_timestamps_ns = [], [], []
+        gps_llh, gps_prec = [], []
+
         for a in json_data['1']['streams']['ACCL']['samples']:
             timestamps_ns.append(a['cts'] * self.ms_to_sec / self.ns_to_sec)
             accl.append([a['value'][1], a['value'][2], a['value'][0]])
@@ -94,6 +100,13 @@ class TelemetryImporter:
         for g in json_data['1']['streams']['GRAV']['samples']:
             gravity.append([g['value'][0], g['value'][1], g['value'][2]])
         
+        # GPS
+    
+        for g in json_data["1"]["streams"]["GPS5"]["samples"]:
+            gps_timestamps_ns.append(g['cts'] * self.ms_to_sec / self.ns_to_sec)
+            lat, long, alt = g["value"][0], g["value"][1], g["value"][2]
+            gps_llh.append([lat,long,alt])
+            gps_prec.append(g["precision"])
 
         camera_fps = json_data['frames/second']
         if skip_seconds != 0.0:
@@ -107,10 +120,13 @@ class TelemetryImporter:
         telemetry["gyroscope"] = gyro
         telemetry["timestamps_ns"] = timestamps_ns
         telemetry["camera_fps"] = camera_fps
-        telemetry["gravity_vector"] = gravity 
+        telemetry["gravity"] = gravity 
         telemetry["camera_orientation"] = cori
-        telemetry["cori_timestamps_ns"] = cori_timestamps_ns
+        telemetry["img_timestamps_ns"] = cori_timestamps_ns
 
+        telemetry["gps_llh"] = gps_llh
+        telemetry["gps_precision"] = gps_prec
+        telemetry["gps_timestamps_ns"] = gps_timestamps_ns
         return telemetry
 
     def read_pilotguru_telemetry(self, path_to_accl_json, path_to_gyro_json, path_to_cam_json, skip_seconds=0.0):
@@ -162,6 +178,7 @@ class TelemetryImporter:
         self.telemetry["gyroscope"] = gyro
         self.telemetry["timestamps_ns"] = timestamps_ns
         self.telemetry["camera_fps"] = camera_fps
+        self.telemetry["img_timestamps_ns"] = []
 
     def read_csv(self, path_to_csv, skip_seconds=0.0):
         accl = []
@@ -187,6 +204,7 @@ class TelemetryImporter:
         self.telemetry["gyroscope"] = gyro
         self.telemetry["timestamps_ns"] = timestamps_ns
         self.telemetry["camera_fps"] = 0.0
+        self.telemetry["img_timestamps_ns"] = []
 
     def read_generic_json(self, path_to_json, skip_seconds=0.0):
         with open(path_to_json, 'r') as f:
@@ -195,13 +213,16 @@ class TelemetryImporter:
         accl = []
         gyro  = []
         timestamps_ns = []
+        img_timestamps_ns = []
         for a in json_data['accelerometer']:
             accl.append([a[0], a[1], a[2]])
         for g in json_data['gyroscope']:
             gyro.append([g[0], g[1], g[2]])
         for t in json_data['timestamps_ns']:
             timestamps_ns.append(t)
-        
+        for t in json_data['img_timestamps_ns']:
+            img_timestamps_ns.append(t)
+
         if skip_seconds != 0.0:
             accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)
 
@@ -212,6 +233,7 @@ class TelemetryImporter:
         self.telemetry["gyroscope"] = gyro
         self.telemetry["timestamps_ns"] = timestamps_ns
         self.telemetry["camera_fps"] = json_data["camera_fps"] 
+        self.telemetry["img_timestamps_ns"] = img_timestamps_ns
 
     def read_zed_jsonl(self, path_to_jsonl, skip_seconds=0.0):
         with open(path_to_jsonl, 'r') as f:
@@ -256,21 +278,48 @@ class TelemetryImporter:
         self.telemetry["gyroscope"] = gyro.tolist()
         self.telemetry["timestamps_ns"] = imu_timestamps_ns.tolist()
         self.telemetry["camera_fps"] = 1/np.mean(np.array(frametimes_s[1:] - frametimes_s[:-1]))
+        self.telemetry["img_timestamps_ns"] = []
 
-    def get_camera_quaternions_at_frametimes(self):
-        # interpolate camera quaternions to frametimes
-        frame_rots = R.from_quat(self.telemetry["camera_orientation"]) 
-        frame_times = np.array(self.telemetry["cori_timestamps_ns"]) * self.ns_to_sec
-        slerp = Slerp(frame_times.tolist(), frame_rots)
+    def get_gps_pos_at_frametimes(self, img_times_ns=None):
+        '''
+        Interpolate a GPS coordinate for each frame.
+        Probably not very accurate but ...
+        '''
+        import pymap3d
+        # interpolate camera gps info at frametimes
+        frame_gps_ecef = [
+            pymap3d.geodetic2ecef(llh[0],llh[1],llh[2]) for llh in self.telemetry["gps_llh"]]
+        frame_gps_ecef = np.array(frame_gps_ecef)
+        gps_times = np.array(self.telemetry["gps_timestamps_ns"]) * self.ns_to_sec
+        if img_times_ns is not None:
+            frame_times = np.array(img_times_ns) * self.ns_to_sec
+        else:
+            frame_times = np.array(self.telemetry["image_timestamps_ns"]) * self.ns_to_sec
+        
+        # find valid interval (interpolate only where we actually have gps measurements)
+        start_frame_time_idx = np.where(gps_times[0] < frame_times)[0][0]
+        end_frame_time_idx = np.where(gps_times[-1] <= frame_times)[0]
+        if not end_frame_time_idx:
+            end_frame_time_idx = len(frame_times)
+
         cam_hz = 1 / self.telemetry["camera_fps"]
-        interp_frame_times = np.round(
+        if img_times_ns is not None:
+            interp_frame_times = frame_times[start_frame_time_idx:end_frame_time_idx]
+        else:
+            interp_frame_times = np.round(
             np.arange(
-                np.round(frame_times[0],2), 
-                np.round(frame_times[-1],2) - cam_hz, cam_hz) ,3) / self.ns_to_sec
+                np.round(frame_times[start_frame_time_idx],2), 
+                np.round(frame_times[end_frame_time_idx],2) - cam_hz, cam_hz) ,3).tolist()
 
-        camera_quaternions = dict(zip( np.array(interp_frame_times), frame_rots.as_quat()))
+        x_interp = np.interp(interp_frame_times, gps_times, frame_gps_ecef[:,0])
+        y_interp = np.interp(interp_frame_times, gps_times, frame_gps_ecef[:,1])
+        z_interp = np.interp(interp_frame_times, gps_times, frame_gps_ecef[:,2])
+        prec_interp = np.interp(interp_frame_times, gps_times, self.telemetry["gps_precision"])
+        xyz_interp = np.stack([x_interp,y_interp,z_interp],1)
 
-        return camera_quaternions
+        camera_gps = dict(zip((np.array(interp_frame_times)*1e9).astype(np.int), xyz_interp.tolist()))
+
+        return camera_gps, prec_interp
 
 class TelemetryConverter:
     ''' TelemetryConverter

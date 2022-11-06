@@ -117,12 +117,23 @@ int main(int argc, char* argv[]) {
       (*new_point)[j] = old_track->Point()[j];
     }
   }
+
+  // read gopro telemetry
+  CameraTelemetryData telemetry_data;
+  CHECK(ReadTelemetryJSON(FLAGS_telemetry_json, telemetry_data))
+      << "Could not read: " << FLAGS_telemetry_json;
+
+  double t_offset_cam_s = 0.0;
+  if (telemetry_data.img_timestamps_s.size() > 0) {
+    t_offset_cam_s = telemetry_data.img_timestamps_s[0];
+  }
+
   for (const auto& view : scene_json["views"].items()) {
     const double timestamp_us = std::stod(view.key());
     const double timestamp_s = timestamp_us * US_TO_S;  // to seconds
     std::string view_name = std::to_string((uint64_t)timestamp_us);
     theia::ViewId view_id =
-        recon_calib_dataset.AddView(view_name, 0, timestamp_s);
+        recon_calib_dataset.AddView(view_name, 0, timestamp_s + t_offset_cam_s);
 
     theia::ViewId old_view_id = pose_dataset.ViewIdFromName(view_name);
     if (old_view_id == theia::kInvalidViewId) {
@@ -148,11 +159,6 @@ int main(int argc, char* argv[]) {
       recon_calib_dataset.AddObservation(view_id, board_pt3_id, feat);
     }
   }
-
-  // read gopro telemetry
-  CameraTelemetryData telemetry_data;
-  CHECK(ReadTelemetryJSON(FLAGS_telemetry_json, telemetry_data))
-      << "Could not read: " << FLAGS_telemetry_json;
 
   // read a gyro to cam calibration json to initialize rotation between imu and
   // camera
@@ -277,6 +283,7 @@ int main(int argc, char* argv[]) {
     // write out spline estimates
     Eigen::Vector3d gyro_spline;
     imu_cam_calibrator.trajectory_.GetAngularVelocity(t_ns, gyro_spline);
+
     const auto bias = imu_cam_calibrator.trajectory_.GetGyroBias(t_ns);
     json_calibspline_results_out["trajectory"][t_ns_s]["gyro_spline"]["x"] =
         gyro_spline[0];

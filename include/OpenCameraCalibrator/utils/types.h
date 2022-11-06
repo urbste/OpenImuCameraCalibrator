@@ -124,6 +124,8 @@ struct CameraTelemetryData {
   // IMU
   CameraAccData accelerometer;
   CameraGyroData gyroscope;
+  // For GoPros we have accurate image timestamps from CORI
+  std::vector<double> img_timestamps_s;
   // GPS
   GPXData gps;
 };

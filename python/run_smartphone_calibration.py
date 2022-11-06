@@ -18,7 +18,7 @@ def main():
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='/media/Data/builds/openicc_release/applications') 
+                        default='/media/Data/projects/OpenICCBuilds/RelDebug/applications') 
     parser.add_argument("--image_downsample_factor", 
                         help="The amount to downsample the image size.", 
                         default=1, type=float)

@@ -58,9 +58,8 @@ bool PoseEstimator::EstimatePosePinhole(
   // Estimate camera pose using
   theia::CalibratedAbsolutePose pose;
   theia::RansacSummary ransac_summary;
-  theia::PnPType pnpr = theia::PnPType::DLS;
   theia::EstimateCalibratedAbsolutePose(
-      ransac_params_, theia::RansacType::RANSAC, pnpr, correspondences_undist, &pose,
+      ransac_params_, theia::RansacType::RANSAC, pnp_type_, correspondences_undist, &pose,
       &ransac_summary);
 
   if (ransac_summary.inliers.size() < 6) {
@@ -227,10 +226,12 @@ void PoseEstimator::OptimizeBoardPoints() {
 void PoseEstimator::OptimizeAllPoses() {
   ba_options_.constant_camera_orientation = false;
   ba_options_.constant_camera_position = false;
-  ba_options_.verbose = true;
+  ba_options_.verbose = false;
   LOG(INFO) << "Optimizing all estimated poses.";
-  theia::BundleAdjustViews(
-      ba_options_, pose_dataset_.ViewIds(), &pose_dataset_);
+  for (auto vid : pose_dataset_.ViewIds()) {
+    theia::BundleAdjustView(
+        ba_options_, vid, &pose_dataset_);
+  }
   LOG(INFO) << "Finished optimizing camera poses.";
 }
 
@@ -249,7 +250,7 @@ void PoseEstimator::FilterBadPoses() {
   for (const auto& v_id : pose_dataset_.ViewIds()) {
       const auto pos = pose_dataset_.View(v_id)->Camera().GetPosition();
       double diff = pos[2] - median_z;
-      if (std::abs(diff) > median_z) {
+      if (std::abs(diff) > std::abs(median_z)) {
         LOG(INFO) << "Removing view " << v_id
                     << " due to large z coordinate: " << pos[2]
                     << " vs median z coordinate " << median_z  << "\n";
