@@ -145,27 +145,48 @@ bool CameraCalibrator::RunCalibration() {
     ba_options.robust_loss_width = 1.345;
   } else {
     ba_options.loss_function_type = theia::LossFunctionType::TRIVIAL;
+    ba_options.robust_loss_width = 5.;
+    ba_options.orthographic_camera = true;
   }
   ba_options.num_threads = std::thread::hardware_concurrency();
-  // with this flag we set tz constant during optimization
-  ba_options.orthographic_camera = camera_model_ == "ORTHOGRAPHIC";
+  ba_options.max_num_iterations = 5;
 
   /////////////////////////////////////////////////
   /// 1. Optimize focal length and radial distortion, keep principal point fixed
   /////////////////////////////////////////////////
-  ba_options.constant_camera_orientation = false;
-  ba_options.constant_camera_position = false;
+  ba_options.constant_camera_orientation = true;
+  ba_options.constant_camera_position = true;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
   if (camera_model_ != "PINHOLE" && camera_model_ != "ORTHOGRAPHIC") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
+    LOG(INFO) << "Bundle adjusting focal length and radial distortion.\n";
+  } else {
+    LOG(INFO) << "Bundle adjusting focal length.\n";
   }
-  LOG(INFO) << "Bundle adjusting focal length and radial distortion.\n";
+
+  auto vids = recon_calib_dataset_.ViewIds();
+  std::cout<<"Value before optim: "<<recon_calib_dataset_.View(vids[0])->Camera().FocalLength()<<"\n";
+  Eigen::Matrix3d R = recon_calib_dataset_.View(vids[0])->Camera().GetOrientationAsRotationMatrix();
+  Eigen::Vector3d t = -R * recon_calib_dataset_.View(vids[0])->Camera().GetPosition();
+  std::cout<<"t: "<<t <<"\n";
 
   theia::BundleAdjustmentSummary summary = BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
+  std::cout<<"Value after optim: "<<recon_calib_dataset_.View(vids[0])->Camera().FocalLength()<<"\n";
+  R = recon_calib_dataset_.View(vids[0])->Camera().GetOrientationAsRotationMatrix();
+  t = -R * recon_calib_dataset_.View(vids[0])->Camera().GetPosition();
+  std::cout<<"t: "<<t <<"\n";
 
+    if (verbose_) {
+      for (int i = 0; i < recon_calib_dataset_.NumViews(); ++i) {
+        const double view_reproj_error = utils::GetReprojErrorOfView(
+          recon_calib_dataset_, recon_calib_dataset_.ViewIds()[i]);
+          LOG(INFO) << "View: " << recon_calib_dataset_.ViewIds()[i]
+                  << " RMSE reprojection error: " << view_reproj_error << "\n";
+      }
+    }
   RemoveViewsReprojError(5.0);
 
   /////////////////////////////////////////////////
@@ -204,8 +225,8 @@ bool CameraCalibrator::RunCalibration() {
         theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION |
             theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS ;
   } else if (camera_model_ == "ORTHOGRAPHIC") {
-    //ba_options.intrinsics_to_optimize |=
-    //    theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
+    ba_options.intrinsics_to_optimize |=
+        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
   }
   summary = theia::BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
@@ -436,6 +457,14 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
         m_view->MutableCamera()->SetFocalLength(alpha);
         m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
           theia::OrthographicCameraModel::ASPECT_RATIO, beta / alpha);
+    }
+    if (verbose_) {
+      for (int i = 0; i < recon_calib_dataset_.NumViews(); ++i) {
+        const double view_reproj_error = utils::GetReprojErrorOfView(
+          recon_calib_dataset_, recon_calib_dataset_.ViewIds()[i]);
+          LOG(INFO) << "View: " << recon_calib_dataset_.ViewIds()[i]
+                  << " RMSE reprojection error: " << view_reproj_error << "\n";
+      }
     }
   }
 

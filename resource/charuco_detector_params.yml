@@ -4,22 +4,22 @@ adaptiveThreshWinSizeMin: 3
 adaptiveThreshWinSizeMax: 23
 adaptiveThreshWinSizeStep: 10
 adaptiveThreshWinSize: 21
-adaptiveThreshConstant: 3
+adaptiveThreshConstant: 5
 minMarkerPerimeterRate: 0.01
 maxMarkerPerimeterRate: 4.0
 polygonalApproxAccuracyRate: 0.05
 minCornerDistance: 5.0
 minDistanceToBorder: 3
-minMarkerDistance: 5.0
-minMarkerDistanceRate: 0.02
+minMarkerDistance: 15.0
+minMarkerDistanceRate: 0.01
 cornerRefinementMethod: 3 # 1->subpix 3->apriltag
-cornerRefinementWinSize: 11
+cornerRefinementWinSize: 5
 cornerRefinementMaxIterations: 10
 cornerRefinementMinAccuracy: 0.001
 markerBorderBits: 1
-perspectiveRemovePixelPerCell: 21
+perspectiveRemovePixelPerCell: 11
 perspectiveRemoveIgnoredMarginPerCell: 0.13
 maxErroneousBitsInBorderRate: 0.04
 minOtsuStdDev: 5.0
-errorCorrectionRate: 0.6
+errorCorrectionRate: 0.9
 

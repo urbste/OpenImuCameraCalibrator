@@ -303,9 +303,10 @@ bool initialize_doublesphere_model(
 
 
 // cf. https://github.com/Seagate/telecentric-calibration/blob/main/src/estimate_params.m
-bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+bool initialize_orthographic_camera_model(
+    const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
     Eigen::Matrix3d& R,
-    Eigen::Vector3d& t,
+    Eigen::Vector3d& p,
     Eigen::Matrix3d& H,
     double& focal_length,
     const Eigen::Vector2d& principal_pt,
@@ -359,29 +360,37 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
 
     Eigen::Matrix3d K_init;
     K_init << magnification, 0, principal_pt[0],
-              0, magnification, principal_pt[1],
-              0, 0, 1;
+              0., magnification, principal_pt[1],
+              0., 0., 1.;
     // focal length in this case is basically f = magnification / pixel_pitch
     focal_length = magnification;
 
-    const Eigen::Matrix3d E = pseudoInverse(K_init) * H;
-    // return translation
-    t <<(H(0,2) - principal_pt[0]) / magnification,
-        (H(1,2) - principal_pt[1]) / magnification,
-        1.0;
-
-    const double r13 = std::sqrt(1-std::pow(E(0,0),2) - std::pow(E(1,0),2));
-    const double r23 = std::sqrt(1-std::pow(E(0,1),2) - std::pow(E(1,1),2));
+    const Eigen::MatrixXd E = pseudoInverseSquare(K_init) * H;
+    // get rotation
+    const double term1 = std::pow(E(0,0),2) + std::pow(E(1,0),2);
+    const double term2 = std::pow(E(0,1),2) + std::pow(E(1,1),2);
+    // Avoid getting imaginary values in sqrt
+    if (term1 > 1.0 || term2 > 1.0) {
+        return false;
+    }
+    const double r13 = std::sqrt(1.0 - term1);
+    const double r23 = std::sqrt(1.0 - term2);
     const Eigen::Vector3d r1(E(0,0), E(1,0), r13);
     const Eigen::Vector3d r2(E(0,1), E(1,1), r23);
     const Eigen::Vector3d r3 = r1.cross(r2);
-    // return rotation
+
     Eigen::Matrix3d Rtmp;
     Rtmp.col(0) = r1;
     Rtmp.col(1) = r2;
     Rtmp.col(2) = r3;
     Eigen::JacobiSVD<Eigen::MatrixXd> svd_R_frob(Rtmp, Eigen::ComputeFullU | Eigen::ComputeFullV);
     R = svd_R_frob.matrixU() * svd_R_frob.matrixV().transpose();
+
+    // return translation
+    p <<(H(0,2) - principal_pt[0]) / magnification,
+        (H(1,2) - principal_pt[1]) / magnification,
+        0.0;
+    p = -R.transpose() * p;
 
     if (std::abs(R.determinant() - 1.) > 1e-5) {
         LOG(INFO) << "Rotation matrix is not orthogonal!";
@@ -391,6 +400,33 @@ bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorres
       VLOG(1) << "Estimated magnification: " << magnification
                 << std::endl;
     }
+
+    // check reprojection error
+    theia::Camera cam;
+    cam.SetCameraIntrinsicsModelType(
+        theia::CameraIntrinsicsModelType::ORTHOGRAPHIC);
+    std::shared_ptr<theia::CameraIntrinsicsModel> intrinsics =
+        cam.MutableCameraIntrinsics();
+    intrinsics->SetFocalLength(magnification);
+    intrinsics->SetPrincipalPoint(principal_pt[0], principal_pt[1]);
+
+    cam.SetPosition(p);
+    cam.SetOrientationFromRotationMatrix(R);
+    // calculate reprojection error
+    double repro_error = 0.0;
+    for (size_t i = 0; i < correspondences.size(); ++i) {
+      Eigen::Vector2d pixel;
+      cam.ProjectPoint(correspondences[i].world_point.homogeneous(), &pixel);
+      repro_error += (pixel - (correspondences[i].feature+principal_pt)).norm();
+    }
+    repro_error /= (double)correspondences.size();
+    std::cout<<"repro_error: "<<repro_error<<"\n";
+    if (repro_error > 20.) {
+      VLOG(1) << "Reprojection error too large: " << repro_error
+              << std::endl;
+      return false;
+    }
+
     return true;
 }
 

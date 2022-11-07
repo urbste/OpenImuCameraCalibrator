@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
   int squaresY = FLAGS_squaresY;
   int squareLength = FLAGS_squareLength;
   int markerLength = FLAGS_markerLength;
-  int dictionaryId = cv::aruco::DICT_ARUCO_ORIGINAL;
+  int dictionaryId = cv::aruco::DICT_4X4_1000;
   int margins = squareLength - markerLength;
   int borderBits = 1;
   bool showImage = false;
@@ -59,9 +59,12 @@ int main(int argc, char* argv[]) {
     cv::waitKey(0);
   }
   const std::string save_string = "board_" + std::to_string(squaresX) + "x" +
-                                  std::to_string(squaresY) + ".png";
-  std::cout << FLAGS_save_charuco_image + save_string << std::endl;
-  cv::imwrite(FLAGS_save_charuco_image + "/" + save_string, boardImage);
+                                  std::to_string(squaresY) + ".jpg";
+  std::cout << FLAGS_save_charuco_image + save_string << std::endl; 
+  std::vector<int> compression_params;
+  compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+  compression_params.push_back(100);
+  cv::imwrite(FLAGS_save_charuco_image + "/" + save_string, boardImage, compression_params);
 
   return 0;
 }

@@ -358,7 +358,7 @@ bool BoardExtractor::ExtractImageFolderToJson(
                     cv::Scalar(0, 0, 255));
         cv::putText(image,
                     "Number corners: " + std::to_string(corners.size()),
-                    cv::Point(10, 20),
+                    cv::Point(10, 30),
                     cv::FONT_HERSHEY_COMPLEX_SMALL,
                     2,
                     cv::Scalar(0, 0, 255));
@@ -432,7 +432,8 @@ bool BoardExtractor::ExtractVideoToJson(const std::string& video_path,
     std::vector<int> ids;
     cv::cvtColor(image, image, cv::COLOR_BGR2GRAY);
     ExtractBoard(image, corners, ids);
-
+    
+    std::cout<<"Extracted "<<ids.size()<<" corners\n";
     for (size_t c = 0; c < ids.size(); ++c) {
       output_json["views"][view_us]["image_points"][std::to_string(ids[c])] = {
           corners[c][0], corners[c][1]};
@@ -448,6 +449,7 @@ bool BoardExtractor::ExtractVideoToJson(const std::string& video_path,
         << total_nr_frames << "\n";
 
     if (verbose_plot_) {
+      cv::cvtColor(image, image, cv::COLOR_GRAY2BGR);
       for (size_t i = 0; i < corners.size(); ++i) {
         cv::drawMarker(
             image,
@@ -466,12 +468,13 @@ bool BoardExtractor::ExtractVideoToJson(const std::string& video_path,
       }
       cv::putText(image,
                   "Number corners: " + std::to_string(corners.size()),
-                  cv::Point(10, 20),
+                  cv::Point(10, 40),
                   cv::FONT_HERSHEY_COMPLEX_SMALL,
                   2,
                   cv::Scalar(0, 0, 255));
-      cv::imshow("corners", image);
-      cv::waitKey(1);
+      //cv::imshow("corners", image);
+      cv::imwrite("/mnt/c/Users/zosurban/Downloads/TestCalib/corners"+std::to_string(frame_cnt)+".jpg", image);
+      //cv::waitKey(1);
     }
   }
 
