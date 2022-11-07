@@ -311,12 +311,10 @@ bool initialize_orthographic_camera_model(
     double& focal_length,
     const Eigen::Vector2d& principal_pt,
     const bool verbose) {
+      
     if (correspondences.size() <= MIN_NUM_POINTS) {
       return false;
     }
-
-//    theia::PlanarUncalibratedOrthographicPose(
-//                )
 
     Eigen::MatrixXd pts2d;
     Eigen::MatrixXd pts3d;
@@ -387,10 +385,11 @@ bool initialize_orthographic_camera_model(
     R = svd_R_frob.matrixU() * svd_R_frob.matrixV().transpose();
 
     // return translation
-    p <<(H(0,2) - principal_pt[0]) / magnification,
-        (H(1,2) - principal_pt[1]) / magnification,
-        0.0;
-    p = -R.transpose() * p;
+    Eigen::Vector3d t(
+      (H(0,2) - principal_pt[0]) / magnification,
+      (H(1,2) - principal_pt[1]) / magnification,
+      0.0);
+    p = -R.transpose()*t;
 
     if (std::abs(R.determinant() - 1.) > 1e-5) {
         LOG(INFO) << "Rotation matrix is not orthogonal!";
@@ -402,25 +401,21 @@ bool initialize_orthographic_camera_model(
     }
 
     // check reprojection error
-    theia::Camera cam;
-    cam.SetCameraIntrinsicsModelType(
-        theia::CameraIntrinsicsModelType::ORTHOGRAPHIC);
-    std::shared_ptr<theia::CameraIntrinsicsModel> intrinsics =
-        cam.MutableCameraIntrinsics();
-    intrinsics->SetFocalLength(magnification);
-    intrinsics->SetPrincipalPoint(principal_pt[0], principal_pt[1]);
-
-    cam.SetPosition(p);
-    cam.SetOrientationFromRotationMatrix(R);
-    // calculate reprojection error
     double repro_error = 0.0;
+    Eigen::Matrix<double,3,4> T_w_c = Eigen::Matrix<double,3,4>::Identity();
+    T_w_c.block<3,3>(0,0) = R;
+    T_w_c.block<3,1>(0,3) = t;
+    T_w_c(2,3) = 0.;
+
     for (size_t i = 0; i < correspondences.size(); ++i) {
-      Eigen::Vector2d pixel;
-      cam.ProjectPoint(correspondences[i].world_point.homogeneous(), &pixel);
-      repro_error += (pixel - (correspondences[i].feature+principal_pt)).norm();
+      Eigen::Vector3d pt_in_cam = T_w_c * correspondences[i].world_point.homogeneous();
+
+      repro_error += (pt_in_cam.head<2>()*magnification - 
+        (correspondences[i].feature)).norm();
+      
     }
     repro_error /= (double)correspondences.size();
-    std::cout<<"repro_error: "<<repro_error<<"\n";
+
     if (repro_error > 20.) {
       VLOG(1) << "Reprojection error too large: " << repro_error
               << std::endl;

@@ -13,7 +13,7 @@ def main():
     parser = ArgumentParser("OpenCameraCalibrator - GoPro Calibrator")
     # Cast the input to string, int or float type 
     parser.add_argument('--path_calib_dataset', 
-                        default='/media/Data/Sparsenet/CameraCalibrationStudy/GoPro9/1080_50/dataset2', 
+                        default='', 
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
@@ -23,7 +23,7 @@ def main():
                         default=2, type=float)
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
-                        choices=['ORTHOGRAPHIC', 'ORTHOGRAPHIC_RADIAL_TANGENTIAL'],
+                        choices=['PINHOLE', 'ORTHOGRAPHIC', 'ORTHOGRAPHIC_RADIAL_TANGENTIAL'],
                         default="ORTHOGRAPHIC", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
@@ -43,9 +43,6 @@ def main():
     parser.add_argument("--recompute_corners", 
                         help="If the corners should be extracted again when running a dataset multiple times.", 
                         default=0, type=int)
-    parser.add_argument("--optimize_board_points", 
-                        help="if board points should be optimized during camera calibration and after pose estimation.", 
-                        default=1, type=int)
     parser.add_argument("--verbose", 
                         help="If calibration steps should output more information.", default=0, type=int)
 
@@ -116,7 +113,6 @@ def main():
                     "--save_path_calib_dataset=" + cam_calib_file_path,
                     "--camera_model_to_calibrate=" + args.camera_model,
                     "--grid_size=" + str(args.voxel_grid_size),
-                    "--optimize_board_points="+str(args.optimize_board_points),
                     "--verbose=" + str(args.verbose),
                     "--logtostderr=1",
                     "--v=1"])

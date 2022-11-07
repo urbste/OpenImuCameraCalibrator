@@ -124,6 +124,9 @@ theia::ViewId CameraCalibrator::AddView(
     cam->CameraIntrinsics()->SetParameter(
         theia::ExtendedUnifiedCameraModel::BETA, 1.0);
   } else if (camera_model_ == "FISHEYE") {
+  } else if (camera_model_ == "ORTHOGRAPHIC") {
+    // set world2cam translation not position for ortho camera
+    cam->SetPosition(-initial_rotation * initial_position);
   }
 
   return view_id;
@@ -144,21 +147,20 @@ bool CameraCalibrator::RunCalibration() {
     ba_options.loss_function_type = theia::LossFunctionType::HUBER;
     ba_options.robust_loss_width = 1.345;
   } else {
-    ba_options.loss_function_type = theia::LossFunctionType::TRIVIAL;
+    ba_options.loss_function_type = theia::LossFunctionType::HUBER;
     ba_options.robust_loss_width = 5.;
     ba_options.orthographic_camera = true;
   }
   ba_options.num_threads = std::thread::hardware_concurrency();
-  ba_options.max_num_iterations = 5;
-
+  ba_options.max_num_iterations = 30;
   /////////////////////////////////////////////////
   /// 1. Optimize focal length and radial distortion, keep principal point fixed
   /////////////////////////////////////////////////
-  ba_options.constant_camera_orientation = true;
-  ba_options.constant_camera_position = true;
+  ba_options.constant_camera_orientation = false;
+  ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH;
-  if (camera_model_ != "PINHOLE" && camera_model_ != "ORTHOGRAPHIC") {
+  if (camera_model_ != "PINHOLE" || camera_model_ != "ORTHOGRAPHIC") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
     LOG(INFO) << "Bundle adjusting focal length and radial distortion.\n";
@@ -166,28 +168,22 @@ bool CameraCalibrator::RunCalibration() {
     LOG(INFO) << "Bundle adjusting focal length.\n";
   }
 
-  auto vids = recon_calib_dataset_.ViewIds();
-  std::cout<<"Value before optim: "<<recon_calib_dataset_.View(vids[0])->Camera().FocalLength()<<"\n";
-  Eigen::Matrix3d R = recon_calib_dataset_.View(vids[0])->Camera().GetOrientationAsRotationMatrix();
-  Eigen::Vector3d t = -R * recon_calib_dataset_.View(vids[0])->Camera().GetPosition();
-  std::cout<<"t: "<<t <<"\n";
-
   theia::BundleAdjustmentSummary summary = BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
-  std::cout<<"Value after optim: "<<recon_calib_dataset_.View(vids[0])->Camera().FocalLength()<<"\n";
-  R = recon_calib_dataset_.View(vids[0])->Camera().GetOrientationAsRotationMatrix();
-  t = -R * recon_calib_dataset_.View(vids[0])->Camera().GetPosition();
-  std::cout<<"t: "<<t <<"\n";
 
-    if (verbose_) {
-      for (int i = 0; i < recon_calib_dataset_.NumViews(); ++i) {
-        const double view_reproj_error = utils::GetReprojErrorOfView(
-          recon_calib_dataset_, recon_calib_dataset_.ViewIds()[i]);
-          LOG(INFO) << "View: " << recon_calib_dataset_.ViewIds()[i]
-                  << " RMSE reprojection error: " << view_reproj_error << "\n";
-      }
+  if (verbose_) {
+    for (int i = 0; i < recon_calib_dataset_.NumViews(); ++i) {
+      const double view_reproj_error = utils::GetReprojErrorOfView(
+        recon_calib_dataset_, recon_calib_dataset_.ViewIds()[i]);
+        LOG(INFO) << "View: " << recon_calib_dataset_.ViewIds()[i]
+                << " RMSE reprojection error: " << view_reproj_error << "\n";
     }
-  RemoveViewsReprojError(5.0);
+  }
+  if (camera_model_ == "ORTHOGRAPHIC") {
+      RemoveViewsReprojError(10.0);
+  } else {
+    RemoveViewsReprojError(5.0);
+  }
 
   /////////////////////////////////////////////////
   /// 2. Optimize principal point keeping everything else fixed
@@ -197,7 +193,7 @@ bool CameraCalibrator::RunCalibration() {
     ba_options.constant_camera_orientation = true;
     ba_options.constant_camera_position = true;
     ba_options.intrinsics_to_optimize =
-      theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
+      theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
 
     summary = theia::BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
@@ -219,19 +215,24 @@ bool CameraCalibrator::RunCalibration() {
   if (camera_model_ != "PINHOLE" && camera_model_ != "ORTHOGRAPHIC") {
     ba_options.intrinsics_to_optimize |=
         theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
-            theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS ;
+        theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
   } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
     ba_options.intrinsics_to_optimize |= theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
         theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION |
-            theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS ;
+        theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
   } else if (camera_model_ == "ORTHOGRAPHIC") {
     ba_options.intrinsics_to_optimize |=
-        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION;
+        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
+        theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
   }
   summary = theia::BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
-  RemoveViewsReprojError(2.0);
+  if (camera_model_ == "ORTHOGRAPHIC") {
+      RemoveViewsReprojError(4.0);
+  } else {
+    RemoveViewsReprojError(2.0);
+  }
 
   if (recon_calib_dataset_.NumViews() < min_num_view_) {
     std::cout << "Not enough views left for proper calibration!" << std::endl;
@@ -269,7 +270,6 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
   vec3_vector saved_poses;
   aligned_vector<Eigen::Matrix3d> ortho_homographies;
 
-  std::map<theia::ViewId,std::vector<theia::FeatureCorrespondence2D3D>> allcorrespondences;
   // iterate views and estimate poses
   const auto views = scene_json["views"];
   const size_t total_nr_views = views.size();
@@ -383,7 +383,6 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
                                     image_height,
                                     timestamp_s);
 
-    allcorrespondences[view_id] = correspondences;
     for (size_t i = 0; i < board_pt3_ids.size(); ++i) {
       AddObservation(view_id, board_pt3_ids[i], corners[i]);
     }
@@ -457,7 +456,16 @@ bool CameraCalibrator::CalibrateCameraFromJson(const nlohmann::json& scene_json,
         m_view->MutableCamera()->SetFocalLength(alpha);
         m_view->MutableCamera()->MutableCameraIntrinsics()->SetParameter(
           theia::OrthographicCameraModel::ASPECT_RATIO, beta / alpha);
+
+        // // optimize camera poses with newly set focal length
+        // auto ba_opts = theia::BundleAdjustmentOptions();
+        // ba_opts.loss_function_type = theia::LossFunctionType::TRIVIAL;
+        // ba_opts.orthographic_camera = true;
+        // ba_opts.verbose = false;
+
+        // auto summary = theia::BundleAdjustView(ba_opts, vid, &recon_calib_dataset_);
     }
+
     if (verbose_) {
       for (int i = 0; i < recon_calib_dataset_.NumViews(); ++i) {
         const double view_reproj_error = utils::GetReprojErrorOfView(
