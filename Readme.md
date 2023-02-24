@@ -88,6 +88,21 @@ cd ../javascript && npm install
 pip install -r requirements.txt
 ```
 
+### Dockerfile
+Build the docker container
+``` bash
+docker build -t openicc .
+```
+Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1fawlqSYcylyNDVnfgCETT7DLccmVDVKX/view?usp=sharing) to /home/Downloads/GoPro9 )
+``` bash
+docker run -it --rm -v `pwd`:/home -v /home/Downloads/GoPro9:/dataset openicc
+``` 
+Finally you can run the calibration like this:
+``` bash
+cd /home
+python3 python/run_gopro_calibration.py --path_calib_dataset /dataset/dataset3/ --path_to_build ../OpenImuCameraCalibrator/build/applications/
+```
+
 ## Usage examples
 
 - [Calibrate a GoPro9](docs/gopro_calibration.md)
