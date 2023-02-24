@@ -4,7 +4,7 @@ For this example I am using a dataset recorded with the GoPro9. Please read the 
 Remember to let the camera stand still for >= 10-15 seconds in the beginning. The IMU bias will be estimated in this phase.
 This is also a parameter you need to supply to the calibration script.
 
-You can get a sample dataset from: [link](https://drive.google.com/file/d/1fawlqSYcylyNDVnfgCETT7DLccmVDVKX/view?usp=sharing). 
+You can get a sample dataset from: [link](https://drive.google.com/file/d/1XjtUX-4ZI0Ydkd2O3BWnaUzfmzm96He4/view?usp=share_link). 
 The folder **static_imu_calib** contains an example file.
 You can run the static imu calibration with. Remember to supply your build and source path of OpenICC to the script:
 ``` python
