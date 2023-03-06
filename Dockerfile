@@ -77,7 +77,8 @@ RUN git clone https://github.com/urbste/pyTheiaSfM && \
 RUN git clone https://github.com/urbste/OpenImuCameraCalibrator && \
     cd OpenImuCameraCalibrator && \
 	mkdir -p build && cd build && cmake .. && \
-	make -j${NUM_PROC} && cd .. && pip3 install -r requirements.txt
+	make -j${NUM_PROC} && cd .. && pip3 install -r requirements.txt && \
+	cd javascript && npm install
 
 # create a symbolic link for python3 to python
 RUN ln -s /usr/bin/python3 /usr/bin/python
