@@ -74,8 +74,11 @@ RUN git clone https://github.com/urbste/pyTheiaSfM && \
 	make -j${NUM_PROC} install && \
     cd ../../ && rm -r pyTheiaSfM
 
-RUN git clone https://github.com/urbste/OpenImuCameraCalibrator && \
-    cd OpenImuCameraCalibrator && \
+WORKDIR /
+
+COPY . OpenImuCameraCalibrator
+
+RUN cd OpenImuCameraCalibrator && \
 	mkdir -p build && cd build && cmake .. && \
 	make -j${NUM_PROC} && cd .. && pip3 install -r requirements.txt && \
 	cd javascript && npm install

@@ -69,14 +69,14 @@ class TelemetryImporter:
         else:
             self.telemetry = self._read_gopro_telemetry(path_to_jsons, skip_seconds=skip_seconds)
 
-    '''
-    path_to_json : str 
-        path to json file
-    skip_seconds : float
-        How many seconds to cut from beginning and end of stream
-    '''
-    def _read_gopro_telemetry(self, path_to_json, skip_seconds=0.0):
 
+    def _read_gopro_telemetry(self, path_to_json, skip_seconds=0.0):
+        '''
+        path_to_json : str 
+            path to json file
+        skip_seconds : float
+            How many seconds to cut from beginning and end of stream
+        '''
         with open(path_to_json, 'r') as f:
             json_data = json.load(f)
 
@@ -84,13 +84,15 @@ class TelemetryImporter:
         timestamps_ns, cori_timestamps_ns, gps_timestamps_ns = [], [], []
         gps_llh, gps_prec = [], []
 
-        for a in json_data['1']['streams']['ACCL']['samples']:
+        stream =  json_data["1"]["streams"]
+
+        for a in stream['ACCL']['samples']:
             timestamps_ns.append(a['cts'] * self.ms_to_sec / self.ns_to_sec)
             accl.append([a['value'][1], a['value'][2], a['value'][0]])
-        for g in json_data['1']['streams']['GYRO']['samples']:
+        for g in stream['GYRO']['samples']:
             gyro.append([g['value'][1], g['value'][2], g['value'][0]])
         # image orientation at framerate
-        for c in json_data['1']['streams']['CORI']['samples']:
+        for c in stream['CORI']['samples']:
             # order w,x,z,y https://github.com/gopro/gpmf-parser/issues/100#issuecomment-656154136
             w, x, z, y = c['value'][0], c['value'][1], c['value'][2], c['value'][3]
             cori.append([x, y, z, w])
@@ -100,13 +102,13 @@ class TelemetryImporter:
         for g in json_data['1']['streams']['GRAV']['samples']:
             gravity.append([g['value'][0], g['value'][1], g['value'][2]])
         
-        # GPS
-    
-        for g in json_data["1"]["streams"]["GPS5"]["samples"]:
-            gps_timestamps_ns.append(g['cts'] * self.ms_to_sec / self.ns_to_sec)
-            lat, long, alt = g["value"][0], g["value"][1], g["value"][2]
-            gps_llh.append([lat,long,alt])
-            gps_prec.append(g["precision"])
+        # GPS is optional
+        if "GPS5" in stream:
+            for g in stream["GPS5"]["samples"]:
+                gps_timestamps_ns.append(g['cts'] * self.ms_to_sec / self.ns_to_sec)
+                lat, long, alt = g["value"][0], g["value"][1], g["value"][2]
+                gps_llh.append([lat,long,alt])
+                gps_prec.append(g["precision"])
 
         camera_fps = json_data['frames/second']
         if skip_seconds != 0.0:
