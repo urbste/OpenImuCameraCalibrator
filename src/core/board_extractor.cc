@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "OpenCameraCalibrator/utils/utils.h"
+#include "OpenCameraCalibrator/utils/point_refinement.h"
 
 using namespace cv;
 
@@ -163,30 +164,27 @@ bool BoardExtractor::ExtractBoard(const Mat& image,
                                                              1);
 
       if (charuco_corners.size() > 0) {
-        cv::cornerSubPix(
-            image,
-            charuco_corners,
-            cv::Size(detector_params_->cornerRefinementWinSize,
-                     detector_params_->cornerRefinementWinSize),
-            cv::Size(-1, -1),
-            cv::TermCriteria(
-                cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 20, 0.01));
+        // cv::cornerSubPix(
+        //     image,
+        //     charuco_corners,
+        //     cv::Size(detector_params_->cornerRefinementWinSize,
+        //              detector_params_->cornerRefinementWinSize),
+        //     cv::Size(-1, -1),
+        //     cv::TermCriteria(
+        //         cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 20, 0.01));
 
-        //          if (marker_ids.size() > 0) {
-        //              cv::Mat imageCopy;
-        //              image.copyTo(imageCopy);
-        //              cv::cvtColor(imageCopy,imageCopy, cv::COLOR_GRAY2BGR);
-        //              cv::aruco::drawDetectedMarkers(imageCopy,
-        //              marker_corners, marker_ids);
-        //              // if at least one charuco corner detected
-        //              if (charuco_ids.size() > 0)
-        //                  cv::aruco::drawDetectedCornersCharuco(imageCopy,
-        //                  charuco_corners, charuco_ids, cv::Scalar(255, 0,
-        //                  0));
-        //              cv::imshow("out", imageCopy);
-        //              cv::waitKey(0);
-        //          }
-
+        // Refine the detected corners
+        std::vector<SaddlePoint> refined;
+        saddleSubpixelRefinement(image, charuco_corners[i], refined,
+                                 detector_params_->cornerRefinementWinSize, 20);
+        for (std::size_t j = 0; j < charuco_corners[i].size(); j++) {
+          if (std::isinf(refined[j].x) || std::isinf(refined[j].y)) {
+            break;
+          }
+          charuco_corners[i][j].x = refined[j].x;
+          charuco_corners[i][j].y = refined[j].y;
+        }
+      
         object_pt_ids = charuco_ids;
         for (const auto& c : charuco_corners) {
           corners.push_back(Eigen::Vector2d(c.x, c.y));
