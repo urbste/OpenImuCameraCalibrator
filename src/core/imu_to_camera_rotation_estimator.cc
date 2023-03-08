@@ -191,7 +191,7 @@ bool ImuToCameraRotationEstimator::EstimateCameraImuRotation(
         std::abs(angVisVec[1]) > 2 * M_PI ||
         std::abs(angVisVec[2]) > 2 * M_PI) {
       if (i > 1) {
-        angVis[i] = angVis[i - 1];
+        angVisVec = angVis[i - 1];
       } else {
         angVisVec.setZero();
       }
