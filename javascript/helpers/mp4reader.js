@@ -10,6 +10,7 @@ const goproTelemetry = require('gopro-telemetry');
  * @param filename
  */
 function streamData(filename) {
+
     return new Promise((resolve, reject) => {
         const mp4boxfile = MP4Box.createFile();
         mp4boxfile.onError = function(e) {
@@ -18,7 +19,7 @@ function streamData(filename) {
         mp4boxfile.onReady = function(videoData) {
             resolve({ videoData, mp4boxfile});
         };
-
+    
 	const chunkSize = 100*1024*1024; // 100Mb
 	const stream = fs.createReadStream(filename, {'highWaterMark': chunkSize});
 
@@ -71,17 +72,18 @@ function toBuffer(ab) {
 
 function readSampleMetadata(videoData) {
     let trackId, nb_samples, start, frameDuration;
+    console.log(`videoData.tracks.length ${videoData.tracks.length}`);
 
     for (let i = 0; i < videoData.tracks.length; i++) {
-	//Find the metadata track. Collect Id and number of samples
-	if (videoData.tracks[i].codec === 'gpmd') {
-	    trackId = videoData.tracks[i].id;
-	    nb_samples = videoData.tracks[i].nb_samples;
-	    start = videoData.tracks[i].created;
-	} else if (videoData.tracks[i].type === 'video') {
-	    const vid = videoData.tracks[i];
-	    //Deduce framerate from video track
-	    frameDuration = vid.movie_duration / vid.movie_timescale / vid.nb_samples;
+	    //Find the metadata track. Collect Id and number of samples
+	    if (videoData.tracks[i].codec === 'gpmd') {
+	        trackId = videoData.tracks[i].id;
+	        nb_samples = videoData.tracks[i].nb_samples;
+	        start = videoData.tracks[i].created;
+	    } else if (videoData.tracks[i].type === 'video') {
+	        const vid = videoData.tracks[i];
+	        //Deduce framerate from video track
+	        frameDuration = vid.movie_duration / vid.movie_timescale / vid.nb_samples;
         }
     }
 
@@ -90,29 +92,28 @@ function readSampleMetadata(videoData) {
 
 class SamplesAnalyser {
     constructor(sampleMetadata) {
-	this.sampleMetadata = sampleMetadata;
+	    this.sampleMetadata = sampleMetadata;
     }
-
     onSamples = (id, user, samples) => {
-	const totalSamples = samples.reduce(function (acc, cur) {
-	    return acc + cur.size;
-	}, 0);
+        const totalSamples = samples.reduce(function (acc, cur) {
+            return acc + cur.size;
+        }, 0);
 
-	//Store them in Uint8Array
-	const uintArr = new Uint8Array(totalSamples);
+        //Store them in Uint8Array
+        const uintArr = new Uint8Array(totalSamples);
 
-	const outputSamples = [];
-	let runningCount = 0;
-	samples.forEach(function (sample) {
-	    outputSamples.push({cts: sample.cts, duration: sample.duration});
-	    uintArr.set(sample.data, runningCount);
-	    runningCount += sample.size;
-	});
-	const rawData = toBuffer(uintArr);
+        const outputSamples = [];
+        let runningCount = 0;
+        samples.forEach(function (sample) {
+            outputSamples.push({cts: sample.cts, duration: sample.duration});
+            uintArr.set(sample.data, runningCount);
+            runningCount += sample.size;
+        });
+        const rawData = toBuffer(uintArr);
 
-	const timing = {'samples': outputSamples, ...this.sampleMetadata};
+        const timing = {'samples': outputSamples, ...this.sampleMetadata};
 
-	this.data = {rawData, timing};
+        this.data = {rawData, timing};
     }
 
 }
@@ -120,12 +121,12 @@ class SamplesAnalyser {
 function extractVideoData(videoData, mp4boxfile) {
     const sampleMetadata = readSampleMetadata(videoData);
     if (sampleMetadata.trackId == null) {
-	return Promise.reject('Track not found');
+	    return Promise.reject('Track not found');
     }
 
     //Request the track
     mp4boxfile.setExtractionOptions(sampleMetadata.trackId, null, {
-	nbSamples: sampleMetadata.nb_samples
+	    nbSamples: sampleMetadata.nb_samples
     });
 
     const proc = new SamplesAnalyser(sampleMetadata);
@@ -133,9 +134,9 @@ function extractVideoData(videoData, mp4boxfile) {
 
     // Start doesn't fire onSamples unless sample finishes in the current block
     while (!proc.data) {
-	mp4boxfile.start();
+        mp4boxfile.start();
     }
-
+    
     return Promise.resolve(proc.data);
 }
 

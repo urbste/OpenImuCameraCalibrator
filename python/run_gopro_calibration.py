@@ -7,6 +7,7 @@ import glob
 import time
 from utils import get_abbr_from_cam_model
 from telemetry_converter import TelemetryConverter, TelemetryImporter
+from py_gpmf_parser.gopro_telemetry_extractor import GoProTelemetryExtractor
 
 def main():
 
@@ -17,7 +18,7 @@ def main():
                         help="Path to calibration dataset")
     parser.add_argument('--path_to_build', 
                         help="Path to OpenCameraCalibrator build folder.",
-                        default='/media/Data/projects/OpenICCBuilds/RelDebug/applications') 
+                        default='/home/steffen/projects/OpenImuCameraCalibrator/build/applications') 
     parser.add_argument('--path_to_imu_intrinsics', 
                         help="If available you can also supply imu intrinsics. Can be generated with static_multipose_imu_calibration.py",
                         default='')  
@@ -27,7 +28,7 @@ def main():
     parser.add_argument("--camera_model", 
                         help="Camera model to use.", 
                         choices=['PINHOLE', 'PINHOLE_RADIAL_TANGENTIAL', 'DIVISION_UNDISTORTION', 'DOUBLE_SPHERE', 'EXTENDED_UNIFIED', 'FISHEYE'],
-                        default="DIVISION_UNDISTORTION", type=str)
+                        default="FISHEYE", type=str)
     parser.add_argument("--checker_size_m",
                         help="Length checkerboard square in m.",
                         default=0.021, type=float)
@@ -190,21 +191,19 @@ def main():
     #
     # 2. Extracting GoPro telemetry
     #   
-    js_extract_file = pjoin(path_to_src,"javascript","extract_metadata.js")
     print("==================================================================")
     print("Extracting GoPro telemetry for imu bias and camera imu calibration.")
     print("==================================================================")
     start = time.time()
-    telemetry_extract = Popen(["node",js_extract_file,
-                       imu_bias_path,
-                       bias_video_fn+".MP4",
-                       imu_bias_path])
-    # error_telemetry_extract = telemetry_extract.wait()
-    telemetry_extract = Popen(["node",js_extract_file,
-                       cam_imu_path,
-                       cam_imu_video_fn+".MP4",
-                       cam_imu_path])
-    error_telemetry_extract = telemetry_extract.wait()
+    extractor = GoProTelemetryExtractor(os.path.join(imu_bias_path,bias_video_fn+".MP4"))
+    extractor.open_source()
+    extractor.extract_data_to_json(imu_bias_telemetry_json_in, ["ACCL", "GYRO"])
+    extractor.close_source()
+
+    extractor = GoProTelemetryExtractor(os.path.join(cam_imu_path,cam_imu_video_fn+".MP4"))
+    extractor.open_source()
+    extractor.extract_data_to_json(gopro_telemetry, ["ACCL", "GYRO"])
+    extractor.close_source()
     print("==================================================================")
     print("Telemetry extraction took {:.2f}s.".format(time.time()-start))
     print("==================================================================")
@@ -214,8 +213,8 @@ def main():
     # 3. Convert gopro json telemetry to common format
     #
     telemetry_conv = TelemetryConverter()
-    telemetry_conv.convert_gopro_telemetry_file(gopro_telemetry, gopro_telemetry_gen)
-    telemetry_conv.convert_gopro_telemetry_file(imu_bias_telemetry_json_in, imu_bias_telemetry_json_in_gen)
+    telemetry_conv.convert_pygpmf_telemetry(gopro_telemetry, gopro_telemetry_gen)
+    telemetry_conv.convert_pygpmf_telemetry(imu_bias_telemetry_json_in, imu_bias_telemetry_json_in_gen)
 
     #
     # 4. Estimating IMU biases
@@ -280,8 +279,6 @@ def main():
     start = time.time()
     # in the case of GoPro's we can actually take the first IMU timestamp as an initial guess
     # for the time offset IMU->CAM
-    importer = TelemetryImporter()
-    importer.read_gopro_telemetry(gopro_telemetry)
     spline_init = Popen([pjoin(bin_path,"estimate_imu_to_camera_rotation"),
                        "--telemetry_json=" + gopro_telemetry_gen,
                        "--input_pose_calibration_dataset=" + pose_calib_dataset,

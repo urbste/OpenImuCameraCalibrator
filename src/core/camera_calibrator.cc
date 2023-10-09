@@ -207,7 +207,7 @@ bool CameraCalibrator::RunCalibration() {
 
   if (optimize_board_pts_) {
     LOG(INFO) << "Optimizing board points.";
-    ba_options.use_homogeneous_local_point_parametrization = false;
+    ba_options.use_homogeneous_point_parametrization = false;
     ba_options.verbose = true;
     theia::BundleAdjustTracks(
         ba_options, recon_calib_dataset_.TrackIds(), &recon_calib_dataset_);

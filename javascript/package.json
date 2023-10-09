@@ -7,8 +7,8 @@
   "scripts": {},
   "license": "MIT",
   "dependencies": {
-    "gpmf-extract": "^0.1.24",
-    "gopro-telemetry": "^1.1.29",
+    "gpmf-extract": "latest",
+    "gopro-telemetry": "latest",
     "mp4box": "latest"
   }
 }
