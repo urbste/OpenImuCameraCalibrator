@@ -53,18 +53,20 @@ Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy
 
 [ORB-SLAM3 fork](https://github.com/urbste/ORB_SLAM3/)
 
-## Installation instructions
-
-Tested on Ubuntu 18.04 and 20.04.
+## Installation instructions Ubuntu 18.04 and 20.04
 
 1. Clone and build [OpenCV](https://github.com/opencv/opencv) >= 4.5.0 **with** [contrib](https://github.com/opencv/opencv) modules. Latter are needed for Aruco marker detection.
+Or try simply installing it from apt:
+``` bash
+sudo apt-get install libopencv-dev libopencv-contrib-dev
+```
 
 2. Install [ceres 2.0](http://ceres-solver.org/installation.html)
 
 3. Clone and build the [TheiaSfM fork](https://github.com/urbste/pyTheiaSfM).
 ``` bash
 git clone https://github.com/urbste/pyTheiaSfM
-cd pyTheiaSfM && git checkout ca50599 && mkdir -p build && cd build
+cd pyTheiaSfM && git checkout 69c3d37 && mkdir -p build && cd build
 cmake .. && make -j
 sudo make install
 ```
@@ -93,7 +95,7 @@ Build the docker container
 ``` bash
 docker build -t openicc .
 ```
-Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1fawlqSYcylyNDVnfgCETT7DLccmVDVKX/view?usp=sharing) to /home/Downloads/GoPro9 )
+Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1XjtUX-4ZI0Ydkd2O3BWnaUzfmzm96He4/view?usp=share_link) to /home/Downloads/GoPro9 )
 ``` bash
 docker run -it --rm -v `pwd`:/home -v /home/Downloads/GoPro9:/dataset openicc
 ``` 
@@ -167,7 +169,7 @@ v0.2
 * [ ] use only bearings in spline reproj error -> local tangent reprojection error
 * [ ] Accurate checkerboard detector (OpenCV has findCheckerboardSB. I integrated a first version but results were weird. Re-check...)
 * [ ] Extend to multi-camera systems
-* [ ] Docker?
+* [x] Docker?
 * [ ] Add more camera models -> Scaramuzza omni model, ...
 * [x] Integrate updated version of spline optimizer
 

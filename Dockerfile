@@ -1,9 +1,8 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
-ENV cvVersion="4.5.1"
 ENV ceresVersion="2.0.0"
-ENV pyTheiaVersion="ca50599"
-ENV NUM_PROC=20
+ENV pyTheiaVersion="69c3d37"
+ENV NUM_PROC=6
 ENV NODE_VERSION=14
 
 RUN apt-get update && \
@@ -27,37 +26,10 @@ RUN apt-get update && \
     libsuitesparse-dev \
 	libgoogle-glog-dev \
 	libgflags-dev \
-	libeigen3-dev 
+	libeigen3-dev libopencv-dev libopencv-contrib-dev
 
 RUN curl -sL https://deb.nodesource.com/setup_$NODE_VERSION.x | bash - && \
     apt-get install -y nodejs
-
-
-RUN git clone https://github.com/opencv/opencv.git && \
-    git clone https://github.com/opencv/opencv_contrib.git && \
-	cd opencv_contrib && \
-	git checkout $cvVersion && \
-    cd .. && \
-    cd opencv && \
-	git checkout $cvVersion && \
-	mkdir -p build && \
-	cd build && \
-	cmake .. -DCMAKE_BUILD_TYPE=RELEASE \
-	-DCMAKE_INSTALL_PREFIX=/usr/local \
-	-DINSTALL_C_EXAMPLES=OFF \
-	-DWITH_TBB=ON \
-	-DWITH_V4L=ON \
-	-DWITH_QT=OFF \
-	-DWITH_OPENGL=OFF \
-	-DWITH_EIGEN=ON \
-    -DBUILD_EXAMPLES=OFF \
-    -DBUILD_PERF_TESTS=OFF \
-    -DBUILD_TESTS=OFF \
-    -DBUILD_WITH_DEBUG_INFO=OFF \
-    -DBUILD_LIST=aruco,core,videoio,video,calib3d,highgui \
-	-DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules && \
-	make -j${NUM_PROC} install && \
-	cd ../../ && rm -r opencv && rm -r opencv_contrib
 
 RUN git clone https://github.com/ceres-solver/ceres-solver && \
     cd ceres-solver && \
