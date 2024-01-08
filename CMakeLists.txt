@@ -23,7 +23,7 @@ endif()
 
 # OpenCV
 message("-- Check for OpenCV")
-find_package(OpenCV 4.5.0)
+find_package(OpenCV)
 if (OpenCV_FOUND)
   message("-- Found OpenCV: ${OpenCV_INCLUDE_DIRS}")
 else (OpenCV_FOUND)

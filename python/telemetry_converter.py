@@ -282,6 +282,67 @@ class TelemetryImporter:
         self.telemetry["camera_fps"] = 1/np.mean(np.array(frametimes_s[1:] - frametimes_s[:-1]))
         self.telemetry["img_timestamps_ns"] = []
 
+    def read_pygpmf_json(self, path_to_json, skip_seconds=0.0):
+        with open(path_to_json, 'r') as f:
+            json_data = json.load(f)
+
+        accl, gyro = [], []
+        gravity, cori = [], []
+        gps_llh, gps_prec = [], []
+        timestamps_ns = []
+        img_timestamps_ns = []
+        gps_timestamps_ns = []
+
+        for a in json_data['ACCL']['data']:
+            accl.append([a[1], a[2], a[0]])
+        for g in json_data['GYRO']['data']:
+            gyro.append([g[1], g[2], g[0]])
+        for t in json_data['ACCL']['timestamps_s']:
+            timestamps_ns.append(t/self.ns_to_sec)
+        for t in json_data['img_timestamps_s']:
+            img_timestamps_ns.append(t/self.ns_to_sec)
+        # image orientation at framerate
+        if "CORI" in json_data:
+            for c in json_data['CORI']['data']:
+                # order w,x,z,y https://github.com/gopro/gpmf-parser/issues/100#issuecomment-656154136
+                w, x, z, y = c[0], c[1], c[2], c[3]
+                cori.append([x, y, z, w])
+        
+        if "GRAV" in json_data:
+            # gravity vector in camera coordinates at framerate
+            for g in json_data['GRAV']['data']:
+                gravity.append([g[0], g[1], g[2]])
+            
+        # GPS is optional
+        if "GPS5" in json_data:
+            for g in json_data["GPS5"]["data"]:
+                lat, long, alt = g[0], g[1], g[2]
+                gps_llh.append([lat,long,alt])
+            for g in json_data["GPSP"]["data"]:    
+                gps_prec.append(g[0])
+            for t in json_data["GPS5"]["timestamps_s"]:
+                gps_timestamps_ns.append(t/self.ns_to_sec)
+
+        camera_fps = 1 /  (np.mean(np.diff(img_timestamps_ns))*self.ns_to_sec)
+        if skip_seconds != 0.0:
+            accl, gyro, timestamps_ns = self._remove_seconds(accl, gyro, timestamps_ns, skip_seconds)
+
+        accl = accl[0:len(timestamps_ns)]
+        gyro = gyro[0:len(timestamps_ns)]
+
+        self.telemetry = {}
+        self.telemetry["accelerometer"] = accl
+        self.telemetry["gyroscope"] = gyro
+        self.telemetry["timestamps_ns"] = timestamps_ns
+        self.telemetry["camera_fps"] = camera_fps
+        self.telemetry["gravity"] = gravity 
+        self.telemetry["camera_orientation"] = cori
+        self.telemetry["img_timestamps_ns"] = img_timestamps_ns
+
+        self.telemetry["gps_llh"] = gps_llh
+        self.telemetry["gps_precision"] = gps_prec
+        self.telemetry["gps_timestamps_ns"] = gps_timestamps_ns
+
     def get_gps_pos_at_frametimes(self, img_times_ns=None):
         '''
         Interpolate a GPS coordinate for each frame.
@@ -367,4 +428,8 @@ class TelemetryConverter:
     
     def convert_zed_recorder_files(self, jsonl_file, output_path, skip_seconds=0.0):
         self.telemetry_importer.read_zed_jsonl(jsonl_file, skip_seconds=skip_seconds)
+        self._dump_final_json(output_path)
+    
+    def convert_pygpmf_telemetry(self, input_json, output_path, skip_seconds=0.0):
+        self.telemetry_importer.read_pygpmf_json(input_json, skip_seconds=skip_seconds)
         self._dump_final_json(output_path)
