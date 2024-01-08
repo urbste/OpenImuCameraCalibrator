@@ -52,7 +52,7 @@ def main():
                         default=9.811104, type=float)
     parser.add_argument("--recompute_corners", 
                         help="If the corners should be extracted again when running a dataset multiple times.", 
-                        default=1, type=int)
+                        default=0, type=int)
     parser.add_argument("--bias_calib_remove_s", 
                         help="How many seconds to remove from start and end (due to press of button)", 
                         default=1.0, type=float)

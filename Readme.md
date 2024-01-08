@@ -1,7 +1,9 @@
 # OpenICC: An Open IMU and Camera Calibrator
 
-WORK IN PROGRESS
-
+* **1/7/2024**: Please re-install pyTheiaSfM from the new commit hash.
+  * Removed javascript requirement. Please install py_gmpf_parser from now on.
+  * Fixed Dockerfile and updated Readme with new installation instructions
+  * Updated dependencies to Ceres 2.1.0
 I developed this repository to experiment with the accurate calibration of action cameras (e.g. GoPro cameras) to use them for geometric vision tasks like Structure-from-Motion, Photogrammetry and SLAM. Modern action cameras are equipped with various sensors like IMUs (accelerometer, gyroscope and magnetometer) and GPS. However the calibration data (e.g. camera projection and IMU to camera transformations) is not available.
 
 This is where the OpenImuCameraCalibrator comes in. With this toolbox you can:
@@ -55,35 +57,37 @@ Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy
 
 ## Installation instructions
 
-Tested on Ubuntu 18.04 and 20.04.
+Tested on Ubuntu 18.04 and 20.04. and 22.04
 
 1. Clone and build [OpenCV](https://github.com/opencv/opencv) >= 4.5.0 **with** [contrib](https://github.com/opencv/opencv) modules. Latter are needed for Aruco marker detection.
+or on Ubuntu 22.04 just install it from apt:
+``` bash
+sudo apt-get install libopencv-dev libopencv-contrib-dev
+``` 
 
-2. Install [ceres 2.0](http://ceres-solver.org/installation.html)
+2. Install [ceres 2.1](http://ceres-solver.org/installation.html)
+``` bash
+git clone https://github.com/ceres-solver/ceres-solver
+git checkout 2.1.0
+mkdir -p build && cd build && cmake .. -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Release
+sudo make -j install
+```
 
 3. Clone and build the [TheiaSfM fork](https://github.com/urbste/pyTheiaSfM).
 ``` bash
 git clone https://github.com/urbste/pyTheiaSfM
-cd pyTheiaSfM && git checkout ca50599 && mkdir -p build && cd build
+cd pyTheiaSfM && git checkout 69c3d37 && mkdir -p build && cd build
 cmake .. && make -j
 sudo make install
 ```
-
-4. Install node >= 12.x (needed to extract GoPro telemetry)
-``` bash
-curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-sudo apt-get install -y nodejs
-``` 
-
-5. Build this project
+4. Build this project
 ``` bash
 git clone https://github.com/urbste/OpenImuCameraCalibrator
 mkdir -p build && cd build && cmake ..
 make -j
-cd ../javascript && npm install
 ``` 
 
-6. Create a python >3.5 environment (or use your local python - not recommended)
+5. Create a python >3.5 environment (or use your local python - not recommended)
 ``` bash
 pip install -r requirements.txt
 ```
