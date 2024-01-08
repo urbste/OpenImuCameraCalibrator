@@ -1,9 +1,13 @@
-# OpenICC: An Open IMU and Camera Calibrator
+# Breaking Changes
 
-* **1/7/2024**: Please re-install pyTheiaSfM from the new commit hash.
-  * Removed javascript requirement. Please install py_gmpf_parser from now on.
+* **1/7/2024**: 
+  * Removed javascript requirement. Please install py_gpmf_parser from now on.
   * Fixed Dockerfile and updated Readme with new installation instructions
   * Updated dependencies to Ceres 2.1.0
+  * Updated pyTheiaSfM version --> Install new version (either master or 69c3d37).
+
+# OpenICC: An Open IMU and Camera Calibrator
+
 I developed this repository to experiment with the accurate calibration of action cameras (e.g. GoPro cameras) to use them for geometric vision tasks like Structure-from-Motion, Photogrammetry and SLAM. Modern action cameras are equipped with various sensors like IMUs (accelerometer, gyroscope and magnetometer) and GPS. However the calibration data (e.g. camera projection and IMU to camera transformations) is not available.
 
 This is where the OpenImuCameraCalibrator comes in. With this toolbox you can:
@@ -60,7 +64,7 @@ Dataset | Time offset IMU to camera | dt_r3 / dt_so3 | T_camera_to_imu (qw,qx,qy
 Tested on Ubuntu 18.04 and 20.04. and 22.04
 
 1. Clone and build [OpenCV](https://github.com/opencv/opencv) >= 4.5.0 **with** [contrib](https://github.com/opencv/opencv) modules. Latter are needed for Aruco marker detection.
-or on Ubuntu 22.04 just install it from apt:
+On Ubuntu 22.04 you can also just install it from apt:
 ``` bash
 sudo apt-get install libopencv-dev libopencv-contrib-dev
 ``` 
