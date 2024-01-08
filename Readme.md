@@ -101,7 +101,7 @@ Build the docker container
 ``` bash
 docker build -t openicc .
 ```
-Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1fawlqSYcylyNDVnfgCETT7DLccmVDVKX/view?usp=sharing) to /home/Downloads/GoPro9 )
+Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1XjtUX-4ZI0Ydkd2O3BWnaUzfmzm96He4/view?usp=share_link) to /home/Downloads/GoPro9 )
 ``` bash
 docker run -it --rm -v `pwd`:/home -v /home/Downloads/GoPro9:/dataset openicc
 ``` 
@@ -175,7 +175,7 @@ v0.2
 * [ ] use only bearings in spline reproj error -> local tangent reprojection error
 * [ ] Accurate checkerboard detector (OpenCV has findCheckerboardSB. I integrated a first version but results were weird. Re-check...)
 * [ ] Extend to multi-camera systems
-* [ ] Docker?
+* [x] Docker?
 * [ ] Add more camera models -> Scaramuzza omni model, ...
 * [x] Integrate updated version of spline optimizer
 
