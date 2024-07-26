@@ -67,5 +67,20 @@ bool initialize_doublesphere_model(
     double& focal_length,
     const bool verbose = false);
 
+// This method closely follows the paper
+// "Telecentric stereo micro-vision system: Calibration method
+// and experiments" Z. Chen et al. (2014)
+bool initialize_orthographic_camera_model(const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+    Eigen::Matrix3d& R,
+    Eigen::Vector3d& t,
+    Eigen::Matrix3d &H, double &focal_length,
+    const Eigen::Vector2d& principal_pt,
+    const bool verbose = false);
+
+bool initialize_orthographic_focal_length(
+    const aligned_vector<Eigen::Matrix3d>& ortho_homographies,
+    double& alpha,
+    double& beta);
+
 }  // namespace utils
 }  // namespace OpenICC

@@ -21,6 +21,7 @@
 #include "theia/sfm/camera/double_sphere_camera_model.h"
 #include "theia/sfm/camera/pinhole_camera_model.h"
 #include <theia/sfm/pose/four_point_focal_length_radial_distortion.h>
+#include "theia/sfm/pose/orthographic_four_point.h"
 
 #include <theia/sfm/estimators/estimate_calibrated_absolute_pose.h>
 #include <theia/sfm/estimators/estimate_radial_dist_uncalibrated_absolute_pose.h>
@@ -28,10 +29,15 @@
 
 #include <opencv2/core/eigen.hpp>
 
-const size_t MIN_NUM_POINTS = 20;
+#include <unsupported/Eigen/Polynomials>
+
+
+const size_t MIN_NUM_POINTS = 12;
 
 namespace OpenICC {
 namespace utils {
+
+
 
 bool initialize_pinhole_camera(
     const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
@@ -295,5 +301,154 @@ bool initialize_doublesphere_model(
   return success;
 }  // for target rows
 
+
+// cf. https://github.com/Seagate/telecentric-calibration/blob/main/src/estimate_params.m
+bool initialize_orthographic_camera_model(
+    const std::vector<theia::FeatureCorrespondence2D3D>& correspondences,
+    Eigen::Matrix3d& R,
+    Eigen::Vector3d& p,
+    Eigen::Matrix3d& H,
+    double& focal_length,
+    const Eigen::Vector2d& principal_pt,
+    const bool verbose) {
+      
+    if (correspondences.size() <= MIN_NUM_POINTS) {
+      return false;
+    }
+
+    Eigen::MatrixXd pts2d;
+    Eigen::MatrixXd pts3d;
+
+    const size_t num_pts = correspondences.size();
+    pts2d.resize(2*num_pts,1);
+    pts3d.resize(2*num_pts,6);
+    pts2d.setZero();
+    pts3d.setZero();
+
+    for (size_t i = 0; i < num_pts; ++i) {
+        // add principal point because it was substracted for other cam models
+        pts2d(i,0) = correspondences[i].feature[0] + principal_pt[0];
+        pts2d(i+num_pts,0) = correspondences[i].feature[1] + principal_pt[1];
+        Eigen::Vector3d world_pt = correspondences[i].world_point;
+        world_pt[2] = 1.0;
+        pts3d.block<1,3>(i,0) = world_pt;
+        pts3d.block<1,3>(i+num_pts,3) = world_pt;
+    }
+
+    Eigen::MatrixXd h = pseudoInverse(pts3d) * pts2d;
+    // ortho homography
+    H << h(0,0), h(1,0), h(2,0),
+         h(3,0), h(4,0), h(5,0),
+         0, 0, 1.;
+
+    // get magnification of orthographic camera
+    const double c1 = h(0,0)*h(0,0) + h(1,0)*h(1,0) + h(3,0)*h(3,0) + h(4,0)*h(4,0);
+    const double c2 = std::pow((h(0,0)*h(4,0) - h(1,0)*h(3,0)),2);
+    Eigen::Matrix<double, 5, 1> coeff;
+    // order of coeffs are swapped in Eigen compared to numpy and Matlab
+    coeff << c2, 0., -c1, 0., 1;
+    Eigen::PolynomialSolver<double, Eigen::Dynamic> solver;
+    solver.compute(coeff);
+    bool has_real_root = false;
+    const double magnification = solver.greatestRealRoot(has_real_root);
+    if (!has_real_root || std::isinf(magnification) ||std::isnan(magnification) || magnification <= 0.0) {
+        LOG(INFO) << "Magnification could not be estimated for this view!";
+        return false;
+    }
+
+    Eigen::Matrix3d K_init;
+    K_init << magnification, 0, principal_pt[0],
+              0., magnification, principal_pt[1],
+              0., 0., 1.;
+    // focal length in this case is basically f = magnification / pixel_pitch
+    focal_length = magnification;
+
+    const Eigen::MatrixXd E = pseudoInverseSquare(K_init) * H;
+    // get rotation
+    const double term1 = std::pow(E(0,0),2) + std::pow(E(1,0),2);
+    const double term2 = std::pow(E(0,1),2) + std::pow(E(1,1),2);
+    // Avoid getting imaginary values in sqrt
+    if (term1 > 1.0 || term2 > 1.0) {
+        return false;
+    }
+    const double r13 = std::sqrt(1.0 - term1);
+    const double r23 = std::sqrt(1.0 - term2);
+    const Eigen::Vector3d r1(E(0,0), E(1,0), r13);
+    const Eigen::Vector3d r2(E(0,1), E(1,1), r23);
+    const Eigen::Vector3d r3 = r1.cross(r2);
+
+    Eigen::Matrix3d Rtmp;
+    Rtmp.col(0) = r1;
+    Rtmp.col(1) = r2;
+    Rtmp.col(2) = r3;
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd_R_frob(Rtmp, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    R = svd_R_frob.matrixU() * svd_R_frob.matrixV().transpose();
+
+    // return translation
+    Eigen::Vector3d t(
+      (H(0,2) - principal_pt[0]) / magnification,
+      (H(1,2) - principal_pt[1]) / magnification,
+      0.0);
+    p = -R.transpose()*t;
+
+    if (std::abs(R.determinant() - 1.) > 1e-5) {
+        LOG(INFO) << "Rotation matrix is not orthogonal!";
+        return false;
+    }
+    if (verbose) {
+      VLOG(1) << "Estimated magnification: " << magnification
+                << std::endl;
+    }
+
+    // check reprojection error
+    double repro_error = 0.0;
+    Eigen::Matrix<double,3,4> T_w_c = Eigen::Matrix<double,3,4>::Identity();
+    T_w_c.block<3,3>(0,0) = R;
+    T_w_c.block<3,1>(0,3) = t;
+    T_w_c(2,3) = 0.;
+
+    for (size_t i = 0; i < correspondences.size(); ++i) {
+      Eigen::Vector3d pt_in_cam = T_w_c * correspondences[i].world_point.homogeneous();
+
+      repro_error += (pt_in_cam.head<2>()*magnification - 
+        (correspondences[i].feature)).norm();
+      
+    }
+    repro_error /= (double)correspondences.size();
+
+    if (repro_error > 20.) {
+      VLOG(1) << "Reprojection error too large: " << repro_error
+              << std::endl;
+      return false;
+    }
+
+    return true;
+}
+
+// cf. https://github.com/Seagate/telecentric-calibration/blob/main/src/estimate_params.m
+bool initialize_orthographic_focal_length(
+    const aligned_vector<Eigen::Matrix3d>& ortho_homographies,
+    double& alpha,
+    double& beta) {
+    Eigen::MatrixXd G, w;
+    const size_t num_calib_views = ortho_homographies.size();
+    G.resize(num_calib_views, 4);
+    G.setZero();
+    G.col(0).setOnes();
+    w.resize(num_calib_views, 1);
+    w.setZero();
+    for (size_t i=0; i < num_calib_views; ++i) {
+        const auto H = ortho_homographies[i];
+        G(i,1) = -std::pow(H(1,0),2) - std::pow(H(1,1),2);
+        G(i,2) = -std::pow(H(0,0),2) - std::pow(H(0,1),2);
+        G(i,3) = 2.0 * (H(0,0)*H(1,0) + H(0,1)*H(1,1));
+        w(i)   = -std::pow(H(0,0)*H(1,1) - H(0,1)* H(1,0),2);
+    }
+    Eigen::MatrixXd l = pseudoInverse(G) * w;
+    alpha = std::sqrt( (l(1)*l(2)-l(3)*l(3)) / l(2));
+    beta = std::sqrt(l(2));
+
+    return true;
+}
 }  // namespace utils
 }  // namespace OpenICC

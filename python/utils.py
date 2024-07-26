@@ -21,6 +21,8 @@ def get_abbr_from_cam_model(model_name):
         return "fi"
     elif model_name == "PINHOLE_RADIAL_TANGENTIAL":
         return "pr"
+    elif model_name == "ORTHOGRAPHIC":
+        return "or"
     else:
         print("Model name ", model_name, " does not exist.")
         exit(-1)

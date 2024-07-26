@@ -80,5 +80,26 @@ T average(const std::vector<T> datas) {
 
 bool IsPathAFile(const std::string& path);
 
+
+// method for calculating the pseudo-Inverse as recommended by Eigen developers
+// https://gist.github.com/gokhansolak/d2abaefcf3e3b767f5bc7d81cfe0b36a
+template<typename _Matrix_Type_>
+_Matrix_Type_ pseudoInverse(const _Matrix_Type_ &a, double epsilon = std::numeric_limits<double>::epsilon())
+{
+    Eigen::JacobiSVD< _Matrix_Type_ > svd(a, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    double tolerance = epsilon * std::max(a.cols(), a.rows()) *svd.singularValues().array().abs()(0);
+    return svd.matrixV() *  (svd.singularValues().array().abs() > tolerance).select(svd.singularValues().array().inverse(), 0).matrix().asDiagonal() * svd.matrixU().adjoint();
+}
+
+// method for calculating the pseudo-Inverse as recommended by Eigen developers
+// https://gist.github.com/gokhansolak/d2abaefcf3e3b767f5bc7d81cfe0b36a
+template<typename _Matrix_Type_>
+_Matrix_Type_ pseudoInverseSquare(const _Matrix_Type_ &a, double epsilon = std::numeric_limits<double>::epsilon())
+{
+    Eigen::JacobiSVD< _Matrix_Type_ > svd(a, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    double tolerance = epsilon * std::max(a.cols(), a.rows()) *svd.singularValues().array().abs()(0);
+    return svd.matrixV() *  (svd.singularValues().array().abs() > tolerance).select(svd.singularValues().array().inverse(), 0).matrix().asDiagonal() * svd.matrixU().adjoint();
+}
+
 }  // namespace utils
 }  // namespace OpenICC

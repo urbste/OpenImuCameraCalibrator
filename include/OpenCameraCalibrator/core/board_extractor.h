@@ -63,7 +63,8 @@ class BoardExtractor {
   //! time time in nanoseconds! e.g. 1000000000000.png
   bool ExtractImageFolderToJson(const std::string& image_folder,
                                 const std::string& save_path,
-                                const double img_downsample_factor);
+                                const double img_downsample_factor,
+                                const std::string img_file_ext = "png");
 
   //! Initializes a Charuco board
   bool InitializeCharucoBoard(std::string path_to_detector_params,

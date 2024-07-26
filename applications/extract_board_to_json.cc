@@ -46,6 +46,7 @@ DEFINE_int32(aruco_dict,
              cv::aruco::DICT_ARUCO_ORIGINAL,
              "Aruco dictionary id.");
 DEFINE_bool(recompute_corners, false, "If corners should be extracted again.");
+DEFINE_string(img_file_ext, "png", "extension of images if no video is used.");
 DEFINE_bool(verbose, false, "If more stuff should be printed");
 
 using namespace OpenICC;
@@ -97,7 +98,8 @@ int main(int argc, char* argv[]) {
   } else {
     board_extractor.ExtractImageFolderToJson(FLAGS_input_path,
                                              FLAGS_save_corners_json_path,
-                                             FLAGS_downsample_factor);
+                                             FLAGS_downsample_factor,
+                                             FLAGS_img_file_ext);
   }
   return 0;
 }
