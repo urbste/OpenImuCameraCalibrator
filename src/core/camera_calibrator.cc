@@ -143,14 +143,14 @@ bool CameraCalibrator::RunCalibration() {
   // bundle adjust everything
   theia::BundleAdjustmentOptions ba_options;
   ba_options.verbose = true;
-  if (camera_model_ != "ORTHOGRAPHIC") {
     ba_options.loss_function_type = theia::LossFunctionType::HUBER;
-    ba_options.robust_loss_width = 1.345;
-  } else {
-    ba_options.loss_function_type = theia::LossFunctionType::HUBER;
+  ba_options.robust_loss_width = 1.345;
+
+  if (camera_model_ == "ORTHOGRAPHIC") {
     ba_options.robust_loss_width = 5.;
     ba_options.orthographic_camera = true;
   }
+  
   ba_options.num_threads = std::thread::hardware_concurrency();
   ba_options.max_num_iterations = 30;
   /////////////////////////////////////////////////
@@ -210,21 +210,14 @@ bool CameraCalibrator::RunCalibration() {
   ba_options.constant_camera_position = false;
   ba_options.intrinsics_to_optimize =
       theia::OptimizeIntrinsicsType::FOCAL_LENGTH |
-      theia::OptimizeIntrinsicsType::ASPECT_RATIO;
+      theia::OptimizeIntrinsicsType::ASPECT_RATIO | 
+      theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
+      theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
 
-  if (camera_model_ != "PINHOLE" && camera_model_ != "ORTHOGRAPHIC") {
-    ba_options.intrinsics_to_optimize |=
-        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
-        theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
-  } else if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
-    ba_options.intrinsics_to_optimize |= theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
-        theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION |
-        theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
-  } else if (camera_model_ == "ORTHOGRAPHIC") {
-    ba_options.intrinsics_to_optimize |=
-        theia::OptimizeIntrinsicsType::RADIAL_DISTORTION |
-        theia::OptimizeIntrinsicsType::PRINCIPAL_POINTS;
-  }
+  if (camera_model_ == "PINHOLE_RADIAL_TANGENTIAL") {
+    ba_options.intrinsics_to_optimize |= theia::OptimizeIntrinsicsType::TANGENTIAL_DISTORTION;
+  } 
+
   summary = theia::BundleAdjustViews(
       ba_options, recon_calib_dataset_.ViewIds(), &recon_calib_dataset_);
 
