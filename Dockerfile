@@ -1,8 +1,8 @@
 FROM ubuntu:22.04
 
 ENV ceresVersion="2.1.0"
-ENV pyTheiaVersion="69c3d37"
-ENV NUM_PROC=5
+ENV pyTheiaVersion="7b83260"
+ENV NUM_PROC=15
 
 RUN apt-get update && \
 	apt-get remove -y && \
