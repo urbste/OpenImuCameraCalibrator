@@ -169,7 +169,6 @@ double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
     const theia::Feature* feat = v->GetFeature(track_ids[t]);
     const theia::Track* track = recon_dataset.Track(track_ids[t]);
 
-    // do not use projectpoint here as orthocam does not have position (c2w) but translation(w2c)!
     Eigen::Vector2d pt;
     v->Camera().ProjectPoint(track->Point(), &pt);
 
