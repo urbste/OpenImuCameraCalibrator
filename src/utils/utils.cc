@@ -171,16 +171,8 @@ double GetReprojErrorOfView(const theia::Reconstruction& recon_dataset,
 
     // do not use projectpoint here as orthocam does not have position (c2w) but translation(w2c)!
     Eigen::Vector2d pt;
-    if (v->Camera().GetCameraIntrinsicsModelType() != theia::CameraIntrinsicsModelType::ORTHOGRAPHIC) {
-      v->Camera().ProjectPoint(track->Point(), &pt);
-    } else {
-      Eigen::Matrix<double,3,4> T_w_c = Eigen::Matrix<double,3,4>::Identity();
-      T_w_c.block<3,3>(0,0) = v->Camera().GetOrientationAsRotationMatrix();
-      T_w_c.block<3,1>(0,3) = v->Camera().GetPosition();
-      T_w_c(2,3) = 0.;
-      pt = v->Camera().CameraIntrinsics()->CameraToImageCoordinates(
-        T_w_c * track->Point());
-    }
+    v->Camera().ProjectPoint(track->Point(), &pt);
+
     view_reproj_error += (pt - (*feat).point_).norm();
   }
   view_reproj_error /= track_ids.size();
