@@ -101,7 +101,7 @@ Build the docker container
 ``` bash
 docker build -t openicc .
 ```
-Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1XjtUX-4ZI0Ydkd2O3BWnaUzfmzm96He4/view?usp=share_link) to /home/Downloads/GoPro9 )
+Now you can mount the OpenICC folder to your docker container, as well as the folder that contains your calibration data (e.g. download [GoPro9 dataset](https://drive.google.com/file/d/1t2_hb4ko6llmVy_rZZHCi7S6D9-lYUa1/view?usp=drive_link) to /home/Downloads/GoPro9 )
 ``` bash
 docker run -it --rm -v `pwd`:/home -v /home/Downloads/GoPro9:/dataset openicc
 ``` 
