@@ -1,5 +1,5 @@
 natsort==8.2.0
 scipy==1.10.1
-opencv-python==4.7.0.72
+opencv-python==4.8.1.78
 matplotlib==3.7.0
 py_gpmf_parser==0.0.3
