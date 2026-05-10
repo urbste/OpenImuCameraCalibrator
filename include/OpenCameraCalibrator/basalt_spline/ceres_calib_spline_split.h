@@ -256,20 +256,18 @@ public:
       trans_knots_[i] = interpo_spline_trans[i];
     }
 
-    // Add local parametrization for SO(3) rotation
+    // Add manifold parametrization for SO(3) rotation
     for (int i = 0; i < num_knots_so3; i++) {
-      ceres::LocalParameterization *local_parameterization =
-          new LieLocalParameterization<Sophus::SO3d>();
+      ceres::Manifold *manifold = new LieManifold<Sophus::SO3d>();
 
       problem_.AddParameterBlock(so3_knots_[i].data(),
-                                 Sophus::SO3d::num_parameters,
-                                 local_parameterization);
+                                 Sophus::SO3d::num_parameters);
+      problem_.SetManifold(so3_knots_[i].data(), manifold);
     }
-    ceres::LocalParameterization *local_parameterization =
-        new LieLocalParameterization<Sophus::SE3d>();
+    ceres::Manifold *manifold = new LieManifold<Sophus::SE3d>();
 
-    problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
-                               local_parameterization);
+    problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters);
+    problem_.SetManifold(T_i_c_.data(), manifold);
   }
 
   void init(const Sophus::SE3d &init, const int num_knots_so3,
@@ -278,21 +276,19 @@ public:
     so3_knots_ = OpenICC::so3_vector(num_knots_so3, init.so3());
     trans_knots_ = OpenICC::vec3_vector(num_knots_r3, init.translation());
 
-    // Add local parametrization for SO(3) rotation
+    // Add manifold parametrization for SO(3) rotation
     for (int i = 0; i < num_knots_so3; i++) {
-      ceres::LocalParameterization *local_parameterization =
-          new LieLocalParameterization<Sophus::SO3d>();
+      ceres::Manifold *manifold = new LieManifold<Sophus::SO3d>();
 
       problem_.AddParameterBlock(so3_knots_[i].data(),
-                                 Sophus::SO3d::num_parameters,
-                                 local_parameterization);
+                                 Sophus::SO3d::num_parameters);
+      problem_.SetManifold(so3_knots_[i].data(), manifold);
     }
 
-    ceres::LocalParameterization *local_parameterization =
-        new LieLocalParameterization<Sophus::SE3d>();
+    ceres::Manifold *manifold = new LieManifold<Sophus::SE3d>();
 
-    problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters,
-                               local_parameterization);
+    problem_.AddParameterBlock(T_i_c_.data(), Sophus::SE3d::num_parameters);
+    problem_.SetManifold(T_i_c_.data(), manifold);
   }
 
   void addGyroMeasurement(const Eigen::Vector3d &meas, const int64_t time_ns,

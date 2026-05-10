@@ -140,11 +140,12 @@ void PrintResult(const std::string cam_type,
 std::string CameraIDToString(const int theia_enum) {
   if (theia_enum == (int)theia::CameraIntrinsicsModelType::DOUBLE_SPHERE) {
     return "DOUBLE_SPHERE";
-  } else if ((int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION) {
+  } else if (theia_enum == (int)theia::CameraIntrinsicsModelType::DIVISION_UNDISTORTION) {
     return "DIVISION_UNDISTORTION";
-  } else if ((int)theia::CameraIntrinsicsModelType::PINHOLE) {
+  } else if (theia_enum == (int)theia::CameraIntrinsicsModelType::PINHOLE) {
     return "PINHOLE";
   }
+  return "UNKNOWN";
 }
 
 int GravDirStringToInt(const std::string& string) {

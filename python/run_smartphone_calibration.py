@@ -33,7 +33,7 @@ def main():
                         help="number of squares in x direction.",
                         default=10, type=int)
     parser.add_argument("--num_squares_y",
-                        help="number of squares in x direction.",
+                        help="number of squares in y direction.",
                         default=8, type=int)
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",

@@ -97,9 +97,8 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
       problem_.SetParameterBlockConstant(T_i_c_.data());
       LOG(INFO) << "Keeping T_I_C constant.";
     } else {
-      ceres::LocalParameterization* local_parameterization =
-          new LieLocalParameterization<Sophus::SE3d>();
-      problem_.SetParameterization(T_i_c_.data(), local_parameterization);
+      ceres::Manifold* manifold = new LieManifold<Sophus::SE3d>();
+      problem_.SetManifold(T_i_c_.data(), manifold);
       problem_.SetParameterBlockVariable(T_i_c_.data());
       LOG(INFO) << "Optimizing T_I_C.";
     }
@@ -145,9 +144,8 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
       const auto track = image_data_.MutableTrack(tid)->MutablePoint()->data();
       if (problem_.HasParameterBlock(track)) {
         problem_.SetParameterBlockVariable(track);
-        ceres::LocalParameterization* local_parameterization =
-            new ceres::HomogeneousVectorParameterization(4);
-        problem_.SetParameterization(track, local_parameterization);
+        ceres::Manifold* manifold = new ceres::SphereManifold<4>();
+        problem_.SetManifold(track, manifold);
       }
     }
     LOG(INFO) << "Optimizing object points.";
@@ -167,14 +165,12 @@ void SplineTrajectoryEstimator<_T>::SetFixedParams(const int flags) {
     }
   }
 
-  // add local parametrization for SO(3)
+  // add manifold parametrization for SO(3)
   for (size_t i = 0; i < so3_knots_.size(); ++i) {
     if (problem_.HasParameterBlock(so3_knots_[i].data())) {
-      ceres::LocalParameterization* local_parameterization =
-          new LieLocalParameterization<Sophus::SO3d>();
+      ceres::Manifold* manifold = new LieManifold<Sophus::SO3d>();
 
-      problem_.SetParameterization(so3_knots_[i].data(),
-                                   local_parameterization);
+      problem_.SetManifold(so3_knots_[i].data(), manifold);
     }
   }
   if (!(flags & SplineOptimFlags::SPLINE)) {

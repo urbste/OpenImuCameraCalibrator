@@ -307,7 +307,8 @@ bool BoardExtractor::ExtractImageFolderToJson(
     std::size_t slash = image_path.find_last_of("/\\");
     std::size_t ending = image_path.find_last_of(".");
 
-    int64_t timestamp_ns = std::stoul(image_path.substr(slash + 1, ending));
+    int64_t timestamp_ns = std::stoul(
+        image_path.substr(slash + 1, ending - slash - 1));
     Mat image = cv::imread(image_path);
     const double timestamp_s = timestamp_ns * NS_TO_S;
     timestamps_s.insert(timestamp_s);

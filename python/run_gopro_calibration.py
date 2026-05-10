@@ -36,7 +36,7 @@ def main():
                         help="number of squares in x direction.",
                         default=10, type=int) # 10 for charuco board, 14 radon board
     parser.add_argument("--num_squares_y",
-                        help="number of squares in x direction.",
+                        help="number of squares in y direction.",
                         default=8, type=int) # 8 for charuco board, 9 radon board
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
@@ -121,8 +121,16 @@ def main():
     cam_imu_corners_json = pjoin(cam_imu_path, "cam_imu_corners_"+cam_imu_video_fn+".uson")
     cam_corners_json = pjoin(cam_calib_path, "cam_corners_"+cam_video_fn+".uson")
 
-    gopro_telemetry = glob.glob(pjoin(cam_imu_path,"G*.MP4"))[0][:-4]+".json"
-    imu_bias_telemetry_json_in = glob.glob(pjoin(imu_bias_path,"G*.MP4"))[0][:-4]+".json"
+    gopro_telemetry_mp4 = glob.glob(pjoin(cam_imu_path,"G*.MP4"))
+    if len(gopro_telemetry_mp4) == 0:
+        print("Error! Could not find GoPro telemetry MP4 (G*.MP4) in "+cam_imu_path)
+        exit(-1)
+    gopro_telemetry = gopro_telemetry_mp4[0][:-4]+".json"
+    imu_bias_telemetry_mp4 = glob.glob(pjoin(imu_bias_path,"G*.MP4"))
+    if len(imu_bias_telemetry_mp4) == 0:
+        print("Error! Could not find GoPro telemetry MP4 (G*.MP4) in "+imu_bias_path)
+        exit(-1)
+    imu_bias_telemetry_json_in = imu_bias_telemetry_mp4[0][:-4]+".json"
     gopro_telemetry_gen = gopro_telemetry[:-5] + "_gen.json"
     imu_bias_telemetry_json_in_gen = imu_bias_telemetry_json_in[:-5] + "_gen.json"
 

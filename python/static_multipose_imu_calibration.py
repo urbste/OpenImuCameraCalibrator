@@ -44,8 +44,12 @@ def main():
 
     # globals
     cam_video_fn = os.path.basename(cam_calib_video[0])[:-4]
-    gopro_telemetry = glob.glob(pjoin(cam_calib_path,"G*.MP4"))[0][:-4]+".json"
-    gopro_telemetry_gen = glob.glob(pjoin(cam_calib_path,"G*.MP4"))[0][:-4]+"_gen.json"
+    gopro_telemetry_mp4 = glob.glob(pjoin(cam_calib_path,"G*.MP4"))
+    if len(gopro_telemetry_mp4) == 0:
+        print("Error! Could not find GoPro telemetry MP4 (G*.MP4) in "+cam_calib_path)
+        exit(-1)
+    gopro_telemetry = gopro_telemetry_mp4[0][:-4]+".json"
+    gopro_telemetry_gen = gopro_telemetry_mp4[0][:-4]+"_gen.json"
 
     #
     # 1. Extracting GoPro telemetry

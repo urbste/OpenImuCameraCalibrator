@@ -1,8 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
-if (COMMAND cmake_policy)
-  cmake_policy(SET CMP0003 NEW)
-endif (COMMAND cmake_policy)
-
+cmake_minimum_required(VERSION 3.16)
 project(OpenImuCameraCalibrator C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -28,7 +24,7 @@ if (OpenCV_FOUND)
   message("-- Found OpenCV: ${OpenCV_INCLUDE_DIRS}")
 else (OpenCV_FOUND)
   message(FATAL_ERROR "Can't find OpenCV. Please set OpenCV_INCLUDE_DIR & "
-    "OpeneCV_LIBRARY")
+    "OpenCV_LIBRARY")
 endif (OpenCV_FOUND)
 
 # TheiaSfM

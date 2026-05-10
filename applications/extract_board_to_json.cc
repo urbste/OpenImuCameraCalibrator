@@ -40,6 +40,9 @@ DEFINE_double(checker_square_length_m,
               0.022,
               "Size of one square on the checkerboard in [m]. Needed to only "
               "take far away poses!");
+DEFINE_double(marker_length_m,
+              -1,
+              "Size of one maker on the checkerboard in [m].");
 DEFINE_int32(num_squares_x, 9, "Number of squares in x.");
 DEFINE_int32(num_squares_y, 7, "Number of squares in y");
 DEFINE_int32(aruco_dict,
@@ -69,7 +72,17 @@ int main(int argc, char* argv[]) {
   }
   BoardType board_type = StringToBoardType(FLAGS_board_type);
   if (board_type == BoardType::CHARUCO) {
-    const float aruco_marker_length = FLAGS_checker_square_length_m / 2.0f;
+    
+    // check that marker_length_m is smaller than checker_square_length_m
+    float aruco_marker_length = FLAGS_checker_square_length_m / 2.0;
+    if (FLAGS_marker_length_m != -1.0) {
+      if (FLAGS_marker_length_m >= FLAGS_checker_square_length_m) {
+        LOG(ERROR) << "The marker length has to be smaller than the checker square length!";
+        return 1;
+      }
+      aruco_marker_length = FLAGS_marker_length_m;
+    }
+    
     board_extractor.InitializeCharucoBoard(FLAGS_aruco_detector_params,
                                            aruco_marker_length,
                                            FLAGS_checker_square_length_m,

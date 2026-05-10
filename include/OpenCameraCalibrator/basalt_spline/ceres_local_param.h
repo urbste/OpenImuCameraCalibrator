@@ -34,7 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 @file
 @brief Generic local parametrization for Sophus Lie group types to be used with
-ceres.
+ceres (Manifold API for Ceres >= 2.1).
 */
 
 /**
@@ -66,24 +66,28 @@ IN THE SOFTWARE.
 
 #include "sophus/se3.hpp"
 #include "sophus/so3.hpp"
-#include <ceres/local_parameterization.h>
+#include <ceres/manifold.h>
 
-/// @brief Local parametrization for ceres that can be used with Sophus Lie
-/// group implementations.
+/// @brief Manifold parametrization for ceres that can be used with Sophus Lie
+/// group implementations (Ceres >= 2.1).
 template <class Groupd>
-class LieLocalParameterization : public ceres::LocalParameterization {
+class LieManifold : public ceres::Manifold {
  public:
-  virtual ~LieLocalParameterization() {}
-
   using Tangentd = typename Groupd::Tangent;
+
+  /// @brief Ambient space dimension (e.g. 4 for SO3, 7 for SE3)
+  int AmbientSize() const override { return Groupd::num_parameters; }
+
+  /// @brief Tangent space dimension (DoF)
+  int TangentSize() const override { return Groupd::DoF; }
 
   /// @brief plus operation for Ceres
   ///
-  ///  T * exp(x)
+  ///  T * exp(delta)
   ///
-  virtual bool Plus(double const* T_raw,
-                    double const* delta_raw,
-                    double* T_plus_delta_raw) const {
+  bool Plus(const double* T_raw,
+            const double* delta_raw,
+            double* T_plus_delta_raw) const override {
     Eigen::Map<Groupd const> const T(T_raw);
     Eigen::Map<Tangentd const> const delta(delta_raw);
     Eigen::Map<Groupd> T_plus_delta(T_plus_delta_raw);
@@ -91,12 +95,12 @@ class LieLocalParameterization : public ceres::LocalParameterization {
     return true;
   }
 
-  ///@brief Jacobian of plus operation for Ceres
+  /// @brief Jacobian of Plus operation for Ceres
   ///
   /// Dx T * exp(x)  with  x=0
   ///
-  virtual bool ComputeJacobian(double const* T_raw,
-                               double* jacobian_raw) const {
+  bool PlusJacobian(const double* T_raw,
+                    double* jacobian_raw) const override {
     Eigen::Map<Groupd const> T(T_raw);
     Eigen::Map<Eigen::Matrix<double,
                              Groupd::num_parameters,
@@ -107,9 +111,32 @@ class LieLocalParameterization : public ceres::LocalParameterization {
     return true;
   }
 
-  ///@brief Global size
-  virtual int GlobalSize() const { return Groupd::num_parameters; }
+  /// @brief Minus operation (required by Manifold API)
+  bool Minus(const double* y_raw,
+             const double* x_raw,
+             double* y_minus_x_raw) const override {
+    Eigen::Map<Groupd const> y(y_raw);
+    Eigen::Map<Groupd const> x(x_raw);
+    Eigen::Map<Tangentd> y_minus_x(y_minus_x_raw);
+    y_minus_x = (x.inverse() * y).log();
+    return true;
+  }
 
-  ///@brief Local size
-  virtual int LocalSize() const { return Groupd::DoF; }
+  /// @brief Jacobian of Minus operation w.r.t. y at y=x
+  ///
+  /// Computes the left pseudo-inverse of PlusJacobian.
+  bool MinusJacobian(const double* x_raw,
+                     double* jacobian_raw) const override {
+    Eigen::Map<Groupd const> x(x_raw);
+    Eigen::Matrix<double, Groupd::num_parameters, Groupd::DoF> J_plus;
+    J_plus = x.Dx_this_mul_exp_x_at_0();
+
+    Eigen::Map<Eigen::Matrix<double,
+                             Groupd::DoF,
+                             Groupd::num_parameters,
+                             Eigen::RowMajor>>
+        jacobian(jacobian_raw);
+    jacobian = (J_plus.transpose() * J_plus).inverse() * J_plus.transpose();
+    return true;
+  }
 };

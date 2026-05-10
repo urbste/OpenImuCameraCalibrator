@@ -35,7 +35,7 @@ def main():
                         help="number of squares in x direction.",
                         default=10, type=int) # 10 for charuco board, 14 radon board
     parser.add_argument("--num_squares_y",
-                        help="number of squares in x direction.",
+                        help="number of squares in y direction.",
                         default=8, type=int) # 8 for charuco board, 9 radon board
     parser.add_argument("--voxel_grid_size",
                         help="Voxel grid size for camera calibration. Will only take images that if there does not exist another pose in the voxel.",
@@ -119,8 +119,16 @@ def main():
     cam_imu_corners_json = pjoin(cam_imu_path, "cam_imu_corners_"+cam_imu_video_fn+".uson")
     cam_corners_json = pjoin(cam_calib_path, "cam_corners_"+cam_video_fn+".uson")
 
-    zed_telemetry = glob.glob(pjoin(cam_imu_path,"*.jsonl"))[0]
-    imu_bias_telemetry_json_in = glob.glob(pjoin(imu_bias_path,"*.jsonl"))[0]
+    zed_telemetry_list = glob.glob(pjoin(cam_imu_path,"*.jsonl"))
+    if len(zed_telemetry_list) == 0:
+        print("Error! Could not find ZED telemetry JSONL (*.jsonl) in "+cam_imu_path)
+        exit(-1)
+    zed_telemetry = zed_telemetry_list[0]
+    imu_bias_telemetry_list = glob.glob(pjoin(imu_bias_path,"*.jsonl"))
+    if len(imu_bias_telemetry_list) == 0:
+        print("Error! Could not find ZED telemetry JSONL (*.jsonl) in "+imu_bias_path)
+        exit(-1)
+    imu_bias_telemetry_json_in = imu_bias_telemetry_list[0]
     zed_telemetry_gen = zed_telemetry[:-6] + "_gen.json"
     imu_bias_telemetry_json_in_gen = imu_bias_telemetry_json_in[:-6] + "_gen.json"
 

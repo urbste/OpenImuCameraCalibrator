@@ -55,7 +55,11 @@ def main():
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
 
-    calib_video = glob.glob(pjoin(args.input_path,"*.MP4"))[0]
+    calib_videos = glob.glob(pjoin(args.input_path,"*.MP4"))
+    if len(calib_videos) == 0:
+        print("Error! Could not find MP4 video in "+args.input_path)
+        exit(-1)
+    calib_video = calib_videos[0]
     extract_frames(calib_video, os.path.join(args.output_path,'cam0'), skip_frames=args.skip_frames)
 
     cam_video_fn = os.path.basename(calib_video)
@@ -67,7 +71,11 @@ def main():
                        args.input_path])
     telemetry_extract.wait()
 
-    gopro_telemetry = glob.glob(pjoin(args.input_path,"G*.MP4"))[0][:-4]+".json"
+    gopro_telemetry_mp4 = glob.glob(pjoin(args.input_path,"G*.MP4"))
+    if len(gopro_telemetry_mp4) == 0:
+        print("Error! Could not find GoPro telemetry MP4 (G*.MP4) in "+args.input_path)
+        exit(-1)
+    gopro_telemetry = gopro_telemetry_mp4[0][:-4]+".json"
     gopro_telemetry_gen = pjoin(args.output_path,"imu0.csv")
 
     telemetry_conv = TelemetryConverter()

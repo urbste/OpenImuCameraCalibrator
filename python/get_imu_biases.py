@@ -38,8 +38,7 @@ def main():
 
     # find z direction of accelerometer, search for maximum acceleration
     mean_accl = np.mean(accl_np,0)
-    mean_accl_abs = np.abs(mean_accl)
-    max_dir = np.where(mean_accl_abs == np.amax(mean_accl_abs))
+    max_dir = np.argmax(np.abs(mean_accl))
     
     grav_array = np.zeros((1,3), dtype=np.float32)
     grav_array[0,max_dir] = args.gravity_const * np.sign(mean_accl[max_dir])

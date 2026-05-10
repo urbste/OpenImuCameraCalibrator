@@ -1,0 +1,68 @@
+site_name: OpenImuCameraCalibrator
+site_description: An Open IMU and Camera Calibrator for action cameras, smartphones and more.
+site_url: https://urbste.github.io/OpenImuCameraCalibrator
+repo_url: https://github.com/urbste/OpenImuCameraCalibrator
+repo_name: urbste/OpenImuCameraCalibrator
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Docker Quickstart: docker.md
+      - Supported Camera Models: camera_models.md
+  - Tutorials:
+      - GoPro Calibration: gopro_calibration.md
+      - Smartphone Calibration: samsung_s20_calibration.md
+      - Calibration from Images: tutorials/calibration_from_images.md
+      - ZED 2i Calibration: zed2i_calibration.md
+      - IMU Intrinsics: imu_intrinsics.md
+      - IMU Noise Parameters: imu_noise_parameters.md
+      - Compare to Kalibr: compare_to_kalibr.md
+  - Theory & Background:
+      - Camera Models: theory/camera_models.md
+      - Spline-based VI Calibration: theory/spline_calibration.md
+      - Rolling Shutter: theory/rolling_shutter.md
+  - Development:
+      - Building from Source: dev/building.md
+      - Contributing: dev/contributing.md
+      - API Overview: dev/api.md
+  - Acknowledgements & Citation: acknowledgements.md
